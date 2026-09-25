@@ -62,6 +62,23 @@ export async function POST(request: Request) {
 
     if (!membership) return jsonError(requestId, 403, "not_authorized", "You are not authorized for this product.");
 
+    const { data: capability } = await supabase
+      .from("workspace_capabilities")
+      .select("capability")
+      .eq("workspace_id", product.workspace_id)
+      .eq("capability", "make_money")
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (!capability) {
+      return jsonError(
+        requestId,
+        409,
+        "capability_not_selected",
+        "Select Make Money before verifying a product connection.",
+      );
+    }
+
     const { error } = await admin
       .from("integrations")
       .update({ last_seen_at: new Date().toISOString() })
