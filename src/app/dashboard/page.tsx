@@ -40,9 +40,21 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      const { data: workspace } = await supabase.from('workspaces').select('id').eq('user_id', user.id).single();
-      if (!workspace) { setLoading(false); return; }
-      setWorkspaceId(workspace.id);
+      const { data: membership, error: membershipError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (membershipError) {
+        setLoading(false);
+        return;
+      }
+
+      if (!membership) { setLoading(false); return; }
+      setWorkspaceId(membership.workspace_id);
 
       const [productsResult, offersResult] = await Promise.all([
         supabase.from('products').select('*, moments(*)').eq('workspace_id', workspace.id).order('created_at', { ascending: false }),
