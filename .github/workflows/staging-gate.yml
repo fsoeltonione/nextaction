@@ -17,10 +17,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       STAGING_URL: ${{ secrets.STAGING_URL }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
@@ -51,10 +51,10 @@ jobs:
       - name: Smoke staging
         shell: bash
         run: |
-          curl --fail --silent --show-error --location --max-time 15             -o /dev/null -w "%{http_code}" "$STAGING_URL/" | grep -qx "200"
+          curl --fail --silent --show-error --location --max-time 15 -o /dev/null -w "%{http_code}" "$STAGING_URL/" | grep -qx "200"
 
-          curl --fail --silent --show-error --max-time 15             -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/track" | grep -qx "401"
+          curl --silent --show-error --max-time 15 -X POST -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/track" | grep -qx "401"
 
-          curl --fail --silent --show-error --max-time 15             -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/offer" | grep -qx "401"
+          curl --silent --show-error --max-time 15 -X POST -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/offer" | grep -qx "401"
 
-          curl --fail --silent --show-error --max-time 15             -X OPTIONS -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/track" | grep -qx "204"
+          curl --silent --show-error --max-time 15 -X OPTIONS -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/track" | grep -qx "204"
