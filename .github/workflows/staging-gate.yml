@@ -1,0 +1,41 @@
+name: Staging Gate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  staging-preflight:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify staging environment
+        shell: bash
+        run: |
+          test -n "$NEXT_PUBLIC_SUPABASE_URL"
+          test -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
