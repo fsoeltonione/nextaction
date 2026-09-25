@@ -1,6 +1,6 @@
 # NextAction Stage 8 — Control-Plane Activation
 
-Status: Implementation complete on branch `stage-8-control-plane-activation`; live Supabase foundation applied and rollback-tested.
+Status: Implemented and merged to `master`; final migration source synchronized with live Supabase.
 
 ## Objective
 
@@ -176,6 +176,7 @@ If an authenticated user opens the landing URL with a new product URL, the onboa
 - `20260925211519_stage_8_activation_foundation_hardening`
 - `20260925212247_stage_8_capability_enforcement`
 - `20260925212601_stage_8_destination_url_compatibility`
+- `20260925212930_stage_8_function_grant_hardening`
 
 The second migration deliberately hardens the first implementation after a transaction-level SQL test exposed PL/pgSQL output-variable ambiguity. No test data survived that failed transaction.
 
