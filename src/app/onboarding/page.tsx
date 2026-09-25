@@ -967,12 +967,12 @@ function OnboardingContent() {
                     Server-side request shape
                   </p>
                   <pre className="text-xs text-neutral-300 overflow-x-auto whitespace-pre-wrap">
-{\`POST /v1/track
+{`POST /v1/track
 Authorization: Bearer <YOUR_NEXTACTION_TOKEN>
 Idempotency-Key: <EVENT_ID>
 Content-Type: application/json
 
-{"type":"invoice.created","data":{}}\`}
+{"type":"invoice.created","data":{}}`}
                   </pre>
                 </div>
 
