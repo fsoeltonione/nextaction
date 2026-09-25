@@ -499,7 +499,15 @@ Immutable ledger / audit trail
 
 No single layer is treated as sufficient for financial or tenant isolation.
 
-## 25. Stage 13 settlement enforcement
+## 25. Stage 14 staging isolation
+
+Settlement and runtime smoke tests must never point at the production database.
+
+A staging Worker must use a dedicated staging Supabase project and disposable test data. Production credentials and production customer data are not valid staging fixtures.
+
+Cloudflare environment-specific secrets are maintained outside Git and are never stored in `wrangler.jsonc`.
+
+## 26. Stage 13 settlement enforcement
 
 The live runtime now enforces the financial boundary described in this document.
 
@@ -525,7 +533,7 @@ The financial invariant remains:
 
 Failure of any financial write rolls back the entire settlement transaction.
 
-## 26. Stage 13 exit criteria
+## 27. Stage 13 exit criteria
 
 Stage 13 is complete when the implementation and live database prove:
 
@@ -537,7 +545,7 @@ Stage 13 is complete when the implementation and live database prove:
 - privileged settlement execution is restricted;
 - no public client can directly mutate financial state.
 
-## 27. Historical Stage 3 exit criteria
+## 28. Historical Stage 3 exit criteria
 
 Stage 3 is complete as a specification when the implementation team can identify, for every production table:
 
