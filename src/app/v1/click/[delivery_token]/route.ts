@@ -29,6 +29,7 @@ function failure(
 ) {
   const response = jsonError(requestId, status, code, message);
   response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("X-Request-Id", requestId);
   return response;
 }
