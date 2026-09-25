@@ -4,6 +4,8 @@
 **Date:** 2026-09-26
 **Baseline:** Stage 10 `master` commit `20ef623810a4e44ce83c838f7396d096db959aa7`
 
+**Resolution:** The qualification policy decision described as unresolved at the Stage 11 gate was explicitly approved before Stage 12 implementation. The locked MVP policy is Qualification Policy v1 (`qv1`): a valid, unexpired Delivery with a trusted server-side destination produces one Qualified Click only for the first Click represented by that Delivery token. Qualification is synchronous, server-authoritative, and writes no financial state. See `docs/stages/NEXTACTION_STAGE_12_QUALIFIED_CLICK_RUNTIME.md`.
+
 ## 1. Purpose
 
 Stage 11 defines the technical boundary required before a Click may become a Qualified Click.
