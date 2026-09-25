@@ -499,6 +499,44 @@ Immutable ledger / audit trail
 
 No single layer is treated as sufficient for financial or tenant isolation.
 
+## 25. Stage 13 settlement enforcement
+
+The live runtime now enforces the financial boundary described in this document.
+
+The settlement operation:
+
+- accepts only an internal Qualified Click identifier;
+- resolves advertiser and publisher workspaces from server-side Delivery, Offer, Integration, and Product relationships;
+- locks the Qualified Click before settlement lookup;
+- locks advertiser capacity before consumption;
+- derives all monetary values server-side;
+- records advertiser debit, publisher credit, platform revenue, and capacity consumption atomically;
+- prevents duplicate settlement through database uniqueness;
+- exposes the settlement function only to `service_role`;
+- does not expose financial tables or mutation controls to browser/public runtime callers.
+
+The financial invariant remains:
+
+```text
+100 cents charge
+= 75 cents publisher
++ 25 cents platform
+```
+
+Failure of any financial write rolls back the entire settlement transaction.
+
+## 26. Stage 13 exit criteria
+
+Stage 13 is complete when the implementation and live database prove:
+
+- qualified Clicks settle atomically;
+- capacity cannot be consumed below zero;
+- replay does not duplicate financial outcomes;
+- financial values are server-derived;
+- ledger rows are tied to one immutable Settlement;
+- privileged settlement execution is restricted;
+- no public client can directly mutate financial state.
+
 ## 25. Stage 3 exit criteria
 
 Stage 3 is complete as a specification when the implementation team can identify, for every production table:
