@@ -358,12 +358,21 @@ export type Database = {
           result_workspace_id: string
         }[]
       }
+      resolve_runtime_integration: {
+        Args: { p_credential_hash: string }
+        Returns: {
+          result_integration_id: string | null
+          result_product_id: string | null
+          result_status: string
+          result_workspace_id: string | null
+        }[]
+      }
       runtime_accept_event: {
         Args: {
           p_integration_id: string
           p_idempotency_key: string
           p_event_type: string
-          p_occurred_at?: string | null
+          p_occurred_at: string
           p_payload: Json
           p_request_id: string
         }
@@ -371,10 +380,6 @@ export type Database = {
           result_created: boolean
           result_event_id: string
         }[]
-      }
-      runtime_ack_event: {
-        Args: { p_message_id: number }
-        Returns: boolean
       }
       runtime_create_decision_delivery: {
         Args: {
@@ -398,30 +403,22 @@ export type Database = {
           result_title: string | null
         }[]
       }
-      runtime_dequeue_events: {
-        Args: {
-          p_quantity?: number
-          p_visibility_seconds?: number
-        }
-        Returns: {
-          event_id: string | null
-          message_id: number
-        }[]
-      }
-      runtime_drain_events: {
-        Args: { p_quantity?: number }
-        Returns: {
-          failed: number
-          processed: number
-          queue_batch_size: number
-        }[]
-      }
       runtime_process_event: {
         Args: { p_event_id: string }
         Returns: {
           result_moment_occurrence_id: string | null
           result_processed: boolean
           result_reason_code: string | null
+        }[]
+      }
+      runtime_worker_tick: {
+        Args: {
+          p_quantity?: number
+          p_visibility_seconds?: number
+        }
+        Returns: {
+          result_failed: number
+          result_processed: number
         }[]
       }
       set_workspace_capabilities: {
