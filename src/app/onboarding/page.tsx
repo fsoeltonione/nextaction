@@ -172,43 +172,46 @@ function OnboardingContent() {
     const payload = await response.json();
     const nextState = payload.state as ActivationState;
 
-    setState(nextState);
-    setCapabilitySelection(nextState.capabilities);
-
-    if (nextState.product) {
-      setDraft({
-        url: nextState.product.canonical_url,
-        name: nextState.product.name,
-        description: nextState.product.description ?? "",
-        moments: toMomentDrafts(nextState.product.moments),
-      });
-    }
-
-    setOfferForm((current) => {
-      const availableMomentIds =
-        nextState.product?.moments.map((moment) => moment.id) ?? [];
-      const kept = current.moment_ids.filter((id) =>
-        availableMomentIds.includes(id),
-      );
-
-      return {
-        ...current,
-        moment_ids:
-          kept.length > 0
-            ? kept
-            : availableMomentIds.length > 0
-              ? [availableMomentIds[0]]
-              : [],
-      };
-    });
-
     return nextState;
   }, [initialUrl, router]);
 
   useEffect(() => {
     let active = true;
 
-    loadState()
+    void loadState()
+      .then((nextState) => {
+        if (!active || !nextState) return;
+
+        setState(nextState);
+        setCapabilitySelection(nextState.capabilities);
+
+        if (nextState.product) {
+          setDraft({
+            url: nextState.product.canonical_url,
+            name: nextState.product.name,
+            description: nextState.product.description ?? "",
+            moments: toMomentDrafts(nextState.product.moments),
+          });
+        }
+
+        setOfferForm((current) => {
+          const availableMomentIds =
+            nextState.product?.moments.map((moment) => moment.id) ?? [];
+          const kept = current.moment_ids.filter((id) =>
+            availableMomentIds.includes(id),
+          );
+
+          return {
+            ...current,
+            moment_ids:
+              kept.length > 0
+                ? kept
+                : availableMomentIds.length > 0
+                  ? [availableMomentIds[0]]
+                  : [],
+          };
+        });
+      })
       .catch((err) => {
         if (active) {
           setError(
@@ -306,13 +309,9 @@ function OnboardingContent() {
     if (!hasDifferentProduct) return;
 
     analysisStarted.current = true;
-    setDraft(null);
-    setState((current) =>
-      current
-        ? { ...current, step: "product_understanding" }
-        : current,
-    );
-    void runAnalysis(initialUrl);
+    queueMicrotask(() => {
+      void runAnalysis(initialUrl);
+    });
   }, [initialUrl, runAnalysis, state]);
 
   function updateMoment(index: number, patch: Partial<MomentDraft>) {
@@ -1028,7 +1027,7 @@ Content-Type: application/json
 
         {configured ? (
           <div className="mt-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">
-            An active offer is configured for this product's Moments.
+            An active offer is configured for this product&apos;s Moments.
           </div>
         ) : (
           <div className="mt-5 space-y-4">
