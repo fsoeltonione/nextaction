@@ -53,6 +53,7 @@ export async function GET() {
       .from("products")
       .select("id, name, description, canonical_url, domain, understanding_status, updated_at, created_at")
       .eq("workspace_id", workspaceId)
+      .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
