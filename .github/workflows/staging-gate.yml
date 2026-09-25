@@ -3,15 +3,19 @@ name: Staging Gate
 on:
   workflow_dispatch:
 
+concurrency:
+  group: staging-gate
+  cancel-in-progress: true
+
 jobs:
-  staging-preflight:
+  staging-smoke:
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 15
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      STAGING_URL: ${{ secrets.STAGING_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +30,11 @@ jobs:
         run: |
           test -n "$NEXT_PUBLIC_SUPABASE_URL"
           test -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
-          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          test -n "$STAGING_URL"
+          case "$STAGING_URL" in
+            http://*|https://*) ;;
+            *) echo "STAGING_URL must be http:// or https://"; exit 1 ;;
+          esac
 
       - name: Install
         run: npm ci
@@ -39,3 +47,14 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Smoke staging
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location --max-time 15             -o /dev/null -w "%{http_code}" "$STAGING_URL/" | grep -qx "200"
+
+          curl --fail --silent --show-error --max-time 15             -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/track" | grep -qx "401"
+
+          curl --fail --silent --show-error --max-time 15             -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/offer" | grep -qx "401"
+
+          curl --fail --silent --show-error --max-time 15             -X OPTIONS -o /dev/null -w "%{http_code}" "$STAGING_URL/v1/track" | grep -qx "204"
