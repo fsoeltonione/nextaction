@@ -337,8 +337,8 @@ export default function Dashboard() {
                   <input
                     required
                     placeholder="https://yourproduct.com"
-                    value={offerForm.cta_url}
-                    onChange={e => setOfferForm(p => ({ ...p, cta_url: e.target.value }))}
+                    value={offerForm.destination_url}
+                    onChange={e => setOfferForm(p => ({ ...p, destination_url: e.target.value }))}
                     className="w-full bg-neutral-950 border border-neutral-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-neutral-100 text-sm placeholder:text-neutral-600 outline-none"
                   />
                 </div>
@@ -356,7 +356,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         key={m.moment_key}
-                        onClick={() => toggleMoment(m.moment_key)}
+                        onClick={() => toggleMoment(m.id)}
                         className={`text-xs font-mono px-3 py-1.5 rounded-lg border transition-all ${offerForm.moment_ids.includes(m.id) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-neutral-950 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}
                       >
                         {m.moment_key}
