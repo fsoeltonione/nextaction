@@ -1,5 +1,7 @@
--- NextAction Stage 9: runtime core, PGMQ queue, and rate limiting
--- Runtime path is server-authoritative and executable only by service_role.
+-- NextAction Stage 9: Runtime Core + PGMQ + rate limiting
+-- The public /v1/* application routes use service-role/secret-key RPCs only.
+-- The runtime domain remains:
+-- Event -> Moment -> Decision -> Delivery
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgmq;
@@ -17,12 +19,44 @@ BEGIN
 END
 $$;
 
--- Credential lookup must be indexed without ever storing plaintext credentials.
+-- ---------------------------------------------------------------------------
+-- Runtime hardening
+-- ---------------------------------------------------------------------------
+
 CREATE UNIQUE INDEX IF NOT EXISTS integration_secrets_credential_hash_uq
   ON private.integration_secrets(credential_hash);
 
--- Lightweight fixed-window limiter. Subjects are hashed by the application,
--- so raw integration tokens and IPs are not persisted in the limiter.
+ALTER TABLE private.decisions
+  ADD COLUMN IF NOT EXISTS moment_id UUID;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'decisions_moment_id_fkey'
+      AND conrelid = 'private.decisions'::regclass
+  ) THEN
+    ALTER TABLE private.decisions
+      ADD CONSTRAINT decisions_moment_id_fkey
+      FOREIGN KEY (moment_id)
+      REFERENCES public.moments(id)
+      ON DELETE RESTRICT;
+  END IF;
+END
+$$;
+
+CREATE INDEX IF NOT EXISTS decisions_moment_id_idx
+  ON private.decisions(moment_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS moment_occurrences_event_id_uq
+  ON private.moment_occurrences(event_id)
+  WHERE event_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- Rate limiting
+-- ---------------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS private.rate_limit_buckets (
   scope TEXT NOT NULL,
   subject_hash TEXT NOT NULL,
@@ -50,53 +84,118 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
-  v_now TIMESTAMPTZ := clock_timestamp();
   v_window_start TIMESTAMPTZ;
   v_window_end TIMESTAMPTZ;
+  v_current_window TIMESTAMPTZ;
   v_count INTEGER;
 BEGIN
   IF p_scope IS NULL OR length(trim(p_scope)) < 1 OR length(p_scope) > 100 THEN
     RAISE EXCEPTION 'invalid rate limit scope' USING ERRCODE = '22023';
   END IF;
+
   IF p_subject_hash IS NULL OR p_subject_hash !~ '^[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'invalid rate limit subject' USING ERRCODE = '22023';
   END IF;
+
   IF p_limit < 1 OR p_limit > 100000 THEN
     RAISE EXCEPTION 'invalid rate limit limit' USING ERRCODE = '22023';
   END IF;
+
   IF p_window_seconds < 1 OR p_window_seconds > 86400 THEN
     RAISE EXCEPTION 'invalid rate limit window' USING ERRCODE = '22023';
   END IF;
 
-  v_window_start := to_timestamp(
-    floor(extract(epoch FROM v_now) / p_window_seconds) * p_window_seconds
-  );
+  v_window_start :=
+    pg_catalog.to_timestamp(
+      pg_catalog.floor(
+        pg_catalog.extract(epoch FROM pg_catalog.clock_timestamp()) / p_window_seconds
+      ) * p_window_seconds
+    );
+  v_window_end := v_window_start + pg_catalog.make_interval(secs => p_window_seconds);
 
-  INSERT INTO private.rate_limit_buckets (
-    scope, subject_hash, window_started_at, request_count
-  )
-  VALUES (p_scope, p_subject_hash, v_window_start, 1)
-  ON CONFLICT (scope, subject_hash)
-  DO UPDATE
-  SET
-    window_started_at = EXCLUDED.window_started_at,
-    request_count = CASE
-      WHEN private.rate_limit_buckets.window_started_at = EXCLUDED.window_started_at
-        THEN private.rate_limit_buckets.request_count + 1
-      ELSE 1
-    END
-  RETURNING request_count INTO v_count;
+  SELECT window_started_at, request_count
+  INTO v_current_window, v_count
+  FROM private.rate_limit_buckets
+  WHERE scope = p_scope
+    AND subject_hash = p_subject_hash
+  FOR UPDATE;
 
-  v_window_end := v_window_start + make_interval(secs => p_window_seconds);
+  IF NOT FOUND THEN
+    INSERT INTO private.rate_limit_buckets (
+      scope, subject_hash, window_started_at, request_count
+    )
+    VALUES (p_scope, p_subject_hash, v_window_start, 1);
+
+    RETURN QUERY
+    SELECT
+      TRUE,
+      p_limit - 1,
+      GREATEST(
+        1,
+        pg_catalog.ceil(
+          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+        )::INTEGER
+      ),
+      1;
+    RETURN;
+  END IF;
+
+  IF v_current_window < v_window_start THEN
+    UPDATE private.rate_limit_buckets
+    SET window_started_at = v_window_start,
+        request_count = 1
+    WHERE scope = p_scope
+      AND subject_hash = p_subject_hash;
+
+    RETURN QUERY
+    SELECT
+      TRUE,
+      p_limit - 1,
+      GREATEST(
+        1,
+        pg_catalog.ceil(
+          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+        )::INTEGER
+      ),
+      1;
+    RETURN;
+  END IF;
+
+  IF v_count >= p_limit THEN
+    RETURN QUERY
+    SELECT
+      FALSE,
+      0,
+      GREATEST(
+        1,
+        pg_catalog.ceil(
+          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+        )::INTEGER
+      ),
+      v_count;
+    RETURN;
+  END IF;
+
+  v_count := v_count + 1;
+
+  UPDATE private.rate_limit_buckets
+  SET request_count = v_count
+  WHERE scope = p_scope
+    AND subject_hash = p_subject_hash;
 
   RETURN QUERY
   SELECT
-    v_count <= p_limit,
-    GREATEST(p_limit - v_count, 0),
-    GREATEST(1, CEIL(EXTRACT(epoch FROM (v_window_end - v_now)))::INTEGER),
+    TRUE,
+    p_limit - v_count,
+    GREATEST(
+      1,
+      pg_catalog.ceil(
+        pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+      )::INTEGER
+    ),
     v_count;
 END;
 $$;
@@ -106,7 +205,129 @@ REVOKE ALL ON FUNCTION public.check_runtime_rate_limit(TEXT, TEXT, INTEGER, INTE
 GRANT EXECUTE ON FUNCTION public.check_runtime_rate_limit(TEXT, TEXT, INTEGER, INTEGER)
   TO service_role;
 
--- Atomic ingest boundary: Event row and queue message commit together.
+-- ---------------------------------------------------------------------------
+-- Runtime credential resolution
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.resolve_runtime_integration(
+  p_credential_hash TEXT
+)
+RETURNS TABLE (
+  result_status TEXT,
+  result_integration_id UUID,
+  result_product_id UUID,
+  result_workspace_id UUID
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_integration_id UUID;
+  v_product_id UUID;
+  v_workspace_id UUID;
+  v_status TEXT;
+  v_revoked_at TIMESTAMPTZ;
+  v_understanding_status TEXT;
+BEGIN
+  IF p_credential_hash IS NULL
+     OR p_credential_hash !~ '^[0-9a-f]{64}$'
+  THEN
+    RETURN QUERY
+    SELECT
+      'invalid_integration_credential'::TEXT,
+      NULL::UUID,
+      NULL::UUID,
+      NULL::UUID;
+    RETURN;
+  END IF;
+
+  SELECT
+    i.id,
+    i.product_id,
+    i.status,
+    i.revoked_at,
+    p.workspace_id,
+    p.understanding_status
+  INTO
+    v_integration_id,
+    v_product_id,
+    v_status,
+    v_revoked_at,
+    v_workspace_id,
+    v_understanding_status
+  FROM private.integration_secrets AS s
+  JOIN public.integrations AS i
+    ON i.id = s.integration_id
+  JOIN public.products AS p
+    ON p.id = i.product_id
+  WHERE s.credential_hash = p_credential_hash
+  LIMIT 1;
+
+  IF v_integration_id IS NULL THEN
+    RETURN QUERY
+    SELECT
+      'invalid_integration_credential'::TEXT,
+      NULL::UUID,
+      NULL::UUID,
+      NULL::UUID;
+    RETURN;
+  END IF;
+
+  IF v_status <> 'active' OR v_revoked_at IS NOT NULL THEN
+    RETURN QUERY
+    SELECT
+      'integration_revoked'::TEXT,
+      v_integration_id,
+      v_product_id,
+      v_workspace_id;
+    RETURN;
+  END IF;
+
+  IF v_understanding_status <> 'confirmed' THEN
+    RETURN QUERY
+    SELECT
+      'integration_not_ready'::TEXT,
+      v_integration_id,
+      v_product_id,
+      v_workspace_id;
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.workspace_capabilities AS wc
+    WHERE wc.workspace_id = v_workspace_id
+      AND wc.capability = 'make_money'
+      AND wc.status = 'active'
+  ) THEN
+    RETURN QUERY
+    SELECT
+      'make_money_not_active'::TEXT,
+      v_integration_id,
+      v_product_id,
+      v_workspace_id;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    'ok'::TEXT,
+    v_integration_id,
+    v_product_id,
+    v_workspace_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.resolve_runtime_integration(TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_runtime_integration(TEXT)
+  TO service_role;
+
+-- ---------------------------------------------------------------------------
+-- Event ingestion: persist Event + enqueue PGMQ message atomically
+-- ---------------------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION public.runtime_accept_event(
   p_integration_id UUID,
   p_idempotency_key TEXT,
@@ -121,41 +342,41 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pgmq, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
   v_event_id UUID;
   v_created BOOLEAN := FALSE;
-  v_existing_event_type TEXT;
-  v_existing_occurred_at TIMESTAMPTZ;
-  v_existing_payload JSONB;
 BEGIN
   IF p_integration_id IS NULL THEN
     RAISE EXCEPTION 'integration is required' USING ERRCODE = '22023';
   END IF;
 
   IF p_idempotency_key IS NULL
-     OR length(trim(p_idempotency_key)) < 1
-     OR length(p_idempotency_key) > 200
+     OR p_idempotency_key !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$'
   THEN
     RAISE EXCEPTION 'invalid idempotency key' USING ERRCODE = '22023';
   END IF;
 
   IF p_event_type IS NULL
-     OR length(trim(p_event_type)) < 1
-     OR length(p_event_type) > 100
+     OR p_event_type !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$'
   THEN
     RAISE EXCEPTION 'invalid event type' USING ERRCODE = '22023';
   END IF;
 
-  IF p_payload IS NULL OR jsonb_typeof(p_payload) <> 'object' THEN
+  IF p_payload IS NULL OR pg_catalog.jsonb_typeof(p_payload) <> 'object' THEN
     RAISE EXCEPTION 'event data must be an object' USING ERRCODE = '22023';
   END IF;
 
   IF NOT EXISTS (
     SELECT 1
     FROM public.integrations AS i
-    JOIN public.products AS p ON p.id = i.product_id
+    JOIN public.products AS p
+      ON p.id = i.product_id
+    JOIN public.workspace_capabilities AS wc
+      ON wc.workspace_id = p.workspace_id
+     AND wc.capability = 'make_money'
+     AND wc.status = 'active'
     WHERE i.id = p_integration_id
       AND i.status = 'active'
       AND i.revoked_at IS NULL
@@ -174,8 +395,8 @@ BEGIN
   )
   VALUES (
     p_integration_id,
-    trim(p_idempotency_key),
-    trim(p_event_type),
+    pg_catalog.trim(p_idempotency_key),
+    pg_catalog.trim(p_event_type),
     p_occurred_at,
     p_payload,
     p_request_id
@@ -188,22 +409,15 @@ BEGIN
     v_created := TRUE;
     PERFORM pgmq.send(
       'runtime-events',
-      jsonb_build_object('event_id', v_event_id::TEXT)
+      pg_catalog.jsonb_build_object('event_id', v_event_id::TEXT)
     );
   ELSE
-    SELECT e.id, e.event_type, e.occurred_at, e.payload
-    INTO v_event_id, v_existing_event_type, v_existing_occurred_at, v_existing_payload
+    SELECT e.id
+    INTO v_event_id
     FROM private.events AS e
     WHERE e.integration_id = p_integration_id
-      AND e.idempotency_key = trim(p_idempotency_key);
-
-    IF v_existing_event_type IS DISTINCT FROM trim(p_event_type)
-       OR v_existing_occurred_at IS DISTINCT FROM p_occurred_at
-       OR v_existing_payload IS DISTINCT FROM p_payload
-    THEN
-      RAISE EXCEPTION 'idempotency key was already used with a different event'
-        USING ERRCODE = '23505';
-    END IF;
+      AND e.idempotency_key = pg_catalog.trim(p_idempotency_key)
+    LIMIT 1;
   END IF;
 
   RETURN QUERY SELECT v_event_id, v_created;
@@ -215,70 +429,10 @@ REVOKE ALL ON FUNCTION public.runtime_accept_event(UUID, TEXT, TEXT, TIMESTAMPTZ
 GRANT EXECUTE ON FUNCTION public.runtime_accept_event(UUID, TEXT, TEXT, TIMESTAMPTZ, JSONB, UUID)
   TO service_role;
 
--- Queue consumer bridge. The queue remains completely hidden from browser roles.
-CREATE OR REPLACE FUNCTION public.runtime_dequeue_events(
-  p_quantity INTEGER DEFAULT 10,
-  p_visibility_seconds INTEGER DEFAULT 60
-)
-RETURNS TABLE (
-  message_id BIGINT,
-  event_id UUID
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pgmq, pg_temp
-AS $$
-BEGIN
-  IF p_quantity < 1 OR p_quantity > 100 THEN
-    RAISE EXCEPTION 'invalid dequeue quantity' USING ERRCODE = '22023';
-  END IF;
+-- ---------------------------------------------------------------------------
+-- Event -> Moment worker
+-- ---------------------------------------------------------------------------
 
-  IF p_visibility_seconds < 5 OR p_visibility_seconds > 3600 THEN
-    RAISE EXCEPTION 'invalid dequeue visibility' USING ERRCODE = '22023';
-  END IF;
-
-  RETURN QUERY
-  SELECT
-    q.msg_id,
-    NULLIF(q.message->>'event_id', '')::UUID
-  FROM pgmq.read(
-    'runtime-events',
-    p_visibility_seconds,
-    p_quantity
-  ) AS q;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.runtime_dequeue_events(INTEGER, INTEGER)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.runtime_dequeue_events(INTEGER, INTEGER)
-  TO service_role;
-
-CREATE OR REPLACE FUNCTION public.runtime_ack_event(
-  p_message_id BIGINT
-)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pgmq, pg_temp
-AS $$
-BEGIN
-  IF p_message_id IS NULL OR p_message_id < 1 THEN
-    RAISE EXCEPTION 'invalid queue message id' USING ERRCODE = '22023';
-  END IF;
-
-  RETURN pgmq.delete('runtime-events', p_message_id);
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.runtime_ack_event(BIGINT)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.runtime_ack_event(BIGINT)
-  TO service_role;
-
--- Event -> Moment normalization.
--- The public runtime contract can send dot/dash/spaced event types, while
--- registered Moment keys use snake_case.
 CREATE OR REPLACE FUNCTION public.runtime_process_event(
   p_event_id UUID
 )
@@ -289,7 +443,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pgmq, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
   v_event private.events%ROWTYPE;
@@ -308,8 +462,20 @@ BEGIN
     RAISE EXCEPTION 'event not found' USING ERRCODE = 'P0002';
   END IF;
 
-  IF v_event.processing_status = 'processed' THEN
-    RETURN QUERY SELECT TRUE, NULL::UUID, 'already_processed'::TEXT;
+  SELECT mo.id
+  INTO v_occurrence_id
+  FROM private.moment_occurrences AS mo
+  WHERE mo.event_id = p_event_id
+  ORDER BY mo.occurred_at DESC, mo.id DESC
+  LIMIT 1;
+
+  IF v_occurrence_id IS NOT NULL THEN
+    UPDATE private.events
+    SET processing_status = 'processed'
+    WHERE id = p_event_id;
+
+    RETURN QUERY
+    SELECT TRUE, v_occurrence_id, 'already_processed'::TEXT;
     RETURN;
   END IF;
 
@@ -327,13 +493,20 @@ BEGIN
     SET processing_status = 'failed'
     WHERE id = p_event_id;
 
-    RETURN QUERY SELECT FALSE, NULL::UUID, 'integration_not_found'::TEXT;
+    RETURN QUERY
+    SELECT FALSE, NULL::UUID, 'integration_not_found'::TEXT;
     RETURN;
   END IF;
 
-  v_moment_key := trim(
-    both '_'
-    FROM lower(regexp_replace(v_event.event_type, '[^a-zA-Z0-9]+', '_', 'g'))
+  v_moment_key := pg_catalog.trim(
+    both '_' FROM pg_catalog.lower(
+      pg_catalog.regexp_replace(
+        v_event.event_type,
+        '[^a-zA-Z0-9]+',
+        '_',
+        'g'
+      )
+    )
   );
 
   IF v_moment_key = '' THEN
@@ -341,7 +514,8 @@ BEGIN
     SET processing_status = 'processed'
     WHERE id = p_event_id;
 
-    RETURN QUERY SELECT TRUE, NULL::UUID, 'moment_not_registered'::TEXT;
+    RETURN QUERY
+    SELECT TRUE, NULL::UUID, 'moment_not_registered'::TEXT;
     RETURN;
   END IF;
 
@@ -358,7 +532,8 @@ BEGIN
     SET processing_status = 'processed'
     WHERE id = p_event_id;
 
-    RETURN QUERY SELECT TRUE, NULL::UUID, 'moment_not_registered'::TEXT;
+    RETURN QUERY
+    SELECT TRUE, NULL::UUID, 'moment_not_registered'::TEXT;
     RETURN;
   END IF;
 
@@ -382,7 +557,14 @@ BEGIN
   SET processing_status = 'processed'
   WHERE id = p_event_id;
 
-  RETURN QUERY SELECT TRUE, v_occurrence_id, NULL::TEXT;
+  RETURN QUERY
+  SELECT TRUE, v_occurrence_id, NULL::TEXT;
+EXCEPTION
+  WHEN OTHERS THEN
+    UPDATE private.events
+    SET processing_status = 'failed'
+    WHERE id = p_event_id;
+    RAISE;
 END;
 $$;
 
@@ -391,7 +573,10 @@ REVOKE ALL ON FUNCTION public.runtime_process_event(UUID)
 GRANT EXECUTE ON FUNCTION public.runtime_process_event(UUID)
   TO service_role;
 
--- Decision -> Delivery is atomic. No money is charged here.
+-- ---------------------------------------------------------------------------
+-- Decision -> Delivery
+-- ---------------------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION public.runtime_create_decision_delivery(
   p_integration_id UUID,
   p_moment_key TEXT,
@@ -414,14 +599,14 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pgmq, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
   v_workspace_id UUID;
   v_product_id UUID;
   v_moment_id UUID;
+  v_occurrence_id UUID;
   v_offer_id UUID;
-  v_offer_workspace_id UUID;
   v_title TEXT;
   v_description TEXT;
   v_cta_label TEXT;
@@ -439,7 +624,8 @@ BEGIN
   SELECT i.product_id, p.workspace_id
   INTO v_product_id, v_workspace_id
   FROM public.integrations AS i
-  JOIN public.products AS p ON p.id = i.product_id
+  JOIN public.products AS p
+    ON p.id = i.product_id
   WHERE i.id = p_integration_id
     AND i.status = 'active'
     AND i.revoked_at IS NULL
@@ -469,14 +655,27 @@ BEGIN
 
   IF v_moment_id IS NULL THEN
     INSERT INTO private.decisions (
-      moment_occurrence_id, integration_id, outcome, offer_id, reason_code, request_id
+      moment_id,
+      moment_occurrence_id,
+      integration_id,
+      outcome,
+      offer_id,
+      reason_code,
+      request_id
     )
     VALUES (
-      NULL, p_integration_id, 'no_fill', NULL, 'moment_not_found', p_request_id
+      NULL,
+      NULL,
+      p_integration_id,
+      'no_fill',
+      NULL,
+      'moment_not_found',
+      p_request_id
     )
     RETURNING id INTO v_decision_id;
 
-    RETURN QUERY SELECT
+    RETURN QUERY
+    SELECT
       'no_fill'::TEXT,
       'moment_not_found'::TEXT,
       v_decision_id,
@@ -490,22 +689,66 @@ BEGIN
     RETURN;
   END IF;
 
+  SELECT mo.id
+  INTO v_occurrence_id
+  FROM private.moment_occurrences AS mo
+  WHERE mo.integration_id = p_integration_id
+    AND mo.moment_id = v_moment_id
+    AND mo.occurred_at >= pg_catalog.clock_timestamp() - INTERVAL '10 minutes'
+  ORDER BY mo.occurred_at DESC, mo.id DESC
+  LIMIT 1;
+
+  IF v_occurrence_id IS NULL THEN
+    INSERT INTO private.decisions (
+      moment_id,
+      moment_occurrence_id,
+      integration_id,
+      outcome,
+      offer_id,
+      reason_code,
+      request_id
+    )
+    VALUES (
+      v_moment_id,
+      NULL,
+      p_integration_id,
+      'no_fill',
+      NULL,
+      'moment_occurrence_not_available',
+      p_request_id
+    )
+    RETURNING id INTO v_decision_id;
+
+    RETURN QUERY
+    SELECT
+      'no_fill'::TEXT,
+      'moment_occurrence_not_available'::TEXT,
+      v_decision_id,
+      NULL::UUID,
+      NULL::UUID,
+      NULL::TEXT,
+      NULL::TEXT,
+      NULL::TEXT,
+      NULL::TEXT,
+      NULL::TIMESTAMPTZ;
+    RETURN;
+  END IF;
+
   SELECT
     o.id,
-    o.workspace_id,
     o.title,
     o.description,
     o.cta_label,
     o.destination_url
   INTO
     v_offer_id,
-    v_offer_workspace_id,
     v_title,
     v_description,
     v_cta_label,
     v_destination_url
   FROM public.offer_moments AS om
-  JOIN public.offers AS o ON o.id = om.offer_id
+  JOIN public.offers AS o
+    ON o.id = om.offer_id
   JOIN public.workspace_capabilities AS wc
     ON wc.workspace_id = o.workspace_id
    AND wc.capability = 'reach_customers'
@@ -515,19 +758,33 @@ BEGIN
    AND aca.available_units > 0
   WHERE om.moment_id = v_moment_id
     AND o.status = 'active'
+    AND o.workspace_id <> v_workspace_id
   ORDER BY o.created_at DESC, o.id
   LIMIT 1;
 
   IF v_offer_id IS NULL THEN
     INSERT INTO private.decisions (
-      moment_occurrence_id, integration_id, outcome, offer_id, reason_code, request_id
+      moment_id,
+      moment_occurrence_id,
+      integration_id,
+      outcome,
+      offer_id,
+      reason_code,
+      request_id
     )
     VALUES (
-      NULL, p_integration_id, 'no_fill', NULL, 'no_eligible_offer', p_request_id
+      v_moment_id,
+      v_occurrence_id,
+      p_integration_id,
+      'no_fill',
+      NULL,
+      'no_eligible_offer',
+      p_request_id
     )
     RETURNING id INTO v_decision_id;
 
-    RETURN QUERY SELECT
+    RETURN QUERY
+    SELECT
       'no_fill'::TEXT,
       'no_eligible_offer'::TEXT,
       v_decision_id,
@@ -552,6 +809,7 @@ BEGIN
   END IF;
 
   INSERT INTO private.decisions (
+    moment_id,
     moment_occurrence_id,
     integration_id,
     outcome,
@@ -560,7 +818,8 @@ BEGIN
     request_id
   )
   VALUES (
-    NULL,
+    v_moment_id,
+    v_occurrence_id,
     p_integration_id,
     'filled',
     v_offer_id,
@@ -587,7 +846,8 @@ BEGIN
   )
   RETURNING id INTO v_delivery_id;
 
-  RETURN QUERY SELECT
+  RETURN QUERY
+  SELECT
     'filled'::TEXT,
     NULL::TEXT,
     v_decision_id,
@@ -608,93 +868,98 @@ GRANT EXECUTE ON FUNCTION public.runtime_create_decision_delivery(
   UUID, TEXT, UUID, TEXT, TEXT, TIMESTAMPTZ
 ) TO service_role;
 
--- Database worker: Supabase Cron invokes this transaction periodically.
-CREATE OR REPLACE FUNCTION public.runtime_drain_events(
-  p_quantity INTEGER DEFAULT 25
+-- ---------------------------------------------------------------------------
+-- Queue worker
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.runtime_worker_tick(
+  p_quantity INTEGER DEFAULT 20,
+  p_visibility_seconds INTEGER DEFAULT 60
 )
 RETURNS TABLE (
-  processed INTEGER,
-  failed INTEGER,
-  queue_batch_size INTEGER
+  result_processed INTEGER,
+  result_failed INTEGER
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pgmq, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
-  v_message_id BIGINT;
+  v_message RECORD;
   v_event_id UUID;
   v_processed INTEGER := 0;
   v_failed INTEGER := 0;
-  v_batch INTEGER := 0;
+  v_deleted BOOLEAN;
 BEGIN
   IF p_quantity < 1 OR p_quantity > 100 THEN
     RAISE EXCEPTION 'invalid worker quantity' USING ERRCODE = '22023';
   END IF;
 
-  FOR v_message_id, v_event_id IN
-    SELECT q.msg_id, NULLIF(q.message->>'event_id', '')::UUID
-    FROM pgmq.read('runtime-events', 60, p_quantity) AS q
-  LOOP
-    v_batch := v_batch + 1;
+  IF p_visibility_seconds < 5 OR p_visibility_seconds > 3600 THEN
+    RAISE EXCEPTION 'invalid worker visibility' USING ERRCODE = '22023';
+  END IF;
 
+  FOR v_message IN
+    SELECT msg_id, message
+    FROM pgmq.read('runtime-events', p_visibility_seconds, p_quantity)
+  LOOP
     BEGIN
+      v_event_id := NULLIF(v_message.message->>'event_id', '')::UUID;
+
       IF v_event_id IS NULL THEN
-        IF pgmq.delete('runtime-events', v_message_id) THEN
-          v_processed := v_processed + 1;
-        ELSE
-          v_failed := v_failed + 1;
-        END IF;
+        v_deleted := pgmq.delete('runtime-events', v_message.msg_id);
+        v_failed := v_failed + 1;
         CONTINUE;
       END IF;
 
-      PERFORM 1
-      FROM public.runtime_process_event(v_event_id);
+      PERFORM public.runtime_process_event(v_event_id);
 
-      IF pgmq.delete('runtime-events', v_message_id) THEN
+      v_deleted := pgmq.delete('runtime-events', v_message.msg_id);
+
+      IF v_deleted THEN
         v_processed := v_processed + 1;
       ELSE
         v_failed := v_failed + 1;
       END IF;
     EXCEPTION
+      WHEN SQLSTATE 'P0002' THEN
+        v_deleted := pgmq.delete('runtime-events', v_message.msg_id);
+        v_failed := v_failed + 1;
       WHEN OTHERS THEN
         v_failed := v_failed + 1;
     END;
   END LOOP;
 
-  RETURN QUERY SELECT v_processed, v_failed, v_batch;
+  RETURN QUERY SELECT v_processed, v_failed;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.runtime_drain_events(INTEGER)
+REVOKE ALL ON FUNCTION public.runtime_worker_tick(INTEGER, INTEGER)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.runtime_drain_events(INTEGER)
+GRANT EXECUTE ON FUNCTION public.runtime_worker_tick(INTEGER, INTEGER)
   TO service_role;
 
+-- ---------------------------------------------------------------------------
+-- Scheduler
+-- ---------------------------------------------------------------------------
+
 DO $$
-DECLARE
-  v_job_id BIGINT;
 BEGIN
-  SELECT jobid
-  INTO v_job_id
-  FROM cron.job
-  WHERE jobname = 'nextaction-runtime-events'
-  LIMIT 1;
-
-  IF v_job_id IS NOT NULL THEN
-    PERFORM cron.unschedule(v_job_id);
+  IF NOT EXISTS (
+    SELECT 1
+    FROM cron.job
+    WHERE jobname = 'nextaction-runtime-worker'
+  ) THEN
+    PERFORM cron.schedule(
+      'nextaction-runtime-worker',
+      '* * * * *',
+      'SELECT public.runtime_worker_tick(20, 60);'
+    );
   END IF;
-
-  PERFORM cron.schedule(
-    'nextaction-runtime-events',
-    '10 seconds',
-    'select public.runtime_drain_events(25);'
-  );
-END;
+END
 $$;
 
--- Only service_role gets direct queue schema usage. Browser roles remain blocked.
-REVOKE ALL ON SCHEMA pgmq FROM anon, authenticated;
-GRANT USAGE ON SCHEMA pgmq TO service_role;
+-- Queue schema remains an internal server boundary.
+REVOKE ALL ON SCHEMA pgmq FROM PUBLIC, anon, authenticated;
 
 COMMIT;
