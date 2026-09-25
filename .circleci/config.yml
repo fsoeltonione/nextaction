@@ -63,8 +63,9 @@ jobs:
     docker:
       - image: cimg/node:24.21.0
     environment:
-      NEXT_PUBLIC_SUPABASE_URL: << pipeline.parameters.staging_supabase_url >>
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: << pipeline.parameters.staging_supabase_publishable_key >>
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      SUPABASE_SECRET_KEY: ci-placeholder
     steps:
       - checkout
       - run:
@@ -139,7 +140,7 @@ jobs:
       - run:
           name: Production health smoke
           command: |
-            STAGING_BASE_URL="${PRODUCTION_BASE_URL}"             npm run staging:smoke
+            STAGING_BASE_URL="${PRODUCTION_BASE_URL}"             EXPECTED_ENVIRONMENT="production"             npm run staging:smoke
 
 workflows:
   quality-gate:
