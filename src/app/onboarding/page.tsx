@@ -282,6 +282,13 @@ function OnboardingContent() {
           : current,
       );
     } catch (err) {
+      setDraft(null);
+      setUrlInput(targetUrl);
+      setState((current) =>
+        current
+          ? { ...current, step: "url" }
+          : current,
+      );
       setError(err instanceof Error ? err.message : "Product analysis failed.");
     } finally {
       setAnalysisRunning(false);
