@@ -1,6 +1,6 @@
 # NextAction Stage 9 — Runtime Core
 
-**Status:** Runtime implementation complete on `stage-9-runtime-core`; merge is blocked by GitHub Actions runner availability.  
+**Status:** Runtime implementation complete on `stage-9-runtime-core`; quality-gate verification is being moved to CircleCI.  
 **Date:** 2026-09-26  
 **Baseline:** Stage 8 `master` `a13a19d8c30ac2080f5a7430a2e4e58147f981fe`
 
@@ -246,7 +246,7 @@ Runtime RPC functions are explicitly executable only by `service_role`.
 
 ### CI
 
-`.github/workflows/ci.yml` runs on:
+`.circleci/config.yml` runs on:
 
 - pull requests targeting `master`
 - pushes to `master`
@@ -264,7 +264,7 @@ No Supabase service secret is passed into the ordinary CI job.
 
 ### Staging Gate
 
-`.github/workflows/staging-gate.yml` is a manual staging gate using the GitHub `staging` environment.
+`.github/workflows/staging-gate.yml` remains a manual staging gate using the GitHub `staging` environment; it is separate from the CircleCI quality gate.
 
 Required secret:
 
@@ -365,7 +365,7 @@ Some corrective entries were produced while reconciling live state and cannot be
 
 Stage 9 is ready to merge when:
 
-- GitHub Actions must execute the quality job on an allocated runner and report green. Current attempts fail before runner steps execute (`runner_id=0`, `steps=[]`), so they do not establish an application lint/typecheck/build failure.
+- CircleCI must execute the `quality` job and report green for `npm ci`, `lint`, `typecheck`, and `build`.
 - runtime RPC privilege checks remain locked.
 - transactional runtime smoke test remains green.
 - staging gate is present and requires a real staging URL before claiming staging readiness.
