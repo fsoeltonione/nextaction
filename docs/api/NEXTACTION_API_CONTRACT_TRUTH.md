@@ -748,8 +748,10 @@ The release path now includes:
 - production approval gate;
 - production health smoke.
 
+The following remain intentionally unimplemented:
+
 - DNS-aware SSRF controls for a future server-side URL scanner
-- automated deployment into a real staging environment
+- automated production promotion without the explicit CircleCI approval gate
 
 ## 19. Authentication callback contract
 
