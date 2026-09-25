@@ -7,6 +7,13 @@ export type RuntimeIntegration = {
   workspaceId: string;
 };
 
+type RuntimeResolutionRow = {
+  result_status: string;
+  result_integration_id: string | null;
+  result_product_id: string | null;
+  result_workspace_id: string | null;
+};
+
 export function extractBearerToken(request: Request): string | null {
   const header = request.headers.get("authorization");
   if (!header) return null;
@@ -23,19 +30,32 @@ export async function resolveRuntimeIntegration(
   token: string,
 ): Promise<
   | { ok: true; integration: RuntimeIntegration }
-  | { ok: false; status: 401 | 403; code: string; message: string }
+  | { ok: false; status: 401 | 403 | 503; code: string; message: string }
 > {
   const admin = createAdminClient();
   const credentialHash = await sha256Hex(token);
 
-  const { data: secret, error: secretError } = await admin
-    .schema("private")
-    .from("integration_secrets")
-    .select("integration_id")
-    .eq("credential_hash", credentialHash)
-    .maybeSingle();
+  const { data, error } = await admin.rpc("resolve_runtime_integration", {
+    p_credential_hash: credentialHash,
+  });
 
-  if (secretError || !secret) {
+  if (error) {
+    console.error("Runtime integration resolution failed", {
+      code: error.code,
+    });
+    return {
+      ok: false,
+      status: 503,
+      code: "runtime_unavailable",
+      message: "Runtime authentication is temporarily unavailable.",
+    };
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | RuntimeResolutionRow
+    | null;
+
+  if (!row) {
     return {
       ok: false,
       status: 401,
@@ -44,68 +64,62 @@ export async function resolveRuntimeIntegration(
     };
   }
 
-  const { data: integration } = await admin
-    .from("integrations")
-    .select("id, product_id, status, revoked_at")
-    .eq("id", secret.integration_id)
-    .maybeSingle();
-
-  if (!integration) {
+  if (row.result_status === "invalid_integration_credential") {
     return {
       ok: false,
       status: 401,
-      code: "invalid_integration_credential",
+      code: row.result_status,
       message: "The integration credential is invalid.",
     };
   }
 
-  if (integration.status !== "active" || integration.revoked_at) {
+  if (row.result_status === "integration_revoked") {
     return {
       ok: false,
       status: 403,
-      code: "integration_revoked",
+      code: row.result_status,
       message: "This integration is no longer active.",
     };
   }
 
-  const { data: product } = await admin
-    .from("products")
-    .select("id, workspace_id, understanding_status")
-    .eq("id", integration.product_id)
-    .maybeSingle();
-
-  if (!product || product.understanding_status !== "confirmed") {
+  if (row.result_status === "integration_not_ready") {
     return {
       ok: false,
       status: 403,
-      code: "integration_not_ready",
+      code: row.result_status,
       message: "This integration is not ready for runtime traffic.",
     };
   }
 
-  const { data: capability } = await admin
-    .from("workspace_capabilities")
-    .select("capability")
-    .eq("workspace_id", product.workspace_id)
-    .eq("capability", "make_money")
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (!capability) {
+  if (row.result_status === "make_money_not_active") {
     return {
       ok: false,
       status: 403,
-      code: "make_money_not_active",
+      code: row.result_status,
       message: "Runtime traffic is not enabled for this workspace.",
+    };
+  }
+
+  if (
+    row.result_status !== "ok" ||
+    !row.result_integration_id ||
+    !row.result_product_id ||
+    !row.result_workspace_id
+  ) {
+    return {
+      ok: false,
+      status: 503,
+      code: "runtime_unavailable",
+      message: "Runtime authentication is temporarily unavailable.",
     };
   }
 
   return {
     ok: true,
     integration: {
-      id: integration.id,
-      productId: integration.product_id,
-      workspaceId: product.workspace_id,
+      id: row.result_integration_id,
+      productId: row.result_product_id,
+      workspaceId: row.result_workspace_id,
     },
   };
 }
