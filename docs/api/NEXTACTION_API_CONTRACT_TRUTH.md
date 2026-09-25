@@ -2,7 +2,8 @@
 
 **Status:** Authoritative v1  
 **Depends on:** `docs/NEXTACTION_PRODUCT_DOMAIN_TRUTH.md`, `docs/architecture/NEXTACTION_ARCHITECTURE_TRUTH.md`, `docs/data-security/NEXTACTION_DATA_SECURITY_TRUTH.md`  
-**Baseline:** Git SHA `b0d4a1ee15aae9cca3eb9edccdc2a7133db8b360`  
+**Baseline:** Stage 8 `master` commit `a13a19d8c30ac2080f5a7430a2e4e58147f981fe`
+**Runtime implementation:** Stage 9 branch `stage-9-runtime-core`  
 **Date:** 2026-09-26
 
 ## 1. Purpose
@@ -15,7 +16,7 @@ It separates:
 - authentication callbacks
 - internal application operations
 
-This phase defines contracts only. It does not implement new endpoints.
+The contract remains authoritative while implementation is staged. Stage 9 implements `/v1/track` and `/v1/offer`; `/v1/click/:delivery_token` remains a later Click/Qualification/Settlement milestone.
 
 ## 2. API surface
 
