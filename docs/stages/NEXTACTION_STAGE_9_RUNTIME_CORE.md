@@ -275,8 +275,8 @@ STAGING_URL
 Required staging checks:
 
 - root page returns `200`
-- `GET /v1/track` without credentials returns `401`
-- `GET /v1/offer` without credentials returns `401`
+- `POST /v1/track` without credentials returns `401`
+- `POST /v1/offer` without credentials returns `401`
 - `OPTIONS /v1/track` returns `204`
 - lint
 - typecheck
@@ -357,7 +357,7 @@ Some corrective entries were produced while reconciling live state and cannot be
 
 Stage 9 is ready to merge when:
 
-- CI is green.
+- GitHub Actions runner executes the CI workflow and CI is green.
 - runtime RPC privilege checks remain locked.
 - transactional runtime smoke test remains green.
 - staging gate is present and requires a real staging URL before claiming staging readiness.
