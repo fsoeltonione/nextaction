@@ -30,6 +30,20 @@ function failure(
   return withRuntimeCors(jsonError(requestId, status, code, message));
 }
 
+function rateLimited(
+  requestId: string,
+  retryAfterSeconds: number,
+) {
+  const response = failure(
+    requestId,
+    429,
+    "rate_limited",
+    "Too many requests. Please retry later.",
+  );
+  response.headers.set("Retry-After", String(retryAfterSeconds));
+  return response;
+}
+
 export function OPTIONS() {
   return runtimeOptionsResponse();
 }
@@ -38,28 +52,20 @@ export async function POST(request: Request) {
   const requestId = createRequestId();
 
   try {
+    // Cheap IP guard runs before credential lookup to reduce brute-force
+    // pressure on the integration_secrets lookup.
+    const authGuard = await checkRateLimit(
+      "runtime:track:auth",
+      getRequestIp(request),
+      300,
+    );
+
+    if (!authGuard.allowed) {
+      return rateLimited(requestId, authGuard.retry_after_seconds);
+    }
+
     const token = extractBearerToken(request);
     if (!token) {
-      const limit = await checkRateLimit(
-        "runtime:track:auth",
-        getRequestIp(request),
-        20,
-      );
-
-      if (!limit.allowed) {
-        const response = failure(
-          requestId,
-          429,
-          "rate_limited",
-          "Too many requests. Please retry later.",
-        );
-        response.headers.set(
-          "Retry-After",
-          String(limit.retry_after_seconds),
-        );
-        return response;
-      }
-
       return failure(
         requestId,
         401,
@@ -70,28 +76,6 @@ export async function POST(request: Request) {
 
     const resolved = await resolveRuntimeIntegration(token);
     if (!resolved.ok) {
-      if (resolved.status === 401) {
-        const limit = await checkRateLimit(
-          "runtime:track:auth",
-          getRequestIp(request),
-          20,
-        );
-
-        if (!limit.allowed) {
-          const response = failure(
-            requestId,
-            429,
-            "rate_limited",
-            "Too many requests. Please retry later.",
-          );
-          response.headers.set(
-            "Retry-After",
-            String(limit.retry_after_seconds),
-          );
-          return response;
-        }
-      }
-
       return failure(
         requestId,
         resolved.status,
@@ -107,30 +91,21 @@ export async function POST(request: Request) {
     );
 
     if (!rateLimit.allowed) {
-      const response = failure(
-        requestId,
-        429,
-        "rate_limited",
-        "Too many requests. Please retry later.",
-      );
-      response.headers.set(
-        "Retry-After",
-        String(rateLimit.retry_after_seconds),
-      );
-      return response;
+      return rateLimited(requestId, rateLimit.retry_after_seconds);
     }
 
     const body = await readJsonBody(request);
 
     if (!isRecord(body)) {
-      throw new HttpError(400, "invalid_event", "Event payload must be an object.");
+      throw new HttpError(
+        400,
+        "invalid_event",
+        "Event payload must be an object.",
+      );
     }
 
     const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
-    if (
-      !idempotencyKey ||
-      !IDEMPOTENCY_KEY_RE.test(idempotencyKey)
-    ) {
+    if (!idempotencyKey || !IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
       throw new HttpError(
         400,
         "missing_idempotency_key",
@@ -138,10 +113,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const eventType =
-      typeof body.type === "string" ? body.type.trim() : "";
+    const eventType = typeof body.type === "string" ? body.type.trim() : "";
     if (!EVENT_TYPE_RE.test(eventType)) {
-      throw new HttpError(400, "invalid_event_type", "Event type is invalid.");
+      throw new HttpError(
+        400,
+        "invalid_event_type",
+        "Event type is invalid.",
+      );
     }
 
     if (!isRecord(body.data)) {
@@ -192,12 +170,22 @@ export async function POST(request: Request) {
           "This integration is not active.",
         );
       }
+
       if (error.code === "22023") {
         return failure(
           requestId,
           400,
           "invalid_event",
           "The event payload is invalid.",
+        );
+      }
+
+      if (error.code === "23505") {
+        return failure(
+          requestId,
+          409,
+          "idempotency_conflict",
+          "The Idempotency-Key was already used with different event data.",
         );
       }
 
