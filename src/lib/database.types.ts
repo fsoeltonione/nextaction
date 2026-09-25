@@ -1,6 +1,3 @@
-// Generated from Supabase project khoygjyikxkdwonygzyh.
-// Do not edit manually; regenerate after schema changes.
-
 export type Json =
   | string
   | number
@@ -319,7 +316,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      confirm_product_activation: {
+        Args: {
+          p_canonical_url: string
+          p_description: string
+          p_domain: string
+          p_moments: Json
+          p_name: string
+        }
+        Returns: {
+          result_moment_count: number
+          result_product_id: string
+          result_workspace_id: string
+        }[]
+      }
+      create_offer_activation: {
+        Args: {
+          p_cta_label: string
+          p_description: string
+          p_destination_url: string
+          p_moment_ids: string[]
+          p_title: string
+        }
+        Returns: {
+          result_moment_count: number
+          result_offer_id: string
+          result_workspace_id: string
+        }[]
+      }
+      set_workspace_capabilities: {
+        Args: { p_capabilities: string[] }
+        Returns: {
+          result_capability: string
+          result_workspace_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -452,4 +483,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

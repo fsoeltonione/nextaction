@@ -14,7 +14,7 @@ function ipv4ToNumber(hostname: string): number | null {
   );
 }
 
-function isBlockedHostname(hostname: string): boolean {
+export function isBlockedHostname(hostname: string): boolean {
   const host = hostname
     .toLowerCase()
     .replace(/^\[/, "")
@@ -124,7 +124,7 @@ export function normalizeProductUrl(input: unknown): NormalizedProductUrl {
     url.pathname = url.pathname.replace(/\/+$/, "");
   }
 
-  const value = url.toString();
+  const value = `${url.origin}${url.pathname === "/" ? "" : url.pathname}`;
 
   return {
     value,

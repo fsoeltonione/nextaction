@@ -19,8 +19,8 @@ export default function Dashboard() {
     title: '',
     description: '',
     cta_label: 'Learn More',
-    cta_url: '',
-    target_moments: [] as string[],
+    destination_url: '',
+    moment_ids: [] as string[],
   });
   const [savingOffer, setSavingOffer] = useState(false);
 
@@ -40,17 +40,54 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      const { data: workspace } = await supabase.from('workspaces').select('id').eq('user_id', user.id).single();
-      if (!workspace) { setLoading(false); return; }
-      setWorkspaceId(workspace.id);
+      const { data: membership, error: membershipError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
-      const [productsResult, offersResult] = await Promise.all([
-        supabase.from('products').select('*, moments(*)').eq('workspace_id', workspace.id).order('created_at', { ascending: false }),
-        supabase.from('offers').select('*').eq('workspace_id', workspace.id).order('created_at', { ascending: false }),
+      if (membershipError) {
+        setLoading(false);
+        return;
+      }
+
+      if (!membership) { setLoading(false); return; }
+
+      const currentWorkspaceId = membership.workspace_id;
+      setWorkspaceId(currentWorkspaceId);
+
+      const [productsResult, offersResult, offerMomentLinksResult] = await Promise.all([
+        supabase
+          .from('products')
+          .select('*, moments(*)')
+          .eq('workspace_id', currentWorkspaceId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('offers')
+          .select('*')
+          .eq('workspace_id', currentWorkspaceId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('offer_moments')
+          .select('offer_id, moment_id'),
       ]);
 
+      const targetIdsByOffer = new Map<string, string[]>();
+      for (const link of offerMomentLinksResult.data || []) {
+        const current = targetIdsByOffer.get(link.offer_id) || [];
+        current.push(link.moment_id);
+        targetIdsByOffer.set(link.offer_id, current);
+      }
+
+      const offersWithTargets = (offersResult.data || []).map((offer) => ({
+        ...offer,
+        target_moment_ids: targetIdsByOffer.get(offer.id) || [],
+      }));
+
       setProducts(productsResult.data || []);
-      setOffers(offersResult.data || []);
+      setOffers(offersWithTargets);
       setLoading(false);
     }
     loadData();
@@ -58,6 +95,7 @@ export default function Dashboard() {
 
   // Gather all moments from all products for the offer targeting
   const allMoments = products.flatMap(p => p.moments || []);
+  const momentById = new Map(allMoments.map((moment: any) => [moment.id, moment]));
 
   const handleCreateOffer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,19 +110,19 @@ export default function Dashboard() {
         const { offer } = await res.json();
         setOffers(prev => [offer, ...prev]);
         setShowCreateOffer(false);
-        setOfferForm({ title: '', description: '', cta_label: 'Learn More', cta_url: '', target_moments: [] });
+        setOfferForm({ title: '', description: '', cta_label: 'Learn More', destination_url: '', moment_ids: [] });
       }
     } finally {
       setSavingOffer(false);
     }
   };
 
-  const toggleMoment = (key: string) => {
+  const toggleMoment = (momentId: string) => {
     setOfferForm(prev => ({
       ...prev,
-      target_moments: prev.target_moments.includes(key)
-        ? prev.target_moments.filter(m => m !== key)
-        : [...prev.target_moments, key]
+      moment_ids: prev.moment_ids.includes(momentId)
+        ? prev.moment_ids.filter(id => id !== momentId)
+        : [...prev.moment_ids, momentId]
     }));
   };
 
@@ -232,9 +270,14 @@ export default function Dashboard() {
                       </div>
                       <p className="text-sm text-neutral-400 mb-3">{offer.description}</p>
                       <div className="flex flex-wrap gap-2">
-                        {offer.target_moments?.map((m: string) => (
-                          <span key={m} className="text-xs font-mono px-2 py-1 bg-neutral-950 border border-neutral-700 rounded text-indigo-300">{m}</span>
-                        ))}
+                        {offer.target_moment_ids?.map((momentId: string) => {
+                          const moment = momentById.get(momentId);
+                          return (
+                            <span key={momentId} className="text-xs font-mono px-2 py-1 bg-neutral-950 border border-neutral-700 rounded text-indigo-300">
+                              {moment?.moment_key || momentId}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -314,7 +357,7 @@ export default function Dashboard() {
                         type="button"
                         key={m.moment_key}
                         onClick={() => toggleMoment(m.moment_key)}
-                        className={`text-xs font-mono px-3 py-1.5 rounded-lg border transition-all ${offerForm.target_moments.includes(m.moment_key) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-neutral-950 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}
+                        className={`text-xs font-mono px-3 py-1.5 rounded-lg border transition-all ${offerForm.moment_ids.includes(m.id) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-neutral-950 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}
                       >
                         {m.moment_key}
                       </button>
@@ -326,7 +369,7 @@ export default function Dashboard() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={savingOffer || offerForm.target_moments.length === 0}
+                  disabled={savingOffer || offerForm.moment_ids.length === 0}
                   className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 font-semibold text-sm transition-all disabled:opacity-50"
                 >
                   {savingOffer ? (
