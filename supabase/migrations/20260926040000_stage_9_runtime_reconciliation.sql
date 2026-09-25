@@ -48,12 +48,12 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_now TIMESTAMPTZ := pg_catalog.clock_timestamp();
   v_window_start TIMESTAMPTZ;
   v_window_end TIMESTAMPTZ;
-  v_current_window TIMESTAMPTZ;
   v_count INTEGER;
 BEGIN
-  IF p_scope IS NULL OR length(trim(p_scope)) < 1 OR length(p_scope) > 100 THEN
+  IF p_scope IS NULL OR pg_catalog.length(pg_catalog.trim(p_scope)) < 1 OR pg_catalog.length(p_scope) > 100 THEN
     RAISE EXCEPTION 'invalid rate limit scope' USING ERRCODE = '22023';
   END IF;
 
@@ -69,89 +69,38 @@ BEGIN
     RAISE EXCEPTION 'invalid rate limit window' USING ERRCODE = '22023';
   END IF;
 
-  v_window_start :=
-    pg_catalog.to_timestamp(
-      pg_catalog.floor(
-        pg_catalog.extract(epoch FROM pg_catalog.clock_timestamp()) / p_window_seconds
-      ) * p_window_seconds
-    );
+  v_window_start := pg_catalog.to_timestamp(
+    pg_catalog.floor(
+      pg_catalog.extract(epoch FROM v_now) / p_window_seconds
+    ) * p_window_seconds
+  );
   v_window_end := v_window_start + pg_catalog.make_interval(secs => p_window_seconds);
 
-  SELECT r.window_started_at, r.request_count
-  INTO v_current_window, v_count
-  FROM private.rate_limit_buckets AS r
-  WHERE r.scope = p_scope
-    AND r.subject_hash = p_subject_hash
-  FOR UPDATE;
-
-  IF NOT FOUND THEN
-    INSERT INTO private.rate_limit_buckets (
-      scope, subject_hash, window_started_at, request_count
-    )
-    VALUES (p_scope, p_subject_hash, v_window_start, 1);
-
-    RETURN QUERY
-    SELECT
-      TRUE,
-      p_limit - 1,
-      GREATEST(
-        1,
-        pg_catalog.ceil(
-          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
-        )::INTEGER
-      ),
-      1;
-    RETURN;
-  END IF;
-
-  IF v_current_window < v_window_start THEN
-    UPDATE private.rate_limit_buckets
-    SET window_started_at = v_window_start,
-        request_count = 1
-    WHERE private.rate_limit_buckets.scope = p_scope
-      AND private.rate_limit_buckets.subject_hash = p_subject_hash;
-
-    RETURN QUERY
-    SELECT
-      TRUE,
-      p_limit - 1,
-      GREATEST(
-        1,
-        pg_catalog.ceil(
-          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
-        )::INTEGER
-      ),
-      1;
-    RETURN;
-  END IF;
-
-  IF v_count >= p_limit THEN
-    RETURN QUERY
-    SELECT
-      FALSE,
-      0,
-      GREATEST(
-        1,
-        pg_catalog.ceil(
-          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
-        )::INTEGER
-      ),
-      v_count;
-    RETURN;
-  END IF;
-
-  v_count := v_count + 1;
-
-  UPDATE private.rate_limit_buckets
-  SET request_count = v_count
-  WHERE private.rate_limit_buckets.scope = p_scope
-    AND private.rate_limit_buckets.subject_hash = p_subject_hash;
+  INSERT INTO private.rate_limit_buckets (
+    scope, subject_hash, window_started_at, request_count
+  )
+  VALUES (
+    p_scope,
+    p_subject_hash,
+    v_window_start,
+    1
+  )
+  ON CONFLICT (scope, subject_hash)
+  DO UPDATE
+  SET
+    window_started_at = EXCLUDED.window_started_at,
+    request_count = CASE
+      WHEN private.rate_limit_buckets.window_started_at = EXCLUDED.window_started_at
+        THEN private.rate_limit_buckets.request_count + 1
+      ELSE 1
+    END
+  RETURNING request_count INTO v_count;
 
   RETURN QUERY
   SELECT
-    TRUE,
-    p_limit - v_count,
-    GREATEST(
+    v_count <= p_limit,
+    pg_catalog.greatest(p_limit - v_count, 0),
+    pg_catalog.greatest(
       1,
       pg_catalog.ceil(
         pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
