@@ -372,7 +372,7 @@ export type Database = {
           p_integration_id: string
           p_idempotency_key: string
           p_event_type: string
-          p_occurred_at: string
+          p_occurred_at: string | null
           p_payload: Json
           p_request_id: string
         }
