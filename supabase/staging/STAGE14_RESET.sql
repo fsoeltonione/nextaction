@@ -70,6 +70,9 @@ WHERE integration_id IN (
   WHERE name = 'stage14-smoke-integration'
 );
 
+DELETE FROM private.rate_limit_buckets
+WHERE scope IN ('runtime:track:auth', 'runtime:track', 'runtime:offer:auth', 'runtime:offer', 'runtime:click:ip');
+
 DELETE FROM private.advertiser_credit_accounts
 WHERE workspace_id IN (
   SELECT id FROM public.workspaces
