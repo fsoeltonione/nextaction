@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS private.financial_accounts_platform_account_type_uq;

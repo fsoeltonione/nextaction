@@ -152,7 +152,7 @@ The URL analyzer/scanner must eventually enforce normalization, SSRF resistance,
 - Current callback `next` handling until redirect safety is enforced.
 - Current generic Create Next App README/metadata.
 
-## 13. Current infrastructure baseline
+## 13. Historical prototype infrastructure baseline
 GitHub `master` currently ends at commit `f761a32e24927bc21456306ca539ced00bdcf4d3`.
 
 Recent commits added the MVP plan/schema reference and removed the unused analyze page.
@@ -166,7 +166,7 @@ Observed row counts:
 - moments: 15
 - offers: 0
 
-Supabase currently reports no recorded migrations and no Edge Functions.
+The original prototype baseline reported no recorded migrations and no Edge Functions. This statement is historical; current runtime migrations are tracked in Supabase production.
 
 Security advisory currently reports leaked-password protection disabled.
 
@@ -174,14 +174,16 @@ Performance advisory currently reports missing foreign-key indexes and RLS polic
 
 CircleCI status could not be established from repository contents because no `.circleci` directory/configuration is present in the current `master` tree, and GitHub workflow-run lookup returned no runs for the baseline commit.
 
-## 14. Non-goals for this phase
-This phase does not add product features.
+## 14. Non-goals for the original truth-establishment phase
+The original truth-establishment phase did not add product features.
 
-It does not implement the runtime, payment system, SDK, scanner, queue, settlement engine, or new dashboard behavior.
+It did not implement the runtime, payment system, SDK, scanner, queue, settlement engine, or new dashboard behavior.
 
-Its job is to establish a stable contract so subsequent implementation work does not drift from the intended product.
+Its job was to establish a stable contract so subsequent implementation work did not drift from the intended product.
 
 ## 15. Change-control rule
 Any change to the locked domain chain, capability semantics, activation flow, qualification/economic model, or source-of-truth rules requires an explicit product/specification amendment.
 
 Implementation shortcuts must not silently redefine product semantics.
+
+## 16. Stage 13 runtime amendment

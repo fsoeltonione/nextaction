@@ -434,6 +434,22 @@ export type Database = {
           result_qualified_at: string | null
         }[]
       }
+      runtime_settle_qualified_click: {
+        Args: { p_qualified_click_id: string }
+        Returns: {
+          result_outcome: string
+          result_settlement_id: string | null
+          result_qualified_click_id: string | null
+          result_advertiser_workspace_id: string | null
+          result_publisher_workspace_id: string | null
+          result_charge_cents: number | null
+          result_publisher_share_cents: number | null
+          result_platform_share_cents: number | null
+          result_currency: string | null
+          result_remaining_capacity: number | null
+          result_reason_code: string | null
+        }[]
+      }
       runtime_worker_tick: {
         Args: {
           p_quantity?: number

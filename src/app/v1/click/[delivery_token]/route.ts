@@ -19,6 +19,20 @@ type ClickResult = {
   result_qualification_status: string | null;
   result_destination_url: string | null;
   result_reason_code: string | null;
+  result_qualified_click_id: string | null;
+};
+
+type SettlementResult = {
+  result_outcome:
+    | "settled"
+    | "replayed"
+    | "not_found"
+    | "not_qualified"
+    | "no_capacity"
+    | "financial_unavailable";
+  result_settlement_id: string | null;
+  result_qualified_click_id: string | null;
+  result_reason_code: string | null;
 };
 
 function failure(
@@ -186,6 +200,85 @@ export async function GET(
         503,
         "destination_unavailable",
         "The offer destination is temporarily unavailable.",
+      );
+    }
+
+    if (!row.result_qualified_click_id) {
+      return failure(
+        requestId,
+        503,
+        "settlement_unavailable",
+        "The qualified click could not be settled.",
+      );
+    }
+
+    const {
+      data: settlementData,
+      error: settlementError,
+    } = await admin.rpc("runtime_settle_qualified_click", {
+      p_qualified_click_id: row.result_qualified_click_id,
+    });
+
+    if (settlementError) {
+      console.error("Runtime settlement failed", {
+        requestId,
+        code: settlementError.code,
+      });
+
+      return failure(
+        requestId,
+        503,
+        "settlement_unavailable",
+        "Click settlement is temporarily unavailable.",
+      );
+    }
+
+    const settlementRow = (
+      Array.isArray(settlementData) ? settlementData[0] : settlementData
+    ) as SettlementResult | null;
+
+    if (!settlementRow) {
+      return failure(
+        requestId,
+        503,
+        "settlement_unavailable",
+        "Click settlement is temporarily unavailable.",
+      );
+    }
+
+    if (
+      settlementRow.result_outcome === "not_found" ||
+      settlementRow.result_outcome === "not_qualified"
+    ) {
+      return failure(
+        requestId,
+        409,
+        "settlement_not_eligible",
+        "The qualified click is not eligible for settlement.",
+      );
+    }
+
+    if (
+      settlementRow.result_outcome === "no_capacity" ||
+      settlementRow.result_outcome === "financial_unavailable"
+    ) {
+      return failure(
+        requestId,
+        503,
+        "settlement_unavailable",
+        "Click settlement is temporarily unavailable.",
+      );
+    }
+
+    if (
+      settlementRow.result_outcome !== "settled" &&
+      settlementRow.result_outcome !== "replayed"
+    ) {
+      return failure(
+        requestId,
+        503,
+        "settlement_unavailable",
+        "Click settlement is temporarily unavailable.",
       );
     }
 
