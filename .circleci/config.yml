@@ -1,0 +1,48 @@
+version: 2.1
+
+jobs:
+  quality:
+    docker:
+      - image: cimg/node:24.21.0
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+    steps:
+      - checkout
+
+      - run:
+          name: Verify runtime
+          command: |
+            node --version
+            npm --version
+
+      - restore_cache:
+          keys:
+            - v1-npm-deps-{{ checksum "package-lock.json" }}
+            - v1-npm-deps-
+
+      - run:
+          name: Install
+          command: npm ci
+
+      - save_cache:
+          key: v1-npm-deps-{{ checksum "package-lock.json" }}
+          paths:
+            - ~/.npm
+
+      - run:
+          name: Lint
+          command: npm run lint
+
+      - run:
+          name: Typecheck
+          command: npm run typecheck
+
+      - run:
+          name: Build
+          command: npm run build
+
+workflows:
+  quality-gate:
+    jobs:
+      - quality
