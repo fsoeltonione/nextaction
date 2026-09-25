@@ -109,9 +109,12 @@ export async function GET(
     const deliveryTokenHash = await sha256Hex(deliveryToken);
     const admin = createAdminClient();
 
-    const { data, error } = await admin.rpc("runtime_record_click", {
-      p_delivery_token_hash: deliveryTokenHash,
-    });
+    const { data, error } = await admin.rpc(
+      "runtime_record_and_qualify_click",
+      {
+        p_delivery_token_hash: deliveryTokenHash,
+      },
+    );
 
     if (error) {
       if (error.code === "22023") {
