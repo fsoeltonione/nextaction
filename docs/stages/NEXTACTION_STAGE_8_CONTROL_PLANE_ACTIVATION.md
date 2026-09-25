@@ -174,8 +174,8 @@ If an authenticated user opens the landing URL with a new product URL, the onboa
 
 - `20260925211435_stage_8_activation_foundation`
 - `20260925211519_stage_8_activation_foundation_hardening`
-- `20260925211942_stage_8_capability_enforcement`
-- `20260925212307_stage_8_destination_url_compatibility`
+- `20260925212247_stage_8_capability_enforcement`
+- `20260925212601_stage_8_destination_url_compatibility`
 
 The second migration deliberately hardens the first implementation after a transaction-level SQL test exposed PL/pgSQL output-variable ambiguity. No test data survived that failed transaction.
 
