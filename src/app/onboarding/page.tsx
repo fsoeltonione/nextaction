@@ -306,6 +306,12 @@ function OnboardingContent() {
     if (!hasDifferentProduct) return;
 
     analysisStarted.current = true;
+    setDraft(null);
+    setState((current) =>
+      current
+        ? { ...current, step: "product_understanding" }
+        : current,
+    );
     void runAnalysis(initialUrl);
   }, [initialUrl, runAnalysis, state]);
 
