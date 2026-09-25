@@ -1,22 +1,21 @@
-import { NextResponse } from "next/server";
-
 export const RUNTIME_CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type, Idempotency-Key",
   "Access-Control-Max-Age": "86400",
+  "Cache-Control": "no-store",
   "Vary": "Origin",
 };
 
-export function withRuntimeCors(response: NextResponse): NextResponse {
+export function withRuntimeCors(response: Response): Response {
   for (const [key, value] of Object.entries(RUNTIME_CORS_HEADERS)) {
     response.headers.set(key, value);
   }
   return response;
 }
 
-export function runtimeOptionsResponse(): NextResponse {
-  return withRuntimeCors(new NextResponse(null, { status: 204 }));
+export function runtimeOptionsResponse(): Response {
+  return withRuntimeCors(new Response(null, { status: 204 }));
 }
 
 export function getRequestIp(request: Request): string {
