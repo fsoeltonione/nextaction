@@ -2,13 +2,13 @@ BEGIN;
 
 DELETE FROM private.financial_entries
 WHERE settlement_id IN (
-  SELECT s.id
-  FROM private.settlements s
-  WHERE s.advertiser_workspace_id IN (
+  SELECT id
+  FROM private.settlements
+  WHERE advertiser_workspace_id IN (
     SELECT id FROM public.workspaces
     WHERE name IN ('Stage 14 Publisher', 'Stage 14 Advertiser')
   )
-  OR s.publisher_workspace_id IN (
+  OR publisher_workspace_id IN (
     SELECT id FROM public.workspaces
     WHERE name IN ('Stage 14 Publisher', 'Stage 14 Advertiser')
   )
@@ -35,10 +35,9 @@ WHERE click_id IN (
   SELECT c.id
   FROM private.clicks c
   JOIN private.deliveries d ON d.id = c.delivery_id
-  WHERE d.delivery_id IS NOT NULL
-    OR d.offer_id IN (
-      SELECT id FROM public.offers WHERE title = 'Stage 14 Smoke Offer'
-    )
+  WHERE d.offer_id IN (
+    SELECT id FROM public.offers WHERE title = 'Stage 14 Smoke Offer'
+  )
 );
 
 DELETE FROM private.clicks
@@ -59,6 +58,18 @@ WHERE offer_id IN (
   SELECT id FROM public.offers WHERE title = 'Stage 14 Smoke Offer'
 );
 
+DELETE FROM private.moment_occurrences
+WHERE integration_id IN (
+  SELECT id FROM public.integrations
+  WHERE name = 'stage14-smoke-integration'
+);
+
+DELETE FROM private.events
+WHERE integration_id IN (
+  SELECT id FROM public.integrations
+  WHERE name = 'stage14-smoke-integration'
+);
+
 DELETE FROM private.advertiser_credit_accounts
 WHERE workspace_id IN (
   SELECT id FROM public.workspaces
@@ -69,6 +80,12 @@ DELETE FROM private.integration_secrets
 WHERE integration_id IN (
   SELECT id FROM public.integrations
   WHERE name = 'stage14-smoke-integration'
+);
+
+DELETE FROM private.financial_accounts
+WHERE workspace_id IN (
+  SELECT id FROM public.workspaces
+  WHERE name IN ('Stage 14 Publisher', 'Stage 14 Advertiser')
 );
 
 DELETE FROM public.offer_moments
