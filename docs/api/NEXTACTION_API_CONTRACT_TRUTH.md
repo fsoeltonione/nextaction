@@ -509,31 +509,54 @@ No price, qualification status, publisher share, or advertiser debit amount is a
 
 ### Server processing
 
-Stage 10 executes the first part of the conceptual flow:
+Stage 10 established the Click recording and trusted redirect boundary.
+
+Stage 12 now executes the qualification step synchronously for the locked MVP policy:
 
 ```
 verify delivery token
   -> validate delivery state
   -> record/retrieve Click
+  -> apply Qualification Policy v1
+  -> persist/retrieve Qualified Click evidence
   -> resolve trusted destination
   -> redirect
 ```
 
-Qualified Click policy and atomic Settlement execution are intentionally deferred until their policy/evidence contract is locked.
+For the first valid Click, Click creation and Qualified Click creation are committed atomically in the same database transaction.
+
+### Qualification Policy v1
+
+A Click qualifies when all of the following are true:
+
+1. the Delivery token is valid;
+2. the Delivery is not expired when the first Click is processed;
+3. the trusted server-side destination is valid;
+4. the Click is the first Click represented by that Delivery token.
+
+Policy-controlled evidence is:
+
+```
+qualification_version = "qv1"
+reason_code = "qv1_valid_first_delivery_click"
+qualified_at = database timestamp
+```
+
+The policy does not use device fingerprinting, cross-site identity tracking, a persistent identity graph, LLM fraud scoring, or client-supplied qualification/financial fields.
 
 ### Qualified result
 
-The server redirects to the trusted destination associated with the Delivery/Offer.
+For a first valid Click, the server persists the Qualified Click and redirects to the trusted destination associated with the Delivery/Offer.
 
 The redirect target is not accepted from the click request.
 
 ### Non-qualified result
 
-The server must not create a financial settlement.
+Under Qualification Policy v1, invalid or expired Delivery requests do not create a Click or Qualified Click.
 
-The endpoint may redirect to the trusted destination with the click marked unqualified, or use a controlled failure destination according to product policy.
+No financial Settlement is created by Click qualification.
 
-The exact non-qualified redirect UX remains an implementation decision.
+The `not_qualified` and `rejected` terminal states remain available for later policy versions but are not used by qv1.
 
 ### Replay behavior
 
@@ -541,14 +564,17 @@ The same signed Delivery/click state may be retried by browsers, proxies, or use
 
 Therefore click processing must be idempotent.
 
-A replay must not create:
-- duplicate Click economics
+A replay returns the existing Click/qualification state and must not create:
+- duplicate Click
 - duplicate Qualified Click
 - duplicate Settlement
 - duplicate advertiser debit
 - duplicate publisher credit
 
+Database uniqueness remains the final duplicate-prevention boundary.
+
 ## 11. HTTP status semantics
+
 
 ### Control plane
 
@@ -684,13 +710,13 @@ No runtime endpoint should require knowledge of NextAction's internal database I
 
 ## 18. Current implementation status
 
-Stage 10 now implements the first executable Click runtime surface in addition to the Stage 9 runtime:
+Stage 12 now implements the executable Click → Qualified Click runtime surface in addition to the Stage 9/10 runtime:
 
 - `POST /v1/track`
 - `POST /v1/offer`
 - `GET /v1/click/:delivery_token`
 
-Stage 9/10 also implement:
+Stage 9/10/12 also implement:
 
 - publisher integration credential resolution
 - Event idempotency enforcement
@@ -702,18 +728,19 @@ Stage 9/10 also implement:
 - PGMQ-backed asynchronous processing
 - server-authoritative destination and Offer selection
 - trusted server-side click redirect
+- Qualification Policy v1
+- synchronous Qualified Click creation
+- qualification evidence versioning
+- database-enforced Click/Qualified Click idempotency
 
 The following remain intentionally unimplemented:
 
-- Click qualification policy
-- Qualified Click evidence/versioning
 - Settlement execution and financial ledger mutation
 - DNS-aware SSRF controls for a future server-side URL scanner
 - automated deployment into a real staging environment
 
-These are later implementation milestones and do not change the target API semantics defined above.
-
 ## 19. Authentication callback contract
+
 
 ### Endpoint
 
