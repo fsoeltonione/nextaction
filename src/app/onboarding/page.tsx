@@ -685,6 +685,12 @@ function OnboardingContent() {
             setUrlInput("");
             setError(null);
             analysisStarted.current = false;
+            setState((current) =>
+              current
+                ? { ...current, step: "url" }
+                : current,
+            );
+            router.replace("/onboarding");
           }}
           className="flex items-center gap-2 text-sm text-neutral-500 hover:text-white mb-6 transition-colors"
         >
