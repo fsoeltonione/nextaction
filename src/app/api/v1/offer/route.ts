@@ -32,6 +32,20 @@ function failure(
   return withRuntimeCors(jsonError(requestId, status, code, message));
 }
 
+function rateLimited(
+  requestId: string,
+  retryAfterSeconds: number,
+) {
+  const response = failure(
+    requestId,
+    429,
+    "rate_limited",
+    "Too many requests. Please retry later.",
+  );
+  response.headers.set("Retry-After", String(retryAfterSeconds));
+  return response;
+}
+
 export function OPTIONS() {
   return runtimeOptionsResponse();
 }
@@ -40,28 +54,18 @@ export async function POST(request: Request) {
   const requestId = createRequestId();
 
   try {
+    const authGuard = await checkRateLimit(
+      "runtime:offer:auth",
+      getRequestIp(request),
+      300,
+    );
+
+    if (!authGuard.allowed) {
+      return rateLimited(requestId, authGuard.retry_after_seconds);
+    }
+
     const token = extractBearerToken(request);
     if (!token) {
-      const limit = await checkRateLimit(
-        "runtime:offer:auth",
-        getRequestIp(request),
-        20,
-      );
-
-      if (!limit.allowed) {
-        const response = failure(
-          requestId,
-          429,
-          "rate_limited",
-          "Too many requests. Please retry later.",
-        );
-        response.headers.set(
-          "Retry-After",
-          String(limit.retry_after_seconds),
-        );
-        return response;
-      }
-
       return failure(
         requestId,
         401,
@@ -72,28 +76,6 @@ export async function POST(request: Request) {
 
     const resolved = await resolveRuntimeIntegration(token);
     if (!resolved.ok) {
-      if (resolved.status === 401) {
-        const limit = await checkRateLimit(
-          "runtime:offer:auth",
-          getRequestIp(request),
-          20,
-        );
-
-        if (!limit.allowed) {
-          const response = failure(
-            requestId,
-            429,
-            "rate_limited",
-            "Too many requests. Please retry later.",
-          );
-          response.headers.set(
-            "Retry-After",
-            String(limit.retry_after_seconds),
-          );
-          return response;
-        }
-      }
-
       return failure(
         requestId,
         resolved.status,
@@ -109,22 +91,16 @@ export async function POST(request: Request) {
     );
 
     if (!rateLimit.allowed) {
-      const response = failure(
-        requestId,
-        429,
-        "rate_limited",
-        "Too many requests. Please retry later.",
-      );
-      response.headers.set(
-        "Retry-After",
-        String(rateLimit.retry_after_seconds),
-      );
-      return response;
+      return rateLimited(requestId, rateLimit.retry_after_seconds);
     }
 
     const body = await readJsonBody(request);
     if (!isRecord(body)) {
-      throw new HttpError(400, "invalid_offer_request", "Offer request must be an object.");
+      throw new HttpError(
+        400,
+        "invalid_offer_request",
+        "Offer request must be an object.",
+      );
     }
 
     const momentKey =
