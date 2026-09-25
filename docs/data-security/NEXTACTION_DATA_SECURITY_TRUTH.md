@@ -537,7 +537,7 @@ Stage 13 is complete when the implementation and live database prove:
 - privileged settlement execution is restricted;
 - no public client can directly mutate financial state.
 
-## 25. Stage 3 exit criteria
+## 27. Historical Stage 3 exit criteria
 
 Stage 3 is complete as a specification when the implementation team can identify, for every production table:
 
