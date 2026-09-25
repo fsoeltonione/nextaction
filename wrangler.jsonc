@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nextaction",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "env": {
+    "staging": {
+      "name": "nextaction-staging",
+      "workers_dev": true,
+      "vars": {
+        "APP_ENV": "staging"
+      },
+      "secrets": {
+        "required": ["SUPABASE_SECRET_KEY"]
+      }
+    },
+    "production": {
+      "name": "nextaction",
+      "workers_dev": true,
+      "vars": {
+        "APP_ENV": "production"
+      },
+      "secrets": {
+        "required": ["SUPABASE_SECRET_KEY"]
+      }
+    }
+  }
+}
