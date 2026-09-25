@@ -49,6 +49,15 @@ run(
   npx,
   [
     "--yes",
+    "@opennextjs/cloudflare@1.20.6",
+    "build",
+  ],
+);
+
+run(
+  npx,
+  [
+    "--yes",
     "wrangler@4.139.0",
     "secret",
     "put",
@@ -57,15 +66,6 @@ run(
     target,
   ],
   process.env.SUPABASE_SECRET_KEY,
-);
-
-run(
-  npx,
-  [
-    "--yes",
-    "@opennextjs/cloudflare@1.20.6",
-    "build",
-  ],
 );
 
 run(
