@@ -1,17 +1,25 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Sparkles, Code2, LogOut, Plus, X, Zap, Target, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { Tables } from "@/lib/database.types";
 
-export default function Dashboard() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [offers, setOffers] = useState<any[]>([]);
+type Product = Tables<"products">;
+type Moment = Tables<"moments">;
+type Offer = Tables<"offers">;
+type ProductWithMoments = Product & { moments: Moment[] };
+type OfferWithTargets = Offer & { target_moment_ids: string[] };
+
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const initialActiveTab = searchParams.get("intent") === "advertise" ? "advertise" : "monetize";
+  const [products, setProducts] = useState<ProductWithMoments[]>([]);
+  const [offers, setOffers] = useState<OfferWithTargets[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'monetize' | 'advertise'>('monetize');
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'monetize' | 'advertise'>(initialActiveTab);
 
   // Create Offer modal state
   const [showCreateOffer, setShowCreateOffer] = useState(false);
@@ -26,14 +34,6 @@ export default function Dashboard() {
 
   const supabase = createClient();
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    // Auto-switch to advertise tab if coming from "Reach Customers"
-    if (searchParams.get('intent') === 'advertise') {
-      setActiveTab('advertise');
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     async function loadData() {
@@ -56,8 +56,6 @@ export default function Dashboard() {
       if (!membership) { setLoading(false); return; }
 
       const currentWorkspaceId = membership.workspace_id;
-      setWorkspaceId(currentWorkspaceId);
-
       const [productsResult, offersResult, offerMomentLinksResult] = await Promise.all([
         supabase
           .from('products')
@@ -86,16 +84,16 @@ export default function Dashboard() {
         target_moment_ids: targetIdsByOffer.get(offer.id) || [],
       }));
 
-      setProducts(productsResult.data || []);
-      setOffers(offersWithTargets);
+      setProducts((productsResult.data || []) as ProductWithMoments[]);
+      setOffers(offersWithTargets as OfferWithTargets[]);
       setLoading(false);
     }
     loadData();
   }, [router, supabase]);
 
   // Gather all moments from all products for the offer targeting
-  const allMoments = products.flatMap(p => p.moments || []);
-  const momentById = new Map(allMoments.map((moment: any) => [moment.id, moment]));
+  const allMoments = products.flatMap((product) => product.moments);
+  const momentById = new Map<string, Moment>(allMoments.map((moment) => [moment.id, moment]));
 
   const handleCreateOffer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,8 +105,11 @@ export default function Dashboard() {
         body: JSON.stringify(offerForm),
       });
       if (res.ok) {
-        const { offer } = await res.json();
-        setOffers(prev => [offer, ...prev]);
+        const { offer } = (await res.json()) as { offer: Offer };
+        setOffers(prev => [
+          { ...offer, target_moment_ids: offer.target_moments ?? [] },
+          ...prev,
+        ]);
         setShowCreateOffer(false);
         setOfferForm({ title: '', description: '', cta_label: 'Learn More', destination_url: '', moment_ids: [] });
       }
@@ -203,7 +204,7 @@ export default function Dashboard() {
 
                     <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-4">Registered Moments</h3>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {product.moments?.map((m: any) => (
+                      {product.moments.map((m) => (
                         <div key={m.id} className="bg-neutral-950 border border-neutral-800/50 rounded-xl p-4 hover:border-indigo-500/30 transition-colors group">
                           <div className="flex items-center gap-2 mb-3">
                             <Code2 className="w-3.5 h-3.5 text-indigo-400" />
@@ -211,7 +212,7 @@ export default function Dashboard() {
                           </div>
                           <div className="bg-black/50 p-2.5 rounded-lg overflow-x-auto">
                             <code className="text-xs font-mono text-emerald-400 whitespace-nowrap">
-                              nextaction.track('{m.moment_key}', uid)
+                              {"nextaction.track('" + m.moment_key + "', uid)"}
                             </code>
                           </div>
                         </div>
@@ -337,8 +338,8 @@ export default function Dashboard() {
                   <input
                     required
                     placeholder="https://yourproduct.com"
-                    value={offerForm.cta_url}
-                    onChange={e => setOfferForm(p => ({ ...p, cta_url: e.target.value }))}
+                    value={offerForm.destination_url}
+                    onChange={e => setOfferForm(p => ({ ...p, destination_url: e.target.value }))}
                     className="w-full bg-neutral-950 border border-neutral-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-neutral-100 text-sm placeholder:text-neutral-600 outline-none"
                   />
                 </div>
@@ -352,11 +353,11 @@ export default function Dashboard() {
                   <p className="text-xs text-neutral-500 italic">No moments found. Add a product under the Monetize tab first.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {allMoments.map((m: any) => (
+                    {allMoments.map((m) => (
                       <button
                         type="button"
                         key={m.moment_key}
-                        onClick={() => toggleMoment(m.moment_key)}
+                        onClick={() => toggleMoment(m.id)}
                         className={`text-xs font-mono px-3 py-1.5 rounded-lg border transition-all ${offerForm.moment_ids.includes(m.id) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-neutral-950 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}
                       >
                         {m.moment_key}
@@ -384,5 +385,20 @@ export default function Dashboard() {
         </div>
       )}
     </div>
+  );
+}
+
+
+export default function Dashboard() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }

@@ -293,7 +293,7 @@ Constraint:
 
 The production model must not depend on a free-form target_moments text array.
 
-Cross-tenant targeting must be rejected.
+Cross-workspace targeting is allowed for advertiser Offers. An Offer owned by one advertiser workspace may target active Moments belonging to another workspace. Runtime decisioning must never use client-supplied workspace identity; the publisher integration determines the publisher workspace, and server-side eligibility resolves the target Moment and advertiser Offer.
 
 ## 11. Event model
 
@@ -921,3 +921,21 @@ Stage 5 is complete as a blueprint when:
 - no live DDL is required to interpret the design
 
 Only after this blueprint is accepted should actual Supabase migrations be written.
+
+
+## 18. Stage 9 data-model amendment
+
+Stage 9 confirmed two runtime implications that supersede earlier prototype assumptions:
+
+1. **Offer targeting is cross-workspace.** The `offer_moments` relation connects an advertiser Offer to active Moments that may belong to another workspace. The previous same-workspace trigger was removed because it contradicted the two-sided promotion-network model.
+2. **Decision is Moment-driven.** `/v1/offer` accepts a canonical `moment_key` and may proceed before the asynchronous Event worker has created a `moment_occurrence`. When a recent occurrence exists, it is attached to the Decision as evidence; absence of an occurrence is not itself a no-fill condition.
+
+Stage 9 runtime additions:
+- `private.decisions.moment_id` with FK to `public.moments`
+- unique partial protection for `moment_occurrences.event_id`
+- private runtime rate-limit buckets
+- service-role-only runtime RPC boundaries
+- PGMQ queue `runtime-events`
+- scheduled PostgreSQL worker for Event processing
+
+These changes preserve the locked chain **Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement** while keeping asynchronous ingestion from blocking a valid Moment decision.

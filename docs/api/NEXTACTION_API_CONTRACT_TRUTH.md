@@ -2,7 +2,8 @@
 
 **Status:** Authoritative v1  
 **Depends on:** `docs/NEXTACTION_PRODUCT_DOMAIN_TRUTH.md`, `docs/architecture/NEXTACTION_ARCHITECTURE_TRUTH.md`, `docs/data-security/NEXTACTION_DATA_SECURITY_TRUTH.md`  
-**Baseline:** Git SHA `b0d4a1ee15aae9cca3eb9edccdc2a7133db8b360`  
+**Baseline:** Stage 8 `master` commit `a13a19d8c30ac2080f5a7430a2e4e58147f981fe`
+**Runtime implementation:** Stage 9 branch `stage-9-runtime-core`  
 **Date:** 2026-09-26
 
 ## 1. Purpose
@@ -15,7 +16,7 @@ It separates:
 - authentication callbacks
 - internal application operations
 
-This phase defines contracts only. It does not implement new endpoints.
+The contract remains authoritative while implementation is staged. Stage 9 implements `/v1/track` and `/v1/offer`; `/v1/click/:delivery_token` remains a later Click/Qualification/Settlement milestone.
 
 ## 2. API surface
 
@@ -151,7 +152,7 @@ Conceptual transport:
 Authorization: Bearer <integration-token>
 ```
 
-The exact token prefix/storage representation remains a later implementation decision.
+Runtime integration credentials use the `na_live_` prefix and are persisted only as SHA-256 hashes. Runtime code resolves them through a service-role-only database function.
 
 The server resolves:
 
@@ -452,7 +453,7 @@ Example:
 }
 ```
 
-The delivery token is opaque to the publisher's business logic and must not expose financial or internal database fields.
+The delivery token is an opaque, server-issued, high-entropy token. Only its SHA-256 hash is persisted; it must not expose financial or internal database fields.
 
 ### No fill
 
@@ -600,7 +601,7 @@ Delivery tokens are server-issued and must be:
 - bounded by expiry where appropriate
 - non-reusable for duplicate settlement
 
-The exact cryptographic format is a later implementation decision.
+The current implementation uses an opaque high-entropy token with SHA-256 hash persistence; click verification remains a later milestone.
 
 ### Open redirects
 
@@ -681,28 +682,33 @@ A publisher integration must be able to:
 
 No runtime endpoint should require knowledge of NextAction's internal database IDs or private schemas.
 
-## 18. Current prototype contract gaps
+## 18. Current implementation status
 
-The existing repository currently exposes:
-- `POST /api/analyze`
-- `POST /api/products/save`
-- `POST /api/offers/create`
-- auth callback at `GET /auth/callback`
+Stage 9 now implements the first public runtime surface described by this contract:
 
-Current implementations are prototype contracts and do not yet satisfy this target contract.
+- `POST /v1/track`
+- `POST /v1/offer`
 
-Notable gaps:
-- no `/v1/track`
-- no `/v1/offer`
-- no `/v1/click`
-- current analysis request accepts only `domain`
-- current product save does not persist capability intent
-- current offer creation accepts free-form `target_moments`
-- current callback accepts a `next` path without a finalized allowlist contract
-- runtime integration authentication does not exist
-- standardized error/idempotency envelopes do not exist
+Stage 9 also implements:
 
-These are implementation gaps, not changes to Product Truth.
+- publisher integration credential resolution
+- Event idempotency enforcement
+- Event → Moment worker processing
+- Decision → Delivery creation
+- runtime rate limiting
+- PGMQ-backed asynchronous processing
+- server-authoritative destination and Offer selection
+
+The following remain intentionally unimplemented:
+
+- `GET /v1/click/:delivery_token`
+- Click qualification policy
+- Qualified Click persistence
+- Settlement execution and financial ledger mutation
+- DNS-aware SSRF controls for a future server-side URL scanner
+- automated deployment into a real staging environment
+
+These are later implementation milestones and do not change the target API semantics defined above.
 
 ## 19. Authentication callback contract
 
