@@ -57,8 +57,8 @@ export default function Dashboard() {
       setWorkspaceId(membership.workspace_id);
 
       const [productsResult, offersResult] = await Promise.all([
-        supabase.from('products').select('*, moments(*)').eq('workspace_id', workspace.id).order('created_at', { ascending: false }),
-        supabase.from('offers').select('*').eq('workspace_id', workspace.id).order('created_at', { ascending: false }),
+        supabase.from('products').select('*, moments(*)').eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
+        supabase.from('offers').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
       ]);
 
       setProducts(productsResult.data || []);
