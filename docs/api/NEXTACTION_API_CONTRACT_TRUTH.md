@@ -601,7 +601,7 @@ Delivery tokens are server-issued and must be:
 - bounded by expiry where appropriate
 - non-reusable for duplicate settlement
 
-The current implementation uses an opaque high-entropy token with SHA-256 hash persistence; click verification remains a later milestone.
+The current implementation uses an opaque high-entropy token with SHA-256 hash persistence; Stage 10 verifies the token against Delivery state before recording/retrieving a Click.
 
 ### Open redirects
 
@@ -684,20 +684,24 @@ No runtime endpoint should require knowledge of NextAction's internal database I
 
 ## 18. Current implementation status
 
-Stage 9 now implements the first public runtime surface described by this contract:
+Stage 10 now implements the first executable Click runtime surface in addition to the Stage 9 runtime:
 
 - `POST /v1/track`
 - `POST /v1/offer`
+- `GET /v1/click/:delivery_token`
 
-Stage 9 also implements:
+Stage 9/10 also implement:
 
 - publisher integration credential resolution
 - Event idempotency enforcement
 - Event → Moment worker processing
 - Decision → Delivery creation
+- Click idempotency enforcement
+- delivery expiry validation
 - runtime rate limiting
 - PGMQ-backed asynchronous processing
 - server-authoritative destination and Offer selection
+- trusted server-side click redirect
 
 The following remain intentionally unimplemented:
 
