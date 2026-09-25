@@ -291,24 +291,23 @@ Live Supabase verification on 2026-09-26 confirmed:
 - `pgmq` extension installed
 - `pg_cron` extension installed
 - `runtime-events` queue exists
-- `nextaction-runtime-worker` cron job is active
+- only `nextaction-runtime-worker` remains active after removing a duplicate worker schedule
 - runtime RPCs are executable by `service_role` only
 - `anon` and `authenticated` cannot execute the runtime RPCs
+- final persistent runtime counts are zero for Events, Moment occurrences, Decisions, Deliveries, rate-limit buckets, Clicks, Qualified Clicks, and Settlements
 
-Transactional runtime smoke test passed with rollback:
+Runtime smoke test passed against live Supabase:
 
 ```
 Event first insert       = created
 Event identical replay   = same Event, not created again
-Conflicting replay       = rejected
-Immediate /v1/offer path  = filled
-Decision occurrence      = optional before async worker
-Worker                    = processed 1, failed 0
-Worker Moment occurrence = created
-Rate limit                = allowed, allowed, rejected
+Conflicting replay      = rejected
+Decision / Delivery     = filled
+Worker processing       = Event → Moment occurrence succeeded
+Rate limit              = allowed, allowed, rejected
 ```
 
-The smoke test created temporary fixtures inside a transaction and rolled them back; persistent product/workspace data was not changed.
+Temporary fixtures were explicitly deleted after verification; the pre-existing workspace/product/Moment data remained unchanged.
 
 ## 13. Known remaining gaps
 
@@ -336,8 +335,23 @@ GitHub contains the canonical Stage 9 SQL snapshots:
 
 - `supabase/migrations/20260926030000_stage_9_runtime_core.sql`
 - `supabase/migrations/20260926040000_stage_9_hardening.sql`
+- `supabase/migrations/20260926044000_stage_9_runtime_surface_cleanup.sql`
 
-The live Supabase migration history also contains reconciliation/hardening entries generated while the Stage 9 runtime was being corrected. Those live records cannot be reconstructed byte-for-byte from migration history alone through the connector; the committed SQL snapshots represent the reproducible intended Stage 9 end state.
+The live Supabase migration history also contains corrective entries created during implementation. The recorded live Stage 9 sequence includes:
+
+```
+20260925214730  20260926030000_stage_9_runtime_core
+20260925215138  stage_9_runtime_reconciliation
+20260925215209  stage_9_runtime_reconciliation
+20260925215210  stage_9_hardening
+20260925215231  stage_9_runtime_hardening
+20260925215322  stage_9_runtime_sql_fix
+20260925215343  stage_9_runtime_builtin_fix
+20260925215416  stage_9_decision_runtime_hardening
+20260925215802  stage_9_runtime_surface_cleanup
+```
+
+Some corrective entries were produced while reconciling live state and cannot be reconstructed byte-for-byte from migration history alone through the connector. The committed Stage 9 snapshots describe the intended final source state; live production was verified separately.
 
 ## 15. Exit criteria
 
