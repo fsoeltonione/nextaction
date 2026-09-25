@@ -296,16 +296,23 @@ Live Supabase verification on 2026-09-26 confirmed:
 - `anon` and `authenticated` cannot execute the runtime RPCs
 - final persistent runtime counts are zero for Events, Moment occurrences, Decisions, Deliveries, rate-limit buckets, Clicks, Qualified Clicks, and Settlements
 
-Runtime smoke test passed against live Supabase:
+Runtime smoke test was re-run against live Supabase with deterministic temporary fixtures and explicit cleanup. Results:
 
 ```
-Event first insert       = created
-Event identical replay   = same Event, not created again
-Conflicting replay      = rejected
+credential resolution   = ok
+event first             = created
+event replay            = same Event, not created again
+conflicting replay      = rejected (23505)
+queue after accept      = 1
+worker tick             = 1 processed / 0 failed
+event status            = processed
+Moment occurrence       = 1
+queue after worker      = 0
 Decision / Delivery     = filled
-Worker processing       = Event → Moment occurrence succeeded
-Rate limit              = allowed, allowed, rejected
+rate limit              = allowed, allowed, rejected
 ```
+
+All deterministic fixtures were deleted before commit; the pre-existing workspace/product/Moment data remained unchanged.
 
 Temporary fixtures were explicitly deleted after verification; the pre-existing workspace/product/Moment data remained unchanged.
 
@@ -336,8 +343,9 @@ GitHub contains the canonical Stage 9 SQL snapshots:
 - `supabase/migrations/20260926030000_stage_9_runtime_core.sql`
 - `supabase/migrations/20260926040000_stage_9_hardening.sql`
 - `supabase/migrations/20260926044000_stage_9_runtime_surface_cleanup.sql`
+- `supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql`
 
-The live Supabase migration history also contains corrective entries created during implementation. The recorded live Stage 9 sequence includes:
+The live Supabase migration history also contains corrective entries created during implementation. The `20260926050000` GitHub snapshot records the atomic-upsert rate-limit implementation found in the already-corrected live database; it is a source-of-truth reconciliation marker and was not re-applied as duplicate live DDL. The recorded live Stage 9 sequence includes:
 
 ```
 20260925214730  20260926030000_stage_9_runtime_core
