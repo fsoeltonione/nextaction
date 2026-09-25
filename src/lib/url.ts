@@ -15,7 +15,11 @@ function ipv4ToNumber(hostname: string): number | null {
 }
 
 function isBlockedHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\.$/, "");
+  const host = hostname
+    .toLowerCase()
+    .replace(/^\[/, "")
+    .replace(/\]$/, "")
+    .replace(/\.$/, "");
 
   if (
     host === "localhost" ||
