@@ -2,8 +2,8 @@
 
 **Status:** Authoritative v1  
 **Depends on:** `docs/NEXTACTION_PRODUCT_DOMAIN_TRUTH.md`, `docs/architecture/NEXTACTION_ARCHITECTURE_TRUTH.md`, `docs/data-security/NEXTACTION_DATA_SECURITY_TRUTH.md`  
-**Baseline:** Stage 8 `master` commit `a13a19d8c30ac2080f5a7430a2e4e58147f981fe`
-**Runtime implementation:** Stage 9 branch `stage-9-runtime-core`  
+**Baseline:** Stage 9 `master` commit `60022390f08e9975235542bf76149f3c2ed54ba3`
+**Runtime implementation:** Stage 10 branch `stage-10-click-runtime`  
 **Date:** 2026-09-26
 
 ## 1. Purpose
@@ -16,7 +16,7 @@ It separates:
 - authentication callbacks
 - internal application operations
 
-The contract remains authoritative while implementation is staged. Stage 9 implements `/v1/track` and `/v1/offer`; `/v1/click/:delivery_token` remains a later Click/Qualification/Settlement milestone.
+The contract remains authoritative while implementation is staged. Stage 10 implements `/v1/track`, `/v1/offer`, and the first executable `/v1/click/:delivery_token` path; Qualified Click and Settlement remain later milestones.
 
 ## 2. API surface
 
@@ -509,17 +509,17 @@ No price, qualification status, publisher share, or advertiser debit amount is a
 
 ### Server processing
 
-Conceptually:
+Stage 10 executes the first part of the conceptual flow:
 
 ```
 verify delivery token
   -> validate delivery state
   -> record/retrieve Click
-  -> apply qualification policy
-  -> if qualified, execute atomic settlement
   -> resolve trusted destination
   -> redirect
 ```
+
+Qualified Click policy and atomic Settlement execution are intentionally deferred until their policy/evidence contract is locked.
 
 ### Qualified result
 
@@ -701,9 +701,8 @@ Stage 9 also implements:
 
 The following remain intentionally unimplemented:
 
-- `GET /v1/click/:delivery_token`
 - Click qualification policy
-- Qualified Click persistence
+- Qualified Click evidence/versioning
 - Settlement execution and financial ledger mutation
 - DNS-aware SSRF controls for a future server-side URL scanner
 - automated deployment into a real staging environment
