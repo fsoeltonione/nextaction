@@ -1,6 +1,6 @@
 # NextAction Stage 9 — Runtime Core
 
-**Status:** Implemented on `stage-9-runtime-core`; pending final CI review and merge to `master`.  
+**Status:** Runtime implementation complete on `stage-9-runtime-core`; merge is blocked by GitHub Actions runner availability.  
 **Date:** 2026-09-26  
 **Baseline:** Stage 8 `master` `a13a19d8c30ac2080f5a7430a2e4e58147f981fe`
 
@@ -365,7 +365,7 @@ Some corrective entries were produced while reconciling live state and cannot be
 
 Stage 9 is ready to merge when:
 
-- GitHub Actions runner executes the CI workflow and CI is green.
+- GitHub Actions must execute the quality job on an allocated runner and report green. Current attempts fail before runner steps execute (`runner_id=0`, `steps=[]`), so they do not establish an application lint/typecheck/build failure.
 - runtime RPC privilege checks remain locked.
 - transactional runtime smoke test remains green.
 - staging gate is present and requires a real staging URL before claiming staging readiness.
