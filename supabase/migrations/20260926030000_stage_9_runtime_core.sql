@@ -126,6 +126,9 @@ AS $$
 DECLARE
   v_event_id UUID;
   v_created BOOLEAN := FALSE;
+  v_existing_event_type TEXT;
+  v_existing_occurred_at TIMESTAMPTZ;
+  v_existing_payload JSONB;
 BEGIN
   IF p_integration_id IS NULL THEN
     RAISE EXCEPTION 'integration is required' USING ERRCODE = '22023';
@@ -188,11 +191,19 @@ BEGIN
       jsonb_build_object('event_id', v_event_id::TEXT)
     );
   ELSE
-    SELECT e.id
-    INTO v_event_id
+    SELECT e.id, e.event_type, e.occurred_at, e.payload
+    INTO v_event_id, v_existing_event_type, v_existing_occurred_at, v_existing_payload
     FROM private.events AS e
     WHERE e.integration_id = p_integration_id
       AND e.idempotency_key = trim(p_idempotency_key);
+
+    IF v_existing_event_type IS DISTINCT FROM trim(p_event_type)
+       OR v_existing_occurred_at IS DISTINCT FROM p_occurred_at
+       OR v_existing_payload IS DISTINCT FROM p_payload
+    THEN
+      RAISE EXCEPTION 'idempotency key was already used with a different event'
+        USING ERRCODE = '23505';
+    END IF;
   END IF;
 
   RETURN QUERY SELECT v_event_id, v_created;
@@ -373,7 +384,7 @@ BEGIN
 
   RETURN QUERY SELECT TRUE, v_occurrence_id, NULL::TEXT;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.runtime_process_event(UUID)
   FROM PUBLIC, anon, authenticated;
