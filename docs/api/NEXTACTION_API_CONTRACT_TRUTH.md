@@ -152,7 +152,7 @@ Conceptual transport:
 Authorization: Bearer <integration-token>
 ```
 
-The exact token prefix/storage representation remains a later implementation decision.
+Runtime integration credentials use the `na_live_` prefix and are persisted only as SHA-256 hashes. Runtime code resolves them through a service-role-only database function.
 
 The server resolves:
 
@@ -453,7 +453,7 @@ Example:
 }
 ```
 
-The delivery token is opaque to the publisher's business logic and must not expose financial or internal database fields.
+The delivery token is an opaque, server-issued, high-entropy token. Only its SHA-256 hash is persisted; it must not expose financial or internal database fields.
 
 ### No fill
 
@@ -601,7 +601,7 @@ Delivery tokens are server-issued and must be:
 - bounded by expiry where appropriate
 - non-reusable for duplicate settlement
 
-The exact cryptographic format is a later implementation decision.
+The current implementation uses an opaque high-entropy token with SHA-256 hash persistence; click verification remains a later milestone.
 
 ### Open redirects
 
