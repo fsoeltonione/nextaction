@@ -18,13 +18,26 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Checkout source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c http.extraheader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
 
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: 24
-          cache: npm
+      - name: Verify runtime
+        shell: bash
+        run: |
+          node --version
+          npm --version
+          case "$(node -p 'process.versions.node.split(".")[0]')" in
+            24) ;;
+            *) echo "CI requires Node 24"; exit 1 ;;
+          esac
 
       - name: Install
         run: npm ci
