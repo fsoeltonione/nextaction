@@ -53,7 +53,7 @@ DECLARE
   v_window_end TIMESTAMPTZ;
   v_count INTEGER;
 BEGIN
-  IF p_scope IS NULL OR pg_catalog.length(pg_catalog.trim(p_scope)) < 1 OR pg_catalog.length(p_scope) > 100 THEN
+  IF p_scope IS NULL OR pg_catalog.length(trim(p_scope)) < 1 OR pg_catalog.length(p_scope) > 100 THEN
     RAISE EXCEPTION 'invalid rate limit scope' USING ERRCODE = '22023';
   END IF;
 
@@ -190,8 +190,8 @@ BEGIN
   )
   VALUES (
     p_integration_id,
-    pg_catalog.trim(p_idempotency_key),
-    pg_catalog.trim(p_event_type),
+    trim(p_idempotency_key),
+    trim(p_event_type),
     p_occurred_at,
     p_payload,
     p_request_id
@@ -219,10 +219,10 @@ BEGIN
       v_existing_payload
     FROM private.events AS e
     WHERE e.integration_id = p_integration_id
-      AND e.idempotency_key = pg_catalog.trim(p_idempotency_key)
+      AND e.idempotency_key = trim(p_idempotency_key)
     LIMIT 1;
 
-    IF v_existing_event_type IS DISTINCT FROM pg_catalog.trim(p_event_type)
+    IF v_existing_event_type IS DISTINCT FROM trim(p_event_type)
        OR v_existing_occurred_at IS DISTINCT FROM p_occurred_at
        OR v_existing_payload IS DISTINCT FROM p_payload
     THEN
