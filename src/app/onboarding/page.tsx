@@ -272,6 +272,15 @@ function OnboardingContent() {
           }),
         ),
       });
+
+      setState((current) =>
+        current
+          ? {
+              ...current,
+              step: "product_understanding",
+            }
+          : current,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Product analysis failed.");
     } finally {
@@ -280,9 +289,14 @@ function OnboardingContent() {
   }, []);
 
   useEffect(() => {
-    if (!state || state.step !== "url" || !initialUrl || analysisStarted.current) {
+    if (!state || !initialUrl || analysisStarted.current) {
       return;
     }
+
+    const hasDifferentProduct =
+      !state.product || state.product.canonical_url !== initialUrl;
+
+    if (!hasDifferentProduct) return;
 
     analysisStarted.current = true;
     void runAnalysis(initialUrl);
