@@ -181,6 +181,22 @@ It does not implement the runtime, payment system, SDK, scanner, queue, settleme
 
 Its job is to establish a stable contract so subsequent implementation work does not drift from the intended product.
 
+## 16. Stage 13 runtime amendment
+
+Stage 13 makes the locked economic boundary executable without changing the product model:
+
+- A valid first Click is qualified under qv1.
+- A Qualified Click is eligible for exactly one Settlement.
+- MVP Settlement is fixed at 100 cents USD.
+- Publisher allocation is 75 cents.
+- NextAction allocation is 25 cents.
+- One advertiser capacity unit is consumed per successful Settlement.
+- Settlement is server-authoritative, atomic, and idempotent.
+- Client input cannot determine financial amounts, workspace identities, capacity state, or settlement state.
+- Publisher navigation proceeds only after Settlement succeeds or an already-existing Settlement is replayed.
+
+Payment-provider integration remains deferred; advertiser capacity is still provisioned inside the NextAction system.
+
 ## 15. Change-control rule
 Any change to the locked domain chain, capability semantics, activation flow, qualification/economic model, or source-of-truth rules requires an explicit product/specification amendment.
 
