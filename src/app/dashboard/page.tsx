@@ -357,7 +357,7 @@ export default function Dashboard() {
                         type="button"
                         key={m.moment_key}
                         onClick={() => toggleMoment(m.moment_key)}
-                        className={`text-xs font-mono px-3 py-1.5 rounded-lg border transition-all ${offerForm.target_moments.includes(m.moment_key) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-neutral-950 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}
+                        className={`text-xs font-mono px-3 py-1.5 rounded-lg border transition-all ${offerForm.moment_ids.includes(m.id) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-neutral-950 border-neutral-700 text-neutral-400 hover:border-neutral-500'}`}
                       >
                         {m.moment_key}
                       </button>
