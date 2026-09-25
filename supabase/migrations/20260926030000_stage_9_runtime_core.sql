@@ -3,6 +3,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgmq;
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 DO $$
 BEGIN
@@ -27,11 +28,8 @@ CREATE TABLE IF NOT EXISTS private.rate_limit_buckets (
   subject_hash TEXT NOT NULL,
   window_started_at TIMESTAMPTZ NOT NULL,
   request_count INTEGER NOT NULL DEFAULT 0 CHECK (request_count >= 0),
-  PRIMARY KEY (scope, subject_hash, window_started_at)
+  PRIMARY KEY (scope, subject_hash)
 );
-
-CREATE INDEX IF NOT EXISTS rate_limit_buckets_window_idx
-  ON private.rate_limit_buckets(window_started_at);
 
 ALTER TABLE private.rate_limit_buckets ENABLE ROW LEVEL SECURITY;
 
@@ -52,55 +50,53 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public, private, pgmq, pg_temp
+SET search_path = pg_catalog, public, private, pg_temp
 AS $$
 DECLARE
+  v_now TIMESTAMPTZ := clock_timestamp();
   v_window_start TIMESTAMPTZ;
-  v_count INTEGER;
   v_window_end TIMESTAMPTZ;
+  v_count INTEGER;
 BEGIN
   IF p_scope IS NULL OR length(trim(p_scope)) < 1 OR length(p_scope) > 100 THEN
     RAISE EXCEPTION 'invalid rate limit scope' USING ERRCODE = '22023';
   END IF;
-
   IF p_subject_hash IS NULL OR p_subject_hash !~ '^[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'invalid rate limit subject' USING ERRCODE = '22023';
   END IF;
-
   IF p_limit < 1 OR p_limit > 100000 THEN
     RAISE EXCEPTION 'invalid rate limit limit' USING ERRCODE = '22023';
   END IF;
-
   IF p_window_seconds < 1 OR p_window_seconds > 86400 THEN
     RAISE EXCEPTION 'invalid rate limit window' USING ERRCODE = '22023';
   END IF;
 
-  v_window_start :=
-    to_timestamp(
-      floor(extract(epoch FROM clock_timestamp()) / p_window_seconds)
-      * p_window_seconds
-    );
+  v_window_start := to_timestamp(
+    floor(extract(epoch FROM v_now) / p_window_seconds) * p_window_seconds
+  );
 
   INSERT INTO private.rate_limit_buckets (
     scope, subject_hash, window_started_at, request_count
   )
   VALUES (p_scope, p_subject_hash, v_window_start, 1)
-  ON CONFLICT (scope, subject_hash, window_started_at)
+  ON CONFLICT (scope, subject_hash)
   DO UPDATE
-  SET request_count = private.rate_limit_buckets.request_count + 1
+  SET
+    window_started_at = EXCLUDED.window_started_at,
+    request_count = CASE
+      WHEN private.rate_limit_buckets.window_started_at = EXCLUDED.window_started_at
+        THEN private.rate_limit_buckets.request_count + 1
+      ELSE 1
+    END
   RETURNING request_count INTO v_count;
 
-  v_window_end :=
-    v_window_start + make_interval(secs => p_window_seconds);
+  v_window_end := v_window_start + make_interval(secs => p_window_seconds);
 
   RETURN QUERY
   SELECT
     v_count <= p_limit,
     GREATEST(p_limit - v_count, 0),
-    GREATEST(
-      1,
-      CEIL(EXTRACT(epoch FROM (v_window_end - clock_timestamp())))::INTEGER
-    ),
+    GREATEST(1, CEIL(EXTRACT(epoch FROM (v_window_end - v_now)))::INTEGER),
     v_count;
 END;
 $$;
@@ -376,14 +372,8 @@ BEGIN
   WHERE id = p_event_id;
 
   RETURN QUERY SELECT TRUE, v_occurrence_id, NULL::TEXT;
-EXCEPTION
-  WHEN OTHERS THEN
-    UPDATE private.events
-    SET processing_status = 'failed'
-    WHERE id = p_event_id;
-    RAISE;
 END;
-$$;
+$;
 
 REVOKE ALL ON FUNCTION public.runtime_process_event(UUID)
   FROM PUBLIC, anon, authenticated;
@@ -606,6 +596,91 @@ REVOKE ALL ON FUNCTION public.runtime_create_decision_delivery(
 GRANT EXECUTE ON FUNCTION public.runtime_create_decision_delivery(
   UUID, TEXT, UUID, TEXT, TEXT, TIMESTAMPTZ
 ) TO service_role;
+
+-- Database worker: Supabase Cron invokes this transaction periodically.
+CREATE OR REPLACE FUNCTION public.runtime_drain_events(
+  p_quantity INTEGER DEFAULT 25
+)
+RETURNS TABLE (
+  processed INTEGER,
+  failed INTEGER,
+  queue_batch_size INTEGER
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, private, pgmq, pg_temp
+AS $$
+DECLARE
+  v_message_id BIGINT;
+  v_event_id UUID;
+  v_processed INTEGER := 0;
+  v_failed INTEGER := 0;
+  v_batch INTEGER := 0;
+BEGIN
+  IF p_quantity < 1 OR p_quantity > 100 THEN
+    RAISE EXCEPTION 'invalid worker quantity' USING ERRCODE = '22023';
+  END IF;
+
+  FOR v_message_id, v_event_id IN
+    SELECT q.msg_id, NULLIF(q.message->>'event_id', '')::UUID
+    FROM pgmq.read('runtime-events', 60, p_quantity) AS q
+  LOOP
+    v_batch := v_batch + 1;
+
+    BEGIN
+      IF v_event_id IS NULL THEN
+        IF pgmq.delete('runtime-events', v_message_id) THEN
+          v_processed := v_processed + 1;
+        ELSE
+          v_failed := v_failed + 1;
+        END IF;
+        CONTINUE;
+      END IF;
+
+      PERFORM 1
+      FROM public.runtime_process_event(v_event_id);
+
+      IF pgmq.delete('runtime-events', v_message_id) THEN
+        v_processed := v_processed + 1;
+      ELSE
+        v_failed := v_failed + 1;
+      END IF;
+    EXCEPTION
+      WHEN OTHERS THEN
+        v_failed := v_failed + 1;
+    END;
+  END LOOP;
+
+  RETURN QUERY SELECT v_processed, v_failed, v_batch;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.runtime_drain_events(INTEGER)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.runtime_drain_events(INTEGER)
+  TO service_role;
+
+DO $$
+DECLARE
+  v_job_id BIGINT;
+BEGIN
+  SELECT jobid
+  INTO v_job_id
+  FROM cron.job
+  WHERE jobname = 'nextaction-runtime-events'
+  LIMIT 1;
+
+  IF v_job_id IS NOT NULL THEN
+    PERFORM cron.unschedule(v_job_id);
+  END IF;
+
+  PERFORM cron.schedule(
+    'nextaction-runtime-events',
+    '10 seconds',
+    'select public.runtime_drain_events(25);'
+  );
+END;
+$$;
 
 -- Only service_role gets direct queue schema usage. Browser roles remain blocked.
 REVOKE ALL ON SCHEMA pgmq FROM anon, authenticated;
