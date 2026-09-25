@@ -557,19 +557,14 @@ WITH CHECK (
     AND EXISTS (
       SELECT 1
       FROM public.workspaces AS w
-      WHERE w.id = workspace_id
+      WHERE w.id = public.workspace_members.workspace_id
         AND w.created_by = (SELECT auth.uid())
-    )
-    AND NOT EXISTS (
-      SELECT 1
-      FROM public.workspace_members AS existing_member
-      WHERE existing_member.workspace_id = workspace_id
     )
   )
   OR
   (
     role = 'member'
-    AND (SELECT private.current_workspace_role(workspace_id)) = 'owner'
+    AND (SELECT private.current_workspace_role(public.workspace_members.workspace_id)) = 'owner'
   )
 );
 
