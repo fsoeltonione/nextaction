@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createRequestId, jsonError, jsonSuccess } from "@/lib/http";
 import {
