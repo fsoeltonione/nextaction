@@ -1,1 +1,277 @@
-import {\n  createRequestId,\n  HttpError,\n  isRecord,\n  jsonError,\n  jsonSuccess,\n  readJsonBody,\n} from "@/lib/http";\nimport { normalizeProductUrl } from "@/lib/url";\n\nconst MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;\nconst ANALYSIS_TIMEOUT_MS = 12_000;\n\ntype AnalysisMoment = {\n  key: string;\n  label: string;\n  description?: string;\n};\n\ntype AnalysisResult = {\n  url: string;\n  name: string;\n  description: string;\n  moments: AnalysisMoment[];\n};\n\nasync function readLimitedText(response: Response, maxBytes: number): Promise<string> {\n  if (!response.body) {\n    const text = await response.text();\n    if (new TextEncoder().encode(text).byteLength > maxBytes) {\n      throw new HttpError(502, "provider_response_too_large", "Analysis provider returned an oversized response.");\n    }\n    return text;\n  }\n\n  const reader = response.body.getReader();\n  const chunks: Uint8Array[] = [];\n  let totalBytes = 0;\n\n  try {\n    while (true) {\n      const result = await reader.read();\n      if (result.done) break;\n      const value = result.value;\n\n      totalBytes += value.byteLength;\n      if (totalBytes > maxBytes) {\n        await reader.cancel();\n        throw new HttpError(502, "provider_response_too_large", "Analysis provider returned an oversized response.");\n      }\n\n      chunks.push(value);\n    }\n  } finally {\n    reader.releaseLock();\n  }\n\n  const merged = new Uint8Array(totalBytes);\n  let offset = 0;\n  for (const chunk of chunks) {\n    merged.set(chunk, offset);\n    offset += chunk.byteLength;\n  }\n\n  return new TextDecoder().decode(merged);\n}\n\nfunction parseAnalysisOutput(value: unknown): AnalysisResult {\n  if (!isRecord(value)) {\n    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");\n  }\n\n  const rawMoments = Array.isArray(value.moments) ? value.moments : [];\n  if (\n    typeof value.name !== "string" ||\n    typeof value.description !== "string" ||\n    value.name.trim().length === 0 ||\n    value.description.trim().length === 0 ||\n    rawMoments.length < 1 ||\n    rawMoments.length > 10\n  ) {\n    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");\n  }\n\n  const moments: AnalysisMoment[] = [];\n\n  for (const rawMoment of rawMoments) {\n    if (!isRecord(rawMoment)) {\n      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");\n    }\n\n    const key =\n      typeof rawMoment.key === "string"\n        ? rawMoment.key.trim()\n        : typeof rawMoment.id === "string"\n          ? rawMoment.id.trim()\n          : "";\n    const label = typeof rawMoment.label === "string" ? rawMoment.label.trim() : "";\n    const description =\n      typeof rawMoment.description === "string" ? rawMoment.description.trim() : undefined;\n\n    if (\n      !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(key) ||\n      key.length > 80 ||\n      label.length === 0 ||\n      label.length > 120 ||\n      (description !== undefined && description.length > 400)\n    ) {\n      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");\n    }\n\n    moments.push({\n      key,\n      label,\n      ...(description ? { description } : {}),\n    });\n  }\n\n  return {\n    url: typeof value.url === "string" ? value.url : "",\n    name: value.name.trim().slice(0, 160),\n    description: value.description.trim().slice(0, 600),\n    moments,\n  };\n}\n\nexport async function POST(request: Request) {\n  const requestId = createRequestId();\n\n  try {\n    const body = await readJsonBody(request);\n\n    if (!isRecord(body)) {\n      throw new HttpError(400, "invalid_request", "Request body must be a JSON object.");\n    }\n\n    let normalized;\n    try {\n      normalized = normalizeProductUrl(body.url);\n    } catch {\n      throw new HttpError(400, "invalid_url", "A valid product URL is required.");\n    }\n\n    const apiKey = process.env.OPENAI_API_KEY;\n    const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";\n    const model = process.env.OPENAI_MODEL || "deepseek-v4.1-flash-free";\n\n    if (!apiKey) {\n      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");\n    }\n\n    const controller = new AbortController();\n    const timeout = setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);\n    let response: Response;\n\n    try {\n      response = await fetch(baseUrl + "/chat/completions", {\n        method: "POST",\n        headers: {\n          "Content-Type": "application/json",\n          Authorization: "Bearer " + apiKey,\n        },\n        body: JSON.stringify({\n          model,\n          messages: [\n            {\n              role: "user",\n              content: [\n                "Analyze this SaaS product URL.",\n                "Return only JSON matching the requested schema.",\n                "Product URL: " + normalized.value,\n                "Schema example: " + JSON.stringify({\n                  name: "Likely product name",\n                  description: "Short product description",\n                  moments: [\n                    {\n                      key: "invoice_created",\n                      label: "Invoice Created",\n                      description: "An invoice has been created and is ready for follow-up.",\n                    },\n                  ],\n                }),\n                "Provide 3 to 8 commercially relevant Moments.",\n              ].join("\n"),\n            },\n          ],\n          temperature: 0.2,\n        }),\n        signal: controller.signal,\n      });\n    } catch (error) {\n      if (error instanceof DOMException && error.name === "AbortError") {\n        throw new HttpError(504, "analysis_timeout", "Product analysis timed out.");\n      }\n\n      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");\n    } finally {\n      clearTimeout(timeout);\n    }\n\n    if (!response.ok) {\n      console.error("Analysis provider request failed", {\n        requestId,\n        status: response.status,\n      });\n      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");\n    }\n\n    const responseText = await readLimitedText(response, MAX_PROVIDER_RESPONSE_BYTES);\n    let providerPayload: unknown;\n\n    try {\n      providerPayload = JSON.parse(responseText);\n    } catch {\n      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");\n    }\n\n    if (\n      !isRecord(providerPayload) ||\n      !Array.isArray(providerPayload.choices) ||\n      !isRecord(providerPayload.choices[0]) ||\n      !isRecord(providerPayload.choices[0].message) ||\n      typeof providerPayload.choices[0].message.content !== "string"\n    ) {\n      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");\n    }\n\n    let content = providerPayload.choices[0].message.content.trim();\n\n    if (content.startsWith("```json")) content = content.slice(7);\n    else if (content.startsWith("```")) content = content.slice(3);\n    if (content.endsWith("```")) content = content.slice(0, -3);\n\n    let parsedOutput: unknown;\n    try {\n      parsedOutput = JSON.parse(content.trim());\n    } catch {\n      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");\n    }\n\n    const analysis = parseAnalysisOutput(parsedOutput);\n\n    return jsonSuccess({\n      analysis: {\n        ...analysis,\n        url: normalized.value,\n      },\n    }, requestId);\n  } catch (error) {\n    if (error instanceof HttpError) {\n      return jsonError(requestId, error.status, error.code, error.message);\n    }\n\n    console.error("Unexpected analysis route failure", { requestId, error });\n    return jsonError(requestId, 500, "internal_error", "Unable to analyze the product.");\n  }\n}\n
+import {
+  createRequestId,
+  HttpError,
+  isRecord,
+  jsonError,
+  jsonSuccess,
+  readJsonBody,
+} from "@/lib/http";
+import { normalizeProductUrl } from "@/lib/url";
+
+const MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;
+const ANALYSIS_TIMEOUT_MS = 12_000;
+
+type AnalysisMoment = {
+  key: string;
+  label: string;
+  description?: string;
+};
+
+type AnalysisResult = {
+  url: string;
+  name: string;
+  description: string;
+  moments: AnalysisMoment[];
+};
+
+async function readLimitedText(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) {
+      throw new HttpError(502, "provider_response_too_large", "Analysis provider returned an oversized response.");
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      const value = result.value;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(502, "provider_response_too_large", "Analysis provider returned an oversized response.");
+      }
+
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new TextDecoder().decode(merged);
+}
+
+function parseAnalysisOutput(value: unknown): AnalysisResult {
+  if (!isRecord(value)) {
+    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+  }
+
+  const rawMoments = Array.isArray(value.moments) ? value.moments : [];
+  if (
+    typeof value.name !== "string" ||
+    typeof value.description !== "string" ||
+    value.name.trim().length === 0 ||
+    value.description.trim().length === 0 ||
+    rawMoments.length < 1 ||
+    rawMoments.length > 10
+  ) {
+    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+  }
+
+  const moments: AnalysisMoment[] = [];
+
+  for (const rawMoment of rawMoments) {
+    if (!isRecord(rawMoment)) {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+    }
+
+    const key =
+      typeof rawMoment.key === "string"
+        ? rawMoment.key.trim()
+        : typeof rawMoment.id === "string"
+          ? rawMoment.id.trim()
+          : "";
+    const label = typeof rawMoment.label === "string" ? rawMoment.label.trim() : "";
+    const description =
+      typeof rawMoment.description === "string" ? rawMoment.description.trim() : undefined;
+
+    if (
+      !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(key) ||
+      key.length > 80 ||
+      label.length === 0 ||
+      label.length > 120 ||
+      (description !== undefined && description.length > 400)
+    ) {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+    }
+
+    moments.push({
+      key,
+      label,
+      ...(description ? { description } : {}),
+    });
+  }
+
+  return {
+    url: typeof value.url === "string" ? value.url : "",
+    name: value.name.trim().slice(0, 160),
+    description: value.description.trim().slice(0, 600),
+    moments,
+  };
+}
+
+export async function POST(request: Request) {
+  const requestId = createRequestId();
+
+  try {
+    const body = await readJsonBody(request);
+
+    if (!isRecord(body)) {
+      throw new HttpError(400, "invalid_request", "Request body must be a JSON object.");
+    }
+
+    const rawUrl =
+      typeof body.url === "string"
+        ? body.url
+        : typeof body.domain === "string"
+          ? body.domain
+          : undefined;
+
+    let normalized;
+    try {
+      normalized = normalizeProductUrl(rawUrl);
+    } catch {
+      throw new HttpError(400, "invalid_url", "A valid product URL is required.");
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+    const model = process.env.OPENAI_MODEL || "deepseek-v4.1-flash-free";
+
+    if (!apiKey) {
+      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
+    let response: Response;
+
+    try {
+      response = await fetch(baseUrl + "/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + apiKey,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: "user",
+              content: [
+                "Analyze this SaaS product URL.",
+                "Return only JSON matching the requested schema.",
+                "Product URL: " + normalized.value,
+                "Schema example: " + JSON.stringify({
+                  name: "Likely product name",
+                  description: "Short product description",
+                  moments: [
+                    {
+                      key: "invoice_created",
+                      label: "Invoice Created",
+                      description: "An invoice has been created and is ready for follow-up.",
+                    },
+                  ],
+                }),
+                "Provide 3 to 8 commercially relevant Moments.",
+              ].join("\n"),
+            },
+          ],
+          temperature: 0.2,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new HttpError(504, "analysis_timeout", "Product analysis timed out.");
+      }
+
+      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      console.error("Analysis provider request failed", {
+        requestId,
+        status: response.status,
+      });
+      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
+    }
+
+    const responseText = await readLimitedText(response, MAX_PROVIDER_RESPONSE_BYTES);
+    let providerPayload: unknown;
+
+    try {
+      providerPayload = JSON.parse(responseText);
+    } catch {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");
+    }
+
+    if (
+      !isRecord(providerPayload) ||
+      !Array.isArray(providerPayload.choices) ||
+      !isRecord(providerPayload.choices[0]) ||
+      !isRecord(providerPayload.choices[0].message) ||
+      typeof providerPayload.choices[0].message.content !== "string"
+    ) {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");
+    }
+
+    let content = providerPayload.choices[0].message.content.trim();
+
+    if (content.startsWith("```json")) content = content.slice(7);
+    else if (content.startsWith("```")) content = content.slice(3);
+    if (content.endsWith("```")) content = content.slice(0, -3);
+
+    let parsedOutput: unknown;
+    try {
+      parsedOutput = JSON.parse(content.trim());
+    } catch {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+    }
+
+    const analysis = parseAnalysisOutput(parsedOutput);
+    const normalizedAnalysis = {
+      ...analysis,
+      url: normalized.value,
+    };
+
+    return jsonSuccess(
+      {
+        analysis: normalizedAnalysis,
+        // Temporary compatibility surface for the current prototype UI.
+        name: normalizedAnalysis.name,
+        description: normalizedAnalysis.description,
+        moments: normalizedAnalysis.moments.map((moment) => ({
+          id: moment.key,
+          key: moment.key,
+          label: moment.label,
+          ...(moment.description ? { description: moment.description } : {}),
+        })),
+      },
+      requestId,
+    );
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return jsonError(requestId, error.status, error.code, error.message);
+    }
+
+    console.error("Unexpected analysis route failure", { requestId, error });
+    return jsonError(requestId, 500, "internal_error", "Unable to analyze the product.");
+  }
+}
