@@ -36,11 +36,9 @@ The product/domain documents already establish:
 
 These are not re-decided by Stage 11.
 
-## 3. What is not yet locked
+## 3. What was not yet locked at the Stage 11 gate
 
-Current authoritative sources do not specify the actual qualification policy.
-
-The following therefore remain unresolved product/policy decisions:
+At the Stage 11 gate, the authoritative sources did not specify the actual qualification policy. The following questions were therefore recorded as unresolved gate-time decisions. They were subsequently resolved by the approved Qualification Policy v1 and implemented in Stage 12.
 
 - What minimum conditions must a Click satisfy to qualify.
 - Whether repeated clicks from the same Delivery are always non-qualifying after the first recorded Click or whether a later window can qualify.
