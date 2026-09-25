@@ -107,7 +107,8 @@ jobs:
           name: Validate staging smoke inputs
           command: |
             test -n "${STAGING_BASE_URL}"
-            test -n "${STAGING_DELIVERY_TOKEN}"
+            test -n "${STAGING_INTEGRATION_TOKEN}"
+            test -n "${STAGING_MOMENT_KEY}"
       - run:
           name: Run staging smoke
           command: npm run staging:smoke
