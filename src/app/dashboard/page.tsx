@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Sparkles, Code2, LogOut, Plus, X, Zap, Target, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -13,7 +13,7 @@ type Offer = Tables<"offers">;
 type ProductWithMoments = Product & { moments: Moment[] };
 type OfferWithTargets = Offer & { target_moment_ids: string[] };
 
-export default function Dashboard() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const initialActiveTab = searchParams.get("intent") === "advertise" ? "advertise" : "monetize";
   const [products, setProducts] = useState<ProductWithMoments[]>([]);
@@ -385,5 +385,20 @@ export default function Dashboard() {
         </div>
       )}
     </div>
+  );
+}
+
+
+export default function Dashboard() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }
