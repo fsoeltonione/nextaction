@@ -1,5 +1,10 @@
 version: 2.1
 
+parameters:
+  run_release_gate:
+    type: boolean
+    default: false
+
 jobs:
   quality:
     docker:
@@ -42,7 +47,126 @@ jobs:
           name: Build
           command: npm run build
 
+  cloudflare_compatibility:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Check Cloudflare compatibility
+          command: npm run cloudflare:check
+
+  cloudflare_build:
+    docker:
+      - image: cimg/node:24.21.0
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: << pipeline.parameters.staging_supabase_url >>
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: << pipeline.parameters.staging_supabase_publishable_key >>
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Build Cloudflare artifact
+          command: npm run cloudflare:build
+
+  deploy_staging:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Validate staging secrets
+          command: |
+            test -n "${CLOUDFLARE_API_TOKEN}"
+            test -n "${CLOUDFLARE_ACCOUNT_ID}"
+            test -n "${STAGING_NEXT_PUBLIC_SUPABASE_URL}"
+            test -n "${STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
+            test -n "${STAGING_SUPABASE_SECRET_KEY}"
+      - run:
+          name: Deploy staging
+          command: |
+            NEXT_PUBLIC_SUPABASE_URL="${STAGING_NEXT_PUBLIC_SUPABASE_URL}"             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"             SUPABASE_SECRET_KEY="${STAGING_SUPABASE_SECRET_KEY}"             npm run deploy:cloudflare -- staging
+
+  staging_smoke:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run staging smoke
+          command: npm run staging:smoke
+
+  deploy_production:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Validate production secrets
+          command: |
+            test -n "${CLOUDFLARE_API_TOKEN}"
+            test -n "${CLOUDFLARE_ACCOUNT_ID}"
+            test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"
+            test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
+            test -n "${PRODUCTION_SUPABASE_SECRET_KEY}"
+      - run:
+          name: Deploy production
+          command: |
+            NEXT_PUBLIC_SUPABASE_URL="${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"             SUPABASE_SECRET_KEY="${PRODUCTION_SUPABASE_SECRET_KEY}"             npm run deploy:cloudflare -- production
+
+  production_smoke:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Production health smoke
+          command: |
+            STAGING_BASE_URL="${PRODUCTION_BASE_URL}"             npm run staging:smoke
+
 workflows:
   quality-gate:
     jobs:
       - quality
+
+  release-gate:
+    when: << pipeline.parameters.run_release_gate >>
+    jobs:
+      - quality
+      - cloudflare_compatibility:
+          requires:
+            - quality
+      - deploy_staging:
+          requires:
+            - quality
+            - cloudflare_compatibility
+      - staging_smoke:
+          requires:
+            - deploy_staging
+      - hold_production:
+          type: approval
+          requires:
+            - staging_smoke
+      - deploy_production:
+          requires:
+            - hold_production
+      - production_smoke:
+          requires:
+            - deploy_production
