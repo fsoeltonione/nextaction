@@ -58,7 +58,7 @@ BEGIN
       v_click_id,
       v_qualification_status,
       v_destination_url,
-      v_reason_code,
+      v_runtime_reason_code,
       NULL::UUID,
       NULL::TEXT,
       NULL::TIMESTAMPTZ;
