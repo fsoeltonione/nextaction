@@ -218,6 +218,10 @@ Staging must contain:
 
 The staging fixture must be disposable and must not contain real customer data.
 
+The seed script `supabase/staging/STAGE14_SEED.sql` creates a disposable publisher/advertiser topology, an integration credential, an Offer targeting the smoke Moment, advertiser capacity, and a Delivery. It prints the generated integration and Delivery tokens for CI configuration.
+
+The reset script `supabase/staging/STAGE14_RESET.sql` removes the disposable runtime and financial data in dependency-safe order.
+
 ## 9. Failure semantics
 
 The release gate treats these as hard failures:
