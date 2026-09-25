@@ -1,5 +1,7 @@
 const baseUrl = process.env.STAGING_BASE_URL;
 const deliveryToken = process.env.STAGING_DELIVERY_TOKEN;
+const expectedEnvironment =
+  process.env.EXPECTED_ENVIRONMENT ?? "staging";
 
 if (!baseUrl) {
   console.error("Missing STAGING_BASE_URL.");
@@ -31,7 +33,7 @@ const healthBody = await health.json();
 if (
   healthBody?.status !== "ok" ||
   healthBody?.service !== "nextaction" ||
-  healthBody?.environment !== "staging"
+  healthBody?.environment !== expectedEnvironment
 ) {
   console.error("Health check returned an unexpected deployment identity.");
   process.exit(1);
