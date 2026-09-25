@@ -42,10 +42,8 @@ if (
 console.log("Staging health check: OK");
 
 if (!deliveryToken) {
-  console.log(
-    "No STAGING_DELIVERY_TOKEN configured; runtime click smoke was not executed.",
-  );
-  process.exit(0);
+  console.error("Missing STAGING_DELIVERY_TOKEN.");
+  process.exit(2);
 }
 
 const clickPath = `/v1/click/${encodeURIComponent(deliveryToken)}`;
