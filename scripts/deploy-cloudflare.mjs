@@ -72,9 +72,13 @@ run(
   npx,
   [
     "--yes",
-    "@opennextjs/cloudflare@1.20.6",
+    "wrangler@4.139.0",
     "deploy",
     "--env",
     target,
+    "--var",
+    `NEXT_PUBLIC_SUPABASE_URL:${process.env.NEXT_PUBLIC_SUPABASE_URL}`,
+    "--var",
+    `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:${process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}`,
   ],
 );
