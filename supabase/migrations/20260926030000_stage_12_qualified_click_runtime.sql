@@ -21,6 +21,7 @@ DECLARE
   v_destination_url TEXT;
   v_outcome TEXT;
   v_reason_code TEXT;
+  v_runtime_reason_code TEXT;
   v_qualified_click_id UUID;
   v_qualification_version TEXT;
   v_qualified_at TIMESTAMPTZ;
@@ -41,9 +42,12 @@ BEGIN
     v_click_id,
     v_qualification_status,
     v_destination_url,
-    v_reason_code
+    v_runtime_reason_code
   FROM public.runtime_record_click(p_delivery_token_hash) AS r
   LIMIT 1;
+
+  -- The qualification reason is code-controlled; runtime outcome reason is separate.
+  v_reason_code := 'qv1_valid_first_delivery_click';
 
   IF v_click_id IS NULL
      OR v_outcome NOT IN ('created', 'replayed')
