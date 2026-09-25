@@ -316,6 +316,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_runtime_rate_limit: {
+        Args: {
+          p_scope: string
+          p_subject_hash: string
+          p_limit: number
+          p_window_seconds?: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          retry_after_seconds: number
+          request_count: number
+        }[]
+      }
       confirm_product_activation: {
         Args: {
           p_canonical_url: string
@@ -342,6 +356,72 @@ export type Database = {
           result_moment_count: number
           result_offer_id: string
           result_workspace_id: string
+        }[]
+      }
+      runtime_accept_event: {
+        Args: {
+          p_integration_id: string
+          p_idempotency_key: string
+          p_event_type: string
+          p_occurred_at?: string | null
+          p_payload: Json
+          p_request_id: string
+        }
+        Returns: {
+          result_created: boolean
+          result_event_id: string
+        }[]
+      }
+      runtime_ack_event: {
+        Args: { p_message_id: number }
+        Returns: boolean
+      }
+      runtime_create_decision_delivery: {
+        Args: {
+          p_delivery_nonce: string
+          p_delivery_token_hash: string
+          p_expires_at: string
+          p_integration_id: string
+          p_moment_key: string
+          p_request_id: string
+        }
+        Returns: {
+          result_cta_label: string | null
+          result_decision_id: string
+          result_delivery_id: string | null
+          result_description: string | null
+          result_destination_url: string | null
+          result_expires_at: string | null
+          result_offer_id: string | null
+          result_outcome: string
+          result_reason_code: string | null
+          result_title: string | null
+        }[]
+      }
+      runtime_dequeue_events: {
+        Args: {
+          p_quantity?: number
+          p_visibility_seconds?: number
+        }
+        Returns: {
+          event_id: string | null
+          message_id: number
+        }[]
+      }
+      runtime_drain_events: {
+        Args: { p_quantity?: number }
+        Returns: {
+          failed: number
+          processed: number
+          queue_batch_size: number
+        }[]
+      }
+      runtime_process_event: {
+        Args: { p_event_id: string }
+        Returns: {
+          result_moment_occurrence_id: string | null
+          result_processed: boolean
+          result_reason_code: string | null
         }[]
       }
       set_workspace_capabilities: {
