@@ -421,6 +421,19 @@ export type Database = {
           result_reason_code: string | null
         }[]
       }
+      runtime_record_and_qualify_click: {
+        Args: { p_delivery_token_hash: string }
+        Returns: {
+          result_click_id: string | null
+          result_destination_url: string | null
+          result_outcome: string
+          result_qualification_status: string | null
+          result_reason_code: string | null
+          result_qualified_click_id: string | null
+          result_qualification_version: string | null
+          result_qualified_at: string | null
+        }[]
+      }
       runtime_worker_tick: {
         Args: {
           p_quantity?: number
