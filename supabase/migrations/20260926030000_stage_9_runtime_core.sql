@@ -92,7 +92,7 @@ DECLARE
   v_current_window TIMESTAMPTZ;
   v_count INTEGER;
 BEGIN
-  IF p_scope IS NULL OR length(trim(p_scope)) < 1 OR length(p_scope) > 100 THEN
+  IF p_scope IS NULL OR length(btrim(p_scope)) < 1 OR length(p_scope) > 100 THEN
     RAISE EXCEPTION 'invalid rate limit scope' USING ERRCODE = '22023';
   END IF;
 
@@ -395,8 +395,8 @@ BEGIN
   )
   VALUES (
     p_integration_id,
-    pg_catalog.trim(p_idempotency_key),
-    pg_catalog.trim(p_event_type),
+    btrim(p_idempotency_key),
+    btrim(p_event_type),
     p_occurred_at,
     p_payload,
     p_request_id
@@ -416,7 +416,7 @@ BEGIN
     INTO v_event_id
     FROM private.events AS e
     WHERE e.integration_id = p_integration_id
-      AND e.idempotency_key = pg_catalog.trim(p_idempotency_key)
+      AND e.idempotency_key = btrim(p_idempotency_key)
     LIMIT 1;
   END IF;
 
