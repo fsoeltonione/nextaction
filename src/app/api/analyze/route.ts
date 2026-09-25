@@ -1,110 +1,277 @@
-import { NextResponse } from 'next/server';
+import {
+  createRequestId,
+  HttpError,
+  isRecord,
+  jsonError,
+  jsonSuccess,
+  readJsonBody,
+} from "@/lib/http";
+import { normalizeProductUrl } from "@/lib/url";
+
+const MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;
+const ANALYSIS_TIMEOUT_MS = 12_000;
+
+type AnalysisMoment = {
+  key: string;
+  label: string;
+  description?: string;
+};
+
+type AnalysisResult = {
+  url: string;
+  name: string;
+  description: string;
+  moments: AnalysisMoment[];
+};
+
+async function readLimitedText(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) {
+      throw new HttpError(502, "provider_response_too_large", "Analysis provider returned an oversized response.");
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      const value = result.value;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(502, "provider_response_too_large", "Analysis provider returned an oversized response.");
+      }
+
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new TextDecoder().decode(merged);
+}
+
+function parseAnalysisOutput(value: unknown): AnalysisResult {
+  if (!isRecord(value)) {
+    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+  }
+
+  const rawMoments = Array.isArray(value.moments) ? value.moments : [];
+  if (
+    typeof value.name !== "string" ||
+    typeof value.description !== "string" ||
+    value.name.trim().length === 0 ||
+    value.description.trim().length === 0 ||
+    rawMoments.length < 1 ||
+    rawMoments.length > 10
+  ) {
+    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+  }
+
+  const moments: AnalysisMoment[] = [];
+
+  for (const rawMoment of rawMoments) {
+    if (!isRecord(rawMoment)) {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+    }
+
+    const key =
+      typeof rawMoment.key === "string"
+        ? rawMoment.key.trim()
+        : typeof rawMoment.id === "string"
+          ? rawMoment.id.trim()
+          : "";
+    const label = typeof rawMoment.label === "string" ? rawMoment.label.trim() : "";
+    const description =
+      typeof rawMoment.description === "string" ? rawMoment.description.trim() : undefined;
+
+    if (
+      !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(key) ||
+      key.length > 80 ||
+      label.length === 0 ||
+      label.length > 120 ||
+      (description !== undefined && description.length > 400)
+    ) {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+    }
+
+    moments.push({
+      key,
+      label,
+      ...(description ? { description } : {}),
+    });
+  }
+
+  return {
+    url: typeof value.url === "string" ? value.url : "",
+    name: value.name.trim().slice(0, 160),
+    description: value.description.trim().slice(0, 600),
+    moments,
+  };
+}
 
 export async function POST(request: Request) {
+  const requestId = createRequestId();
+
   try {
-    const { domain } = await request.json();
-    
-    if (!domain) {
-      return NextResponse.json({ error: "Domain is required" }, { status: 400 });
+    const body = await readJsonBody(request);
+
+    if (!isRecord(body)) {
+      throw new HttpError(400, "invalid_request", "Request body must be a JSON object.");
+    }
+
+    const rawUrl =
+      typeof body.url === "string"
+        ? body.url
+        : typeof body.domain === "string"
+          ? body.domain
+          : undefined;
+
+    let normalized;
+    try {
+      normalized = normalizeProductUrl(rawUrl);
+    } catch {
+      throw new HttpError(400, "invalid_url", "A valid product URL is required.");
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-
-    // Fallback data if API key is missing or call fails
-    const fallbackResponse = {
-      name: domain,
-      description: "A great SaaS product for modern teams.",
-      moments: [
-        { id: "account_created", label: "Account Created" },
-        { id: "subscription_started", label: "Subscription Started" }
-      ]
-    };
+    const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+    const model = process.env.OPENAI_MODEL || "deepseek-v4.1-flash-free";
 
     if (!apiKey) {
-      return NextResponse.json({ error: "API Key is missing in .env.local" }, { status: 500 });
+      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
     }
 
-    const prompt = `You are an expert SaaS analyst. I will give you a domain name (or URL). 
-Your job is to deduce or guess what the SaaS does based on its domain name, and define commercially relevant "Moments" (semantic events that occur inside the app).
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
+    let response: Response;
 
-Target Domain: ${domain}
+    try {
+      response = await fetch(baseUrl + "/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + apiKey,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: "user",
+              content: [
+                "Analyze this SaaS product URL.",
+                "Return only JSON matching the requested schema.",
+                "Product URL: " + normalized.value,
+                "Schema example: " + JSON.stringify({
+                  name: "Likely product name",
+                  description: "Short product description",
+                  moments: [
+                    {
+                      key: "invoice_created",
+                      label: "Invoice Created",
+                      description: "An invoice has been created and is ready for follow-up.",
+                    },
+                  ],
+                }),
+                "Provide 3 to 8 commercially relevant Moments.",
+              ].join("\n"),
+            },
+          ],
+          temperature: 0.2,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new HttpError(504, "analysis_timeout", "Product analysis timed out.");
+      }
 
-Return ONLY a valid JSON object with this exact structure:
-{
-  "name": "The likely name of the product (Capitalized)",
-  "description": "A short 1-2 sentence description of what the SaaS likely does",
-  "moments": [
-    { "id": "snake_case_event_name", "label": "Human Readable Event Name" }
-  ]
-}
-
-Ensure you provide 3 to 5 realistic moments (e.g. invoice_created, deal_won, repository_connected, etc based on the likely domain context). 
-Output ONLY valid JSON. Do NOT wrap it in markdown code blocks like \`\`\`json.`;
-
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'deepseek-v4.1-flash-free',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-      })
-    });
+      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("LLM API Error:", errText);
-      return NextResponse.json({ error: `API Provider Error: ${errText}` }, { status: response.status });
+      console.error("Analysis provider request failed", {
+        requestId,
+        status: response.status,
+      });
+      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
     }
 
-    const responseText = await response.text();
-    
-    let data;
+    const responseText = await readLimitedText(response, MAX_PROVIDER_RESPONSE_BYTES);
+    let providerPayload: unknown;
+
     try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Failed to parse API response as JSON:", responseText);
-      const match = responseText.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          data = JSON.parse(match[0]);
-        } catch (innerE) {
-          return NextResponse.json({ error: "Failed to parse API provider response even with regex fallback" }, { status: 500 });
-        }
-      } else {
-        return NextResponse.json({ error: "API provider returned non-JSON response" }, { status: 500 });
-      }
+      providerPayload = JSON.parse(responseText);
+    } catch {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");
     }
 
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error("Unexpected API response structure:", data);
-      return NextResponse.json({ error: "Unexpected API response structure from provider" }, { status: 500 });
+    if (
+      !isRecord(providerPayload) ||
+      !Array.isArray(providerPayload.choices) ||
+      !isRecord(providerPayload.choices[0]) ||
+      !isRecord(providerPayload.choices[0].message) ||
+      typeof providerPayload.choices[0].message.content !== "string"
+    ) {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");
     }
 
-    let content = data.choices[0].message.content.trim();
-    
-    // Clean up markdown blocks just in case the model disobeys
-    if (content.startsWith('```json')) content = content.substring(7);
-    else if (content.startsWith('```')) content = content.substring(3);
-    if (content.endsWith('```')) content = content.substring(0, content.length - 3);
+    let content = providerPayload.choices[0].message.content.trim();
 
-    // One more try-catch for the LLM output itself
-    let jsonResult;
+    if (content.startsWith("```json")) content = content.slice(7);
+    else if (content.startsWith("```")) content = content.slice(3);
+    if (content.endsWith("```")) content = content.slice(0, -3);
+
+    let parsedOutput: unknown;
     try {
-      jsonResult = JSON.parse(content.trim());
-    } catch (e) {
-      console.error("LLM output is not valid JSON:", content);
-      return NextResponse.json({ error: `LLM output was not valid JSON: ${content}` }, { status: 500 });
+      parsedOutput = JSON.parse(content.trim());
+    } catch {
+      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
     }
 
-    return NextResponse.json(jsonResult);
+    const analysis = parseAnalysisOutput(parsedOutput);
+    const normalizedAnalysis = {
+      ...analysis,
+      url: normalized.value,
+    };
 
+    return jsonSuccess(
+      {
+        analysis: normalizedAnalysis,
+        // Temporary compatibility surface for the current prototype UI.
+        name: normalizedAnalysis.name,
+        description: normalizedAnalysis.description,
+        moments: normalizedAnalysis.moments.map((moment) => ({
+          id: moment.key,
+          key: moment.key,
+          label: moment.label,
+          ...(moment.description ? { description: moment.description } : {}),
+        })),
+      },
+      requestId,
+    );
   } catch (error) {
-    console.error("Error analyzing domain:", error);
-    return NextResponse.json({ error: "Failed to analyze" }, { status: 500 });
+    if (error instanceof HttpError) {
+      return jsonError(requestId, error.status, error.code, error.message);
+    }
+
+    console.error("Unexpected analysis route failure", { requestId, error });
+    return jsonError(requestId, 500, "internal_error", "Unable to analyze the product.");
   }
 }
