@@ -682,28 +682,33 @@ A publisher integration must be able to:
 
 No runtime endpoint should require knowledge of NextAction's internal database IDs or private schemas.
 
-## 18. Current prototype contract gaps
+## 18. Current implementation status
 
-The existing repository currently exposes:
-- `POST /api/analyze`
-- `POST /api/products/save`
-- `POST /api/offers/create`
-- auth callback at `GET /auth/callback`
+Stage 9 now implements the first public runtime surface described by this contract:
 
-Current implementations are prototype contracts and do not yet satisfy this target contract.
+- `POST /v1/track`
+- `POST /v1/offer`
 
-Notable gaps:
-- no `/v1/track`
-- no `/v1/offer`
-- no `/v1/click`
-- current analysis request accepts only `domain`
-- current product save does not persist capability intent
-- current offer creation accepts free-form `target_moments`
-- current callback accepts a `next` path without a finalized allowlist contract
-- runtime integration authentication does not exist
-- standardized error/idempotency envelopes do not exist
+Stage 9 also implements:
 
-These are implementation gaps, not changes to Product Truth.
+- publisher integration credential resolution
+- Event idempotency enforcement
+- Event → Moment worker processing
+- Decision → Delivery creation
+- runtime rate limiting
+- PGMQ-backed asynchronous processing
+- server-authoritative destination and Offer selection
+
+The following remain intentionally unimplemented:
+
+- `GET /v1/click/:delivery_token`
+- Click qualification policy
+- Qualified Click persistence
+- Settlement execution and financial ledger mutation
+- DNS-aware SSRF controls for a future server-side URL scanner
+- automated deployment into a real staging environment
+
+These are later implementation milestones and do not change the target API semantics defined above.
 
 ## 19. Authentication callback contract
 
