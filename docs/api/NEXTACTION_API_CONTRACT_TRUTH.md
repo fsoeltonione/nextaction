@@ -509,9 +509,7 @@ No price, qualification status, publisher share, or advertiser debit amount is a
 
 ### Server processing
 
-Stage 10 established the Click recording and trusted redirect boundary.
-
-Stage 12 now executes the qualification step synchronously for the locked MVP policy:
+Stage 13 completes the executable runtime chain through Settlement:
 
 ```
 verify delivery token
@@ -519,11 +517,12 @@ verify delivery token
   -> record/retrieve Click
   -> apply Qualification Policy v1
   -> persist/retrieve Qualified Click evidence
+  -> settle Qualified Click atomically
   -> resolve trusted destination
   -> redirect
 ```
 
-For the first valid Click, Click creation and Qualified Click creation are committed atomically in the same database transaction.
+Stage 12 makes the Click qualified under qv1. Stage 13 then executes the financial Settlement transaction.
 
 ### Qualification Policy v1
 
@@ -544,19 +543,39 @@ qualified_at = database timestamp
 
 The policy does not use device fingerprinting, cross-site identity tracking, a persistent identity graph, LLM fraud scoring, or client-supplied qualification/financial fields.
 
+### Settlement policy
+
+For a Qualified Click, MVP settlement is server-derived:
+
+```
+charge_cents          = 100
+publisher_share_cents = 75
+platform_share_cents  = 25
+currency              = USD
+capacity consumption  = 1 unit
+```
+
+The settlement transaction locks the Qualified Click and advertiser capacity, verifies available capacity, creates the Settlement, creates the three financial ledger entries, records one capacity consumption, and commits atomically.
+
+Settlement is retried safely. A repeated request for the same Qualified Click returns the existing Settlement and does not create duplicate debit, credit, revenue, or capacity-consumption records.
+
 ### Qualified result
 
-For a first valid Click, the server persists the Qualified Click and redirects to the trusted destination associated with the Delivery/Offer.
+After successful first-click qualification and settlement, the server redirects to the trusted destination associated with the Delivery/Offer.
 
 The redirect target is not accepted from the click request.
 
-### Non-qualified result
+### Settlement unavailable
 
-Under Qualification Policy v1, invalid or expired Delivery requests do not create a Click or Qualified Click.
+If a Qualified Click cannot be settled because advertiser capacity is unavailable or required financial configuration is unavailable, the click endpoint returns a controlled `503` and does not report a successful navigation.
 
-No financial Settlement is created by Click qualification.
+The Qualified Click remains server-authoritative and can be retried by the runtime after the blocking condition is resolved.
 
-The `not_qualified` and `rejected` terminal states remain available for later policy versions but are not used by qv1.
+### Invalid/non-eligible result
+
+Invalid or expired Delivery requests do not create a Click or Qualified Click and return `404`.
+
+A settlement attempt against a missing or non-qualified Click cannot create financial records.
 
 ### Replay behavior
 
@@ -564,14 +583,16 @@ The same signed Delivery/click state may be retried by browsers, proxies, or use
 
 Therefore click processing must be idempotent.
 
-A replay returns the existing Click/qualification state and must not create:
+A replay returns the existing Click, Qualified Click, and Settlement state and must not create:
 - duplicate Click
 - duplicate Qualified Click
 - duplicate Settlement
 - duplicate advertiser debit
 - duplicate publisher credit
+- duplicate platform revenue
+- duplicate advertiser capacity consumption
 
-Database uniqueness remains the final duplicate-prevention boundary.
+Database uniqueness and transaction locking remain the final duplicate-prevention boundaries.
 
 ## 11. HTTP status semantics
 
@@ -710,13 +731,13 @@ No runtime endpoint should require knowledge of NextAction's internal database I
 
 ## 18. Current implementation status
 
-Stage 12 now implements the executable Click → Qualified Click runtime surface in addition to the Stage 9/10 runtime:
+Stage 13 now implements the executable runtime chain through Settlement:
 
 - `POST /v1/track`
 - `POST /v1/offer`
 - `GET /v1/click/:delivery_token`
 
-Stage 9/10/12 also implement:
+Stage 9/10/12/13 also implement:
 
 - publisher integration credential resolution
 - Event idempotency enforcement
@@ -731,15 +752,20 @@ Stage 9/10/12 also implement:
 - Qualification Policy v1
 - synchronous Qualified Click creation
 - qualification evidence versioning
-- database-enforced Click/Qualified Click idempotency
+- atomic Settlement execution
+- advertiser debit ledger entry
+- publisher credit ledger entry
+- platform revenue ledger entry
+- advertiser capacity consumption
+- database-enforced settlement idempotency
 
 The following remain intentionally unimplemented:
 
-- Settlement execution and financial ledger mutation
 - DNS-aware SSRF controls for a future server-side URL scanner
 - automated deployment into a real staging environment
 
 ## 19. Authentication callback contract
+
 
 
 ### Endpoint
