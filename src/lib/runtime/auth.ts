@@ -32,7 +32,7 @@ export async function resolveRuntimeIntegration(
   | { ok: true; integration: RuntimeIntegration }
   | { ok: false; status: 401 | 403 | 503; code: string; message: string }
 > {
-  const admin = createAdminClient();
+  const admin = await createAdminClient();
   const credentialHash = await sha256Hex(token);
 
   const { data, error } = await admin.rpc("resolve_runtime_integration", {
