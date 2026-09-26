@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       Date.now() + DELIVERY_TTL_SECONDS * 1000,
     ).toISOString();
 
-    const admin = await createAdminClient();
+    const admin = createAdminClient();
     const { data, error } = await admin.rpc(
       "runtime_create_decision_delivery",
       {
