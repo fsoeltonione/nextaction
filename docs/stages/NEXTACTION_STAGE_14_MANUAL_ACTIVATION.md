@@ -67,10 +67,11 @@ Add these variables to `nextaction-staging`:
 STAGING_NEXT_PUBLIC_SUPABASE_URL=https://njjybpswxalxjhqjlvqa.supabase.co
 STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<staging publishable key>
 STAGING_SUPABASE_SECRET_KEY=<staging secret key>
-STAGING_BASE_URL=<staging Worker HTTPS URL>
 STAGING_INTEGRATION_TOKEN=<token produced by STAGE14_SEED.sql>
 STAGING_MOMENT_KEY=stage14_smoke_moment
 ~~~
+
+The release workflow captures the actual `workers.dev` URL after the staging deployment and passes it to the staging smoke job. `STAGING_BASE_URL` does not need to be configured manually.
 
 Add these variables to `nextaction-production`:
 
@@ -78,7 +79,6 @@ Add these variables to `nextaction-production`:
 PRODUCTION_NEXT_PUBLIC_SUPABASE_URL=<production Supabase URL>
 PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<production publishable key>
 PRODUCTION_SUPABASE_SECRET_KEY=<production secret key>
-PRODUCTION_BASE_URL=<production Worker HTTPS URL>
 ~~~
 
 Do not commit any of these values to Git.
@@ -88,13 +88,15 @@ CircleCI masks stored environment variables; they are configured from the Circle
 Reference:
 https://circleci.com/docs/guides/security/set-environment-variable/
 
-## 4. One-time staging URL bootstrap
+## 4. Worker URLs
 
-The release workflow needs `STAGING_BASE_URL` before the staging smoke job can run.
+No Worker URL needs to be hard-coded into CircleCI.
 
-The first staging Worker URL must therefore be obtained from the initial Cloudflare deployment/dashboard and then stored as `STAGING_BASE_URL` in the `nextaction-staging` CircleCI context.
+After `deploy_staging`, the workflow captures the `workers.dev` URL emitted by Wrangler and passes it to `staging_smoke`.
 
-After that, normal release-gate runs can reuse the same URL.
+After `deploy_production`, the workflow does the same for `production_smoke`.
+
+This keeps the deployment URL derived from the actual deployment rather than from manually copied configuration.
 
 ## 5. Seed token
 
