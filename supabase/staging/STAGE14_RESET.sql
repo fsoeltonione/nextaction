@@ -1,5 +1,12 @@
 BEGIN;
 
+-- Staging is disposable. Immutable-history triggers are disabled only inside
+-- this reset transaction so fixture cleanup can remove prior smoke records.
+ALTER TABLE private.financial_entries DISABLE TRIGGER trg_financial_entries_immutable;
+ALTER TABLE private.advertiser_credit_entries DISABLE TRIGGER trg_advertiser_credit_entries_immutable;
+ALTER TABLE private.settlements DISABLE TRIGGER trg_settlements_immutable;
+ALTER TABLE private.qualified_clicks DISABLE TRIGGER trg_qualified_clicks_immutable;
+
 DELETE FROM private.financial_entries
 WHERE settlement_id IN (
   SELECT id
@@ -122,5 +129,10 @@ WHERE workspace_id IN (
 
 DELETE FROM public.workspaces
 WHERE name IN ('Stage 14 Publisher', 'Stage 14 Advertiser');
+
+ALTER TABLE private.financial_entries ENABLE TRIGGER trg_financial_entries_immutable;
+ALTER TABLE private.advertiser_credit_entries ENABLE TRIGGER trg_advertiser_credit_entries_immutable;
+ALTER TABLE private.settlements ENABLE TRIGGER trg_settlements_immutable;
+ALTER TABLE private.qualified_clicks ENABLE TRIGGER trg_qualified_clicks_immutable;
 
 COMMIT;
