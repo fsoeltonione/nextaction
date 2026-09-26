@@ -1,6 +1,7 @@
 # NextAction Data & Security Truth
 
 **Status:** Authoritative v1  
+**Security exception register:** `docs/data-security/NEXTACTION_SECURITY_EXCEPTIONS.md`  
 **Depends on:** `docs/NEXTACTION_PRODUCT_DOMAIN_TRUTH.md`, `docs/architecture/NEXTACTION_ARCHITECTURE_TRUTH.md`  
 **Observed Supabase project:** `khoygjyikxkdwonygzyh`  
 **Date:** 2026-09-26
@@ -447,18 +448,24 @@ Before any production migration:
 - run application integration tests
 - verify Supabase advisors
 
-The current live database has zero migration history, so migration bootstrap is a prerequisite to production schema work.
+The current production database now has committed migration history. Staging also has dedicated migration history including the Stage 14 bootstrap and repeatable fixture migration.
 
-## 22. Current security findings that are not to be ignored
+## 22. Current security findings and accepted exception
 
-The live project currently reports:
-- leaked password protection disabled
-- RLS policy performance findings
-- missing covering indexes for three foreign keys
+The live NextAction Supabase projects currently report:
 
-These are baseline findings.
+- leaked password protection disabled;
+- RLS-enabled private runtime/financial tables without browser-facing policies;
+- performance advisor findings, including unused indexes.
 
-They are not being patched during Stage 3 because Stage 3 establishes the target truth before implementation changes.
+The leaked-password protection finding is **not fixed**. It is an explicitly accepted MVP security exception because NextAction is remaining on the Supabase Free plan. Supabase currently documents leaked-password protection as a Pro Plan and above feature.
+
+The current NextAction application login flow uses Google OAuth and does not implement email/password sign-in. This reduces the current application exposure, but the project-level Auth advisory remains valid.
+
+The accepted exception is recorded in:
+`docs/data-security/NEXTACTION_SECURITY_EXCEPTIONS.md`
+
+It must be revisited before introducing password-based authentication or when the Supabase plan/security posture changes.
 
 ## 23. Required database invariants
 
