@@ -1,11 +1,15 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  turbopack: {
-    resolveAlias: {
-      "cloudflare:workers": "./src/utils/cloudflare-workers-fallback.ts",
-    },
-  },
-};
+const isVinextCloudflareBuild = process.env.VINEXT_CLOUDFLARE === "1";
+
+const nextConfig: NextConfig = isVinextCloudflareBuild
+  ? {}
+  : {
+      turbopack: {
+        resolveAlias: {
+          "cloudflare:workers": "./src/utils/cloudflare-workers-fallback.ts",
+        },
+      },
+    };
 
 export default nextConfig;
