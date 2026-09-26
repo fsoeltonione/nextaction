@@ -258,6 +258,25 @@ export async function POST(request: Request) {
       process.env.APP_ENV === "staging";
 
     if (isStaging) {
+      let debugReason = "unclassified_exception";
+
+      if (
+        error instanceof Error &&
+        error.message === "Supabase server credentials are not configured."
+      ) {
+        debugReason = "supabase_credentials_missing";
+      } else if (
+        error instanceof Error &&
+        error.message === "Rate limit service returned no result."
+      ) {
+        debugReason = "rate_limit_empty_result";
+      } else if (
+        error instanceof Error &&
+        error.message.includes("crypto")
+      ) {
+        debugReason = "crypto_runtime_error";
+      }
+
       return withRuntimeCors(
         jsonSuccess(
           {
@@ -265,6 +284,7 @@ export async function POST(request: Request) {
               code: "runtime_error",
               message: "Unable to accept the event.",
               debug_stage: runtimeStage,
+              debug_reason: debugReason,
             },
           },
           requestId,
