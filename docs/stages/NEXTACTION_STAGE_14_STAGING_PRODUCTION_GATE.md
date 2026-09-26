@@ -1,6 +1,6 @@
 # NextAction Stage 14 — Staging & Production Release Gate
 
-**Status:** Release-gate infrastructure implemented; activation requires external staging credentials and a dedicated staging Supabase project.
+**Status:** Release-gate infrastructure implemented; dedicated staging Supabase is provisioned and seeded; activation still requires Cloudflare/CircleCI credentials and a deployed staging Worker.
 **Date:** 2026-09-26
 **Baseline:** Stage 13 `master` commit `9992efd9d0ec54a95676cf8bc7152fedd70d1230`
 
@@ -203,9 +203,15 @@ PRODUCTION_SUPABASE_SECRET_KEY
 PRODUCTION_BASE_URL
 ~~~
 
-The current connected Supabase account exposes the NextAction production project and an unrelated `ragamstudio` project; no dedicated NextAction staging project is available. The unrelated project is not used as staging.
+The connected Supabase Free organization now contains:
+- production project `nextaction` (`khoygjyikxkdwonygzyh`);
+- staging project `nextaction-staging` (`njjybpswxalxjhqjlvqa`, region `ca-central-1`).
 
-No new paid/billable project is created automatically by Stage 14.
+The unrelated `ragamstudio` project remains separate from NextAction and is currently inactive/paused.
+
+The staging project was provisioned at $0/month under the current Free organization and seeded with the disposable Stage 14 fixture. No production data is used by the staging fixture.
+
+A separate Ragamstudio organization has not yet been created because the currently connected Supabase tool surface does not expose organization-creation/project-transfer actions. This is an administrative UI/API step and does not block the existence of the isolated NextAction staging project.
 
 ## 8. Staging data isolation
 
@@ -282,7 +288,11 @@ Not yet executable end-to-end:
 - real staging runtime smoke;
 - production promotion through CircleCI.
 
-Those require the external staging Supabase project, Cloudflare account credentials, and a seeded disposable staging Delivery.
+Those now require:
+- Cloudflare account credentials;
+- CircleCI environment/secrets;
+- the seeded staging integration token and Moment key stored as protected CI variables;
+- the staging Worker base URL after Cloudflare deployment.
 
 ## 12. Exit criteria
 
