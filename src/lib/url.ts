@@ -1,3 +1,5 @@
+import { isIpAddress, isPublicIpAddress } from "@/lib/ip-address";
+
 const IPV4_RE = /^(\d{1,3})(?:\.(\d{1,3})){3}$/;
 
 function ipv4ToNumber(hostname: string): number | null {
@@ -30,45 +32,7 @@ export function isBlockedHostname(hostname: string): boolean {
     return true;
   }
 
-  const ipv4 = ipv4ToNumber(host);
-  if (ipv4 !== null) {
-    const ranges = [
-      [0, 256 ** 3 - 1], // 0.0.0.0/8
-      [10 * 256 ** 3, 10 * 256 ** 3 + 256 ** 3 - 1], // 10.0.0.0/8
-      [100 * 256 ** 3 + 64 * 256 ** 2, 100 * 256 ** 3 + 127 * 256 ** 2 + 255 * 256 + 255], // 100.64.0.0/10
-      [127 * 256 ** 3, 127 * 256 ** 3 + 256 ** 3 - 1], // 127.0.0.0/8
-      [169 * 256 ** 2 + 254 * 256, 169 * 256 ** 2 + 254 * 256 + 255], // 169.254.0.0/16
-      [172 * 256 ** 2 + 16 * 256, 172 * 256 ** 2 + 31 * 256 + 255], // 172.16.0.0/12
-      [192 * 256 ** 3, 192 * 256 ** 3 + 255], // 192.0.0.0/24
-      [192 * 256 ** 2 + 0 * 256 + 2 * 256, 192 * 256 ** 2 + 0 * 256 + 2 * 256 + 255], // 192.0.2.0/24
-      [192 * 256 ** 2 + 168 * 256, 192 * 256 ** 2 + 168 * 256 + 255], // 192.168.0.0/16
-      [198 * 256 ** 2 + 18 * 256, 198 * 256 ** 2 + 19 * 256 + 255], // 198.18.0.0/15
-      [198 * 256 ** 2 + 51 * 256, 198 * 256 ** 2 + 51 * 256 + 255], // 198.51.100.0/24
-      [203 * 256 ** 3 + 0 * 256 ** 2 + 113 * 256, 203 * 256 ** 3 + 0 * 256 ** 2 + 113 * 256 + 255], // 203.0.113.0/24
-      [224 * 256 ** 3, 256 * 256 ** 3 - 1], // multicast/reserved
-    ];
-
-    return ranges.some(([start, end]) => ipv4 >= start && ipv4 <= end);
-  }
-
-  if (host.includes(":")) {
-    if (
-      host === "::" ||
-      host === "::1" ||
-      host.startsWith("fc") ||
-      host.startsWith("fd") ||
-      host.startsWith("fe8") ||
-      host.startsWith("fe9") ||
-      host.startsWith("fea") ||
-      host.startsWith("feb") ||
-      host.startsWith("ff")
-    ) {
-      return true;
-    }
-
-    const mappedIpv4 = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-    if (mappedIpv4) return ipv4ToNumber(mappedIpv4[1]) !== null;
-  }
+  if (isIpAddress(host)) return !isPublicIpAddress(host);
 
   return false;
 }
