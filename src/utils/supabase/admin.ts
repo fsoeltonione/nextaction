@@ -10,17 +10,18 @@ type RuntimeBindings = {
 };
 
 function getRuntimeBindings(): RuntimeBindings {
-  const processBindings: RuntimeBindings = {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  };
-
   const workerBindings = cloudflareEnv as RuntimeBindings;
 
   return {
-    ...processBindings,
-    ...workerBindings,
+    NEXT_PUBLIC_SUPABASE_URL:
+      workerBindings.NEXT_PUBLIC_SUPABASE_URL ??
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_SECRET_KEY:
+      workerBindings.SUPABASE_SECRET_KEY ??
+      process.env.SUPABASE_SECRET_KEY,
+    SUPABASE_SERVICE_ROLE_KEY:
+      workerBindings.SUPABASE_SERVICE_ROLE_KEY ??
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
 }
 
