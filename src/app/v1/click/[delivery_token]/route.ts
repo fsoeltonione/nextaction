@@ -121,7 +121,7 @@ export async function GET(
     }
 
     const deliveryTokenHash = await sha256Hex(deliveryToken);
-    const admin = await createAdminClient();
+    const admin = createAdminClient();
 
     const { data, error } = await admin.rpc(
       "runtime_record_and_qualify_click",
