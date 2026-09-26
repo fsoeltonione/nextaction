@@ -44,7 +44,9 @@ function run(command, args, input) {
 }
 
 process.env.NEXT_PUBLIC_APP_ENV = target;
+process.env.CLOUDFLARE_ENV = target;
 console.log(`Deploying NextAction to Cloudflare environment: ${target}`);
+console.log(`Cloudflare Vite environment: ${process.env.CLOUDFLARE_ENV}`);
 
 run(process.execPath, ["scripts/cloudflare-vinext-build.mjs"]);
 
