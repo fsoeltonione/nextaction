@@ -576,3 +576,13 @@ And for every financial transition:
 - immutable record
 
 Only after those are agreed should production migrations be written.
+
+## 29. Stage 15 product-analysis enforcement
+
+Stage 15 implements the Product Analysis security requirements in Section 20 as an application boundary.
+
+The server-side scanner validates HTTP/HTTPS URLs, rejects embedded credentials and IP-literal targets, resolves A and AAAA records, rejects non-public/reserved addresses, manually handles redirects, re-validates redirect targets, applies timeout and response-size limits, restricts content types to HTML/XHTML, and does not forward caller Authorization or Cookie headers to arbitrary destinations.
+
+Anonymous product analysis is protected by the existing server-side rate limiter. Scanner output is bounded before it reaches the model provider, and retrieved page content is treated as untrusted data.
+
+The implementation does not claim perfect DNS connection pinning on Cloudflare Workers; the residual TOCTOU limitation is explicit and must not be represented as a resolved guarantee.
