@@ -1,6 +1,6 @@
 # NextAction Stage 15 — DNS-aware Product Scanner / SSRF Hardening
 
-**Status:** Implementation complete; final CI verification pending after the latest timeout/validation hardening.
+**Status:** FULLY COMPLETED and merged after green quality, scanner-security, Cloudflare-compatibility, and Cloudflare-build gates.
 **Date:** 2026-09-27
 **Baseline:** Stage 14 release-gated master
 
@@ -167,6 +167,17 @@ Stage 15 can be merged when:
 - the DNS TOCTOU limitation is explicitly documented.
 
 The next milestone is Stage 16 — Activation Flow v2 Completion.
+
+
+## 11.1 Final verification
+
+Merged Stage 15 commit: `d7d3f5260c2d50ef09334397c08c2651318d961d`
+
+Final post-merge CI gates were green:
+- `quality`
+- `product_scanner_security`
+- `cloudflare_compatibility`
+- `cloudflare_build`
 
 ## 12. External references used
 
