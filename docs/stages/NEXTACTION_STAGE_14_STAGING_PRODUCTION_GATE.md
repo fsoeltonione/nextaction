@@ -101,18 +101,23 @@ The staging smoke harness:
 
 1. requires an HTTPS staging URL;
 2. verifies `GET /api/health` returns the expected environment;
-3. requires a pre-seeded staging Delivery token;
-4. calls `GET /v1/click/:delivery_token`;
-5. requires HTTP `302`;
-6. verifies the redirect target uses HTTP(S);
-7. replays the same Delivery token;
-8. requires HTTP `302` again;
-9. verifies the replay destination is identical.
+3. requires a staging Integration token and canonical Moment key;
+4. calls `POST /v1/track` and verifies Event acceptance;
+5. replays the same Event idempotency key and verifies the original Event is returned;
+6. calls `POST /v1/offer` for the smoke Moment and obtains a fresh Delivery token;
+7. calls `GET /v1/click/:delivery_token`;
+8. requires HTTP `302`;
+9. verifies the redirect target uses HTTP(S);
+10. replays the same Delivery token and verifies the redirect destination is unchanged.
 
-Because the click runtime only redirects after successful qualification and settlement, the two navigation checks exercise the deployed chain:
+The Offer call creates the Delivery used by the smoke. A separate `STAGING_DELIVERY_TOKEN` is therefore not required by the executable smoke harness.
+
+Because the click runtime only redirects after successful qualification and settlement, the deployed checks exercise the full chain:
 
 ~~~text
-Delivery
+Event
+  ↓
+Moment → Decision → Delivery
   ↓
 Click
   ↓
@@ -185,7 +190,8 @@ STAGING_SUPABASE_SECRET_KEY
 
 ~~~text
 STAGING_BASE_URL
-STAGING_DELIVERY_TOKEN
+STAGING_INTEGRATION_TOKEN
+STAGING_MOMENT_KEY
 ~~~
 
 ### Production
@@ -218,7 +224,7 @@ Staging must contain:
 
 The staging fixture must be disposable and must not contain real customer data.
 
-The seed script `supabase/staging/STAGE14_SEED.sql` creates a disposable publisher/advertiser topology, an integration credential, an Offer targeting the smoke Moment, advertiser capacity, and a Delivery. It prints the generated integration and Delivery tokens for CI configuration.
+The seed script `supabase/staging/STAGE14_SEED.sql` creates a disposable publisher/advertiser topology, an integration credential, an Offer targeting the smoke Moment, advertiser capacity, and an initial Delivery. The executable smoke path uses the Integration token and Moment key, then requests a fresh Delivery through `/v1/offer`; the pre-created Delivery is available for fixture inspection but is not a CI input.
 
 The reset script `supabase/staging/STAGE14_RESET.sql` removes the disposable runtime and financial data in dependency-safe order.
 
