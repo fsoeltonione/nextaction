@@ -66,7 +66,7 @@ if (!integrationToken) {
 
 const idempotencyKey = `stage14-smoke-${crypto.randomUUID()}`;
 const trackBody = JSON.stringify({
-  type: "stage14.smoke",
+  type: "stage14.smoke.moment",
   occurred_at: new Date().toISOString(),
   data: {
     smoke_id: crypto.randomUUID(),
