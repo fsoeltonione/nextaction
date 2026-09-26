@@ -236,7 +236,7 @@ Staging must contain:
 
 The staging fixture must be disposable and must not contain real customer data.
 
-The seed script `supabase/staging/STAGE14_SEED.sql` creates a disposable publisher/advertiser topology, an integration credential, an Offer targeting the smoke Moment, advertiser capacity, and an initial Delivery. The executable smoke path uses the Integration token and Moment key, then requests a fresh Delivery through `/v1/offer`; the pre-created Delivery is available for fixture inspection but is not a CI input.
+The staging bootstrap `supabase/staging/STAGE14_BOOTSTRAP.sql` prepares the legacy prototype tables and disposable anonymous auth owner required by the fixture. The seed script `supabase/staging/STAGE14_SEED.sql` then creates a disposable publisher/advertiser topology, an integration credential, an Offer targeting the smoke Moment, advertiser capacity, and an initial Delivery. The executable smoke path uses the Integration token and Moment key, then requests a fresh Delivery through `/v1/offer`; the pre-created Delivery is available for fixture inspection but is not a CI input.
 
 The reset script `supabase/staging/STAGE14_RESET.sql` removes the disposable runtime and financial data in dependency-safe order.
 
