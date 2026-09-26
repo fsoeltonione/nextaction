@@ -45,14 +45,7 @@ function run(command, args, input) {
 
 console.log(`Deploying NextAction to Cloudflare environment: ${target}`);
 
-run(
-  npx,
-  [
-    "--yes",
-    "@opennextjs/cloudflare@1.20.6",
-    "build",
-  ],
-);
+run(process.execPath, ["scripts/cloudflare-vinext-build.mjs"]);
 
 run(
   npx,
