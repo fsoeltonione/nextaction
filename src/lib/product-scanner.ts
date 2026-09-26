@@ -279,36 +279,35 @@ export async function scanProductUrl(
     let response: Response;
 
     try {
-      response = await fetchImpl(currentValue, {
-        method: "GET",
-        redirect: "manual",
-        signal: controller.signal,
-        headers: {
-          Accept: "text/html,application/xhtml+xml",
-          "User-Agent": "NextActionProductScanner/1.0",
-        },
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
+      try {
+        response = await fetchImpl(currentValue, {
+          method: "GET",
+          redirect: "manual",
+          signal: controller.signal,
+          headers: {
+            Accept: "text/html,application/xhtml+xml",
+            "User-Agent": "NextActionProductScanner/1.0",
+          },
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw new ProductScannerError(
+            "fetch_timeout",
+            "Product analysis timed out.",
+            504,
+          );
+        }
+
         throw new ProductScannerError(
-          "fetch_timeout",
-          "Product analysis timed out.",
-          504,
+          "fetch_failed",
+          "Product page could not be retrieved.",
         );
       }
 
-      throw new ProductScannerError(
-        "fetch_failed",
-        "Product page could not be retrieved.",
-      );
-    } finally {
-      clearTimeout(timeout);
-    }
+      const resolvedAfter = await resolveAddresses(current.hostname);
+      validatePublicAddresses(resolvedAfter, "non_public_address_after_fetch");
 
-    const resolvedAfter = await resolveAddresses(current.hostname);
-    validatePublicAddresses(resolvedAfter, "non_public_address_after_fetch");
-
-    if (REDIRECT_STATUSES.has(response.status)) {
+      if (REDIRECT_STATUSES.has(response.status)) {
       const location = response.headers.get("location");
       await response.body?.cancel();
 
@@ -352,53 +351,65 @@ export async function scanProductUrl(
       continue;
     }
 
-    if (response.status < 200 || response.status >= 300) {
-      await response.body?.cancel();
-      throw new ProductScannerError(
-        "upstream_status",
-        "Product page could not be retrieved.",
+      if (response.status < 200 || response.status >= 300) {
+        await response.body?.cancel();
+        throw new ProductScannerError(
+          "upstream_status",
+          "Product page could not be retrieved.",
+        );
+      }
+
+      const contentType =
+        response.headers.get("content-type")?.trim().toLowerCase() ?? "";
+      const mediaType = contentType.split(";", 1)[0];
+
+      if (mediaType !== "text/html" && mediaType !== "application/xhtml+xml") {
+        await response.body?.cancel();
+        throw new ProductScannerError(
+          "unsupported_content_type",
+          "Product response is not an HTML document.",
+          415,
+        );
+      }
+
+      const contentLength = Number(response.headers.get("content-length"));
+      if (
+        Number.isFinite(contentLength) &&
+        contentLength > PRODUCT_SCANNER_LIMITS.maxResponseBytes
+      ) {
+        await response.body?.cancel();
+        throw new ProductScannerError(
+          "response_too_large",
+          "Product response is too large.",
+          413,
+        );
+      }
+
+      const body = await readLimitedBody(
+        response,
+        PRODUCT_SCANNER_LIMITS.maxResponseBytes,
       );
+      const signals = extractHtmlSignals(body);
+
+      return {
+        finalUrl: currentValue,
+        redirects,
+        contentType,
+        resolvedAddresses: firstResolvedAddresses ?? resolvedBefore,
+        ...signals,
+      };
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new ProductScannerError(
+          "fetch_timeout",
+          "Product analysis timed out.",
+          504,
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const contentType =
-      response.headers.get("content-type")?.trim().toLowerCase() ?? "";
-    const mediaType = contentType.split(";", 1)[0];
-
-    if (mediaType !== "text/html" && mediaType !== "application/xhtml+xml") {
-      await response.body?.cancel();
-      throw new ProductScannerError(
-        "unsupported_content_type",
-        "Product response is not an HTML document.",
-        415,
-      );
-    }
-
-    const contentLength = Number(response.headers.get("content-length"));
-    if (
-      Number.isFinite(contentLength) &&
-      contentLength > PRODUCT_SCANNER_LIMITS.maxResponseBytes
-    ) {
-      await response.body?.cancel();
-      throw new ProductScannerError(
-        "response_too_large",
-        "Product response is too large.",
-        413,
-      );
-    }
-
-    const body = await readLimitedBody(
-      response,
-      PRODUCT_SCANNER_LIMITS.maxResponseBytes,
-    );
-    const signals = extractHtmlSignals(body);
-
-    return {
-      finalUrl: currentValue,
-      redirects,
-      contentType,
-      resolvedAddresses: firstResolvedAddresses ?? resolvedBefore,
-      ...signals,
-    };
   }
 
   throw new ProductScannerError(
