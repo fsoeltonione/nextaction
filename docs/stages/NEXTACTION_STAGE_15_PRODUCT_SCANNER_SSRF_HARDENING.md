@@ -1,6 +1,6 @@
 # NextAction Stage 15 — DNS-aware Product Scanner / SSRF Hardening
 
-**Status:** Implemented on branch stage-15-dns-aware-product-scanner; pending CI verification and merge.
+**Status:** Implementation complete; final CI verification pending after the latest timeout/validation hardening.
 **Date:** 2026-09-27
 **Baseline:** Stage 14 release-gated master
 
