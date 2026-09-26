@@ -1,4 +1,4 @@
-import { isIpAddress, isPublicIpAddress } from "@/lib/ip-address";
+import { isIpAddress, isPublicIpAddress } from "./ip-address.ts";
 
 export function isBlockedHostname(hostname: string): boolean {
   const host = hostname
