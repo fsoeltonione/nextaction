@@ -48,7 +48,7 @@ BEGIN
 
   v_window_start := pg_catalog.to_timestamp(
     pg_catalog.floor(
-      pg_catalog.extract(epoch FROM v_now) / p_window_seconds
+      extract(epoch FROM v_now) / p_window_seconds
     ) * p_window_seconds
   );
   v_window_end := v_window_start
@@ -81,11 +81,11 @@ BEGIN
   RETURN QUERY
   SELECT
     v_count <= p_limit,
-    pg_catalog.greatest(p_limit - v_count, 0),
-    pg_catalog.greatest(
+    GREATEST(p_limit - v_count, 0),
+    GREATEST(
       1,
       pg_catalog.ceil(
-        pg_catalog.extract(
+        extract(
           epoch FROM (v_window_end - pg_catalog.clock_timestamp())
         )
       )::INTEGER
