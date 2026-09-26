@@ -16,7 +16,7 @@ It separates:
 - authentication callbacks
 - internal application operations
 
-The contract remains authoritative while implementation is staged. Stage 10 implements `/v1/track`, `/v1/offer`, and the first executable `/v1/click/:delivery_token` path; Qualified Click and Settlement remain later milestones.
+The contract remains authoritative for the executable runtime. Stage 14 carries the implementation through `/v1/track`, `/v1/offer`, `/v1/click/:delivery_token`, Qualified Click, and atomic Settlement, with deployment/release controls defined separately.
 
 ## 2. API surface
 
