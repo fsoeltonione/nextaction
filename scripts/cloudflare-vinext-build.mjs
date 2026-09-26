@@ -12,9 +12,9 @@ const packages = [
   "wrangler@4.139.0",
 ];
 
-function run(command, args) {
+function run(command, args, env = process.env) {
   const result = spawnSync(command, args, {
-    env: process.env,
+    env,
     stdio: "inherit",
   });
 
@@ -39,8 +39,15 @@ run(process.platform === "win32" ? "npm.cmd" : "npm", [
 ]);
 
 console.log("Running vinext production build...");
-run(process.platform === "win32" ? "npx.cmd" : "npx", [
-  "--no-install",
-  "vinext",
-  "build",
-]);
+run(
+  process.platform === "win32" ? "npx.cmd" : "npx",
+  [
+    "--no-install",
+    "vinext",
+    "build",
+  ],
+  {
+    ...process.env,
+    VINEXT_CLOUDFLARE: "1",
+  },
+);
