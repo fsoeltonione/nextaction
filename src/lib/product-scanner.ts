@@ -98,7 +98,7 @@ function normalizeScannerUrl(input: string | URL): URL {
   return new URL(normalized.value);
 }
 
-async function resolvePublicAddresses(hostname: string): Promise<string[]> {
+async function resolveDnsAddresses(hostname: string): Promise<string[]> {
   const results = await Promise.allSettled([
     dns.promises.resolve4(hostname),
     dns.promises.resolve6(hostname),
@@ -128,17 +128,24 @@ async function resolvePublicAddresses(hostname: string): Promise<string[]> {
     );
   }
 
-  for (const address of unique) {
+  return unique;
+}
+
+function validatePublicAddresses(
+  addresses: string[],
+  code: "non_public_address" | "non_public_address_after_fetch",
+): void {
+  for (const address of addresses) {
     if (!isPublicIpAddress(address)) {
       throw new ProductScannerError(
-        "non_public_address",
-        "Product host resolves to a non-public network address.",
+        code,
+        code === "non_public_address"
+          ? "Product host resolves to a non-public network address."
+          : "Product host resolved to a non-public network address after retrieval.",
         400,
       );
     }
   }
-
-  return unique;
 }
 
 async function readLimitedBody(
@@ -237,7 +244,7 @@ type ResolveAddresses = (hostname: string) => Promise<string[]>;
 export async function scanProductUrl(
   input: string,
   fetchImpl: typeof fetch = fetch,
-  resolveAddresses: ResolveAddresses = resolvePublicAddresses,
+  resolveAddresses: ResolveAddresses = resolveDnsAddresses,
 ): Promise<ProductScanResult> {
   let current = normalizeScannerUrl(input);
   const visited = new Set<string>();
@@ -258,6 +265,7 @@ export async function scanProductUrl(
     visited.add(currentValue);
 
     const resolvedBefore = await resolveAddresses(current.hostname);
+    validatePublicAddresses(resolvedBefore, "non_public_address");
     if (firstResolvedAddresses === null) {
       firstResolvedAddresses = resolvedBefore;
     }
@@ -298,12 +306,7 @@ export async function scanProductUrl(
     }
 
     const resolvedAfter = await resolveAddresses(current.hostname);
-    if (resolvedAfter.some((address) => !isPublicIpAddress(address))) {
-      throw new ProductScannerError(
-        "non_public_address_after_fetch",
-        "Product host resolved to a non-public network address after retrieval.",
-      );
-    }
+    validatePublicAddresses(resolvedAfter, "non_public_address_after_fetch");
 
     if (REDIRECT_STATUSES.has(response.status)) {
       const location = response.headers.get("location");
