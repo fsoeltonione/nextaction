@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    resolveAlias: {
+      "cloudflare:workers": "./src/utils/cloudflare-workers-fallback.ts",
+    },
+  },
 };
 
 export default nextConfig;
