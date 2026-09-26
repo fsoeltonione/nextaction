@@ -1,5 +1,3 @@
-import "server-only";
-
 import dns from "node:dns";
 import { isIpAddress, isPublicIpAddress } from "@/lib/ip-address";
 import { isBlockedHostname, normalizeProductUrl } from "@/lib/url";
