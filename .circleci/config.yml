@@ -167,11 +167,16 @@ workflows:
           requires:
             - cloudflare_compatibility
       - deploy_staging:
+          context:
+            - nextaction-cloudflare
+            - nextaction-staging
           requires:
             - quality
             - cloudflare_compatibility
             - cloudflare_build
       - staging_smoke:
+          context:
+            - nextaction-staging
           requires:
             - deploy_staging
       - hold_production:
@@ -179,8 +184,13 @@ workflows:
           requires:
             - staging_smoke
       - deploy_production:
+          context:
+            - nextaction-cloudflare
+            - nextaction-production
           requires:
             - hold_production
       - production_smoke:
+          context:
+            - nextaction-production
           requires:
             - deploy_production
