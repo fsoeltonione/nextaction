@@ -33,7 +33,9 @@
         }
       },
       "vars": {
-        "APP_ENV": "staging"
+        "APP_ENV": "staging",
+        "NEXT_PUBLIC_SUPABASE_URL": "https://njjybpswxalxjhqjlvqa.supabase.co",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_XhqGHkpYkUX278dF86SYJQ_OY2S9ID_"
       }
     },
     "production": {
@@ -48,7 +50,9 @@
         }
       },
       "vars": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "NEXT_PUBLIC_SUPABASE_URL": "https://khoygjyikxkdwonygzyh.supabase.co",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_n4OUdr5cMIGT43I0ShLEOg_l3uayuFT"
       }
     }
   }
