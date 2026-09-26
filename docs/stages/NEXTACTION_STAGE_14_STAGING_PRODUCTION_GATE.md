@@ -40,19 +40,23 @@ The Stage 14 deployment target is Cloudflare Workers.
 
 Cloudflare's current Next.js documentation recommends vinext as the default Workers deployment path. Stage 14 now uses vinext for the Cloudflare build/deployment path while retaining the normal Next.js build for the existing application quality gate. This is necessary because the application uses Next.js 16 `proxy.ts`, which runs on the Node.js runtime; the current OpenNext Cloudflare adapter documentation states that Node.js in Middleware is not yet supported, while vinext supports `proxy.ts` and `middleware.ts`.
 
-OpenNext configuration is explicit in `wrangler.jsonc` and targets:
+vinext configuration is explicit in `vite.config.mjs` and `wrangler.jsonc` and targets:
 
 ~~~text
-.open-next/worker.js
-.open-next/assets
+vinext/server/fetch-handler
+dist/client
 ~~~
 
-The deployment adapter and Wrangler CLI versions are pinned in repository scripts:
+The Cloudflare build toolchain is pinned by `scripts/cloudflare-vinext-build.mjs`:
 
 ~~~text
-@opennextjs/cloudflare 1.20.6
+vinext 1.0.0-beta.12
+@vinext/cloudflare 1.0.0-beta.10
+@cloudflare/vite-plugin 1.54.11
+vite 8.3.0
+@vitejs/plugin-rsc 0.5.35
+react-server-dom-webpack 19.2.8
 wrangler 4.139.0
-vinext 1.0.0-beta.11  (compatibility check only)
 ~~~
 
 ## 3. Cloudflare environments
