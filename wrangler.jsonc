@@ -8,7 +8,12 @@
     "nodejs_compat_populate_process_env"
   ],
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "head_sampling_rate": 1
+    }
   },
   "assets": {
     "directory": "dist/client",
@@ -22,6 +27,7 @@
       "observability": {
         "enabled": true,
         "logs": {
+          "enabled": true,
           "invocation_logs": true,
           "head_sampling_rate": 1
         }
