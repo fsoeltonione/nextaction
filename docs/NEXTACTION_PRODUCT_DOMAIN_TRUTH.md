@@ -187,3 +187,10 @@ Any change to the locked domain chain, capability semantics, activation flow, qu
 Implementation shortcuts must not silently redefine product semantics.
 
 ## 16. Stage 13 runtime amendment
+## 17. Stage 15 scanner amendment
+
+Stage 15 introduces the server-side Product Scanner trust boundary required by the Product and Security Truth. Product URLs remain untrusted input. The scanner performs bounded retrieval only for HTTP/HTTPS public hostnames, with DNS/IP safety checks, redirect validation, resource limits, and abuse controls.
+
+The scanner does not change the locked Event -> Moment -> Decision -> Delivery -> Click -> Qualified Click -> Settlement domain chain, capability semantics, or MVP economics.
+
+The Cloudflare Workers implementation does not claim connection-level DNS pinning for arbitrary internet hostnames. The residual DNS TOCTOU limitation is explicitly documented in the Stage 15 stage contract.
