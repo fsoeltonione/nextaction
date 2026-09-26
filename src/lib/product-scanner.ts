@@ -1,6 +1,6 @@
 import dns from "node:dns";
-import { isIpAddress, isPublicIpAddress } from "@/lib/ip-address";
-import { isBlockedHostname, normalizeProductUrl } from "@/lib/url";
+import { isIpAddress, isPublicIpAddress } from "./ip-address.ts";
+import { isBlockedHostname, normalizeProductUrl } from "./url.ts";
 
 export const PRODUCT_SCANNER_LIMITS = Object.freeze({
   maxRedirects: 3,
