@@ -42,6 +42,7 @@
       "observability": {
         "enabled": true,
         "logs": {
+          "enabled": true,
           "invocation_logs": true,
           "head_sampling_rate": 1
         }
