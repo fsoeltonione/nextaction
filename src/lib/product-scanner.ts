@@ -232,9 +232,12 @@ function isHttpsDowngrade(from: URL, to: URL): boolean {
   return from.protocol === "https:" && to.protocol === "http:";
 }
 
+type ResolveAddresses = (hostname: string) => Promise<string[]>;
+
 export async function scanProductUrl(
   input: string,
   fetchImpl: typeof fetch = fetch,
+  resolveAddresses: ResolveAddresses = resolvePublicAddresses,
 ): Promise<ProductScanResult> {
   let current = normalizeScannerUrl(input);
   const visited = new Set<string>();
@@ -254,7 +257,7 @@ export async function scanProductUrl(
     }
     visited.add(currentValue);
 
-    const resolvedBefore = await resolvePublicAddresses(current.hostname);
+    const resolvedBefore = await resolveAddresses(current.hostname);
     if (firstResolvedAddresses === null) {
       firstResolvedAddresses = resolvedBefore;
     }
@@ -294,7 +297,7 @@ export async function scanProductUrl(
       clearTimeout(timeout);
     }
 
-    const resolvedAfter = await resolvePublicAddresses(current.hostname);
+    const resolvedAfter = await resolveAddresses(current.hostname);
     if (resolvedAfter.some((address) => !isPublicIpAddress(address))) {
       throw new ProductScannerError(
         "non_public_address_after_fetch",
