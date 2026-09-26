@@ -1,21 +1,5 @@
 import { isIpAddress, isPublicIpAddress } from "@/lib/ip-address";
 
-const IPV4_RE = /^(\d{1,3})(?:\.(\d{1,3})){3}$/;
-
-function ipv4ToNumber(hostname: string): number | null {
-  if (!IPV4_RE.test(hostname)) return null;
-
-  const parts = hostname.split(".").map(Number);
-  if (parts.some((part) => part < 0 || part > 255)) return null;
-
-  return (
-    parts[0] * 256 ** 3 +
-    parts[1] * 256 ** 2 +
-    parts[2] * 256 +
-    parts[3]
-  );
-}
-
 export function isBlockedHostname(hostname: string): boolean {
   const host = hostname
     .toLowerCase()
