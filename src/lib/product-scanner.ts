@@ -47,24 +47,18 @@ function normalizeScannerUrl(input: string | URL): URL {
     throw new ProductScannerError("invalid_url", "A valid product URL is required.", 400);
   }
 
-  const normalized = normalizeProductUrl(raw);
-  let url: URL;
+  const candidate = /^[a-z][a-z\\d+.-]*:\\/\\//i.test(raw)
+    ? raw
+    : "https://" + raw;
 
+  let parsed: URL;
   try {
-    url = new URL(normalized.value);
+    parsed = new URL(candidate);
   } catch {
     throw new ProductScannerError("invalid_url", "A valid product URL is required.", 400);
   }
 
-  const hostname = url.hostname.replace(/^\[/, "").replace(/\]$/, "");
-
-  if (isBlockedHostname(hostname)) {
-    throw new ProductScannerError(
-      "blocked_hostname",
-      "This product URL is not allowed.",
-      400,
-    );
-  }
+  const hostname = parsed.hostname.replace(/^\\[/, "").replace(/\\]$/, "");
 
   if (isIpAddress(hostname)) {
     throw new ProductScannerError(
@@ -74,9 +68,17 @@ function normalizeScannerUrl(input: string | URL): URL {
     );
   }
 
-  const port = url.port
-    ? Number(url.port)
-    : url.protocol === "https:"
+  if (isBlockedHostname(hostname)) {
+    throw new ProductScannerError(
+      "blocked_hostname",
+      "This product URL is not allowed.",
+      400,
+    );
+  }
+
+  const port = parsed.port
+    ? Number(parsed.port)
+    : parsed.protocol === "https:"
       ? 443
       : 80;
 
@@ -88,7 +90,14 @@ function normalizeScannerUrl(input: string | URL): URL {
     );
   }
 
-  return url;
+  let normalized: ReturnType<typeof normalizeProductUrl>;
+  try {
+    normalized = normalizeProductUrl(parsed.toString());
+  } catch {
+    throw new ProductScannerError("invalid_url", "A valid product URL is required.", 400);
+  }
+
+  return new URL(normalized.value);
 }
 
 async function resolvePublicAddresses(hostname: string): Promise<string[]> {
