@@ -40,6 +40,18 @@ jobs:
           name: Build
           command: npm run build
 
+  product_scanner_security:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run product scanner security suite
+          command: npm run test:scanner
+
   cloudflare_compatibility:
     docker:
       - image: cimg/node:24.21.0
@@ -182,9 +194,13 @@ workflows:
   quality-gate:
     jobs:
       - quality
+      - product_scanner_security:
+          requires:
+            - quality
       - cloudflare_compatibility:
           requires:
             - quality
+            - product_scanner_security
       - cloudflare_build:
           requires:
             - quality
@@ -194,9 +210,13 @@ workflows:
     when: << pipeline.parameters.run_release_gate >>
     jobs:
       - quality
+      - product_scanner_security:
+          requires:
+            - quality
       - cloudflare_compatibility:
           requires:
             - quality
+            - product_scanner_security
       - cloudflare_build:
           requires:
             - cloudflare_compatibility
