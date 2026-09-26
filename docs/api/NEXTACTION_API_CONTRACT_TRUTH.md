@@ -731,38 +731,27 @@ No runtime endpoint should require knowledge of NextAction's internal database I
 
 ## 18. Current implementation status
 
-Stage 13 now implements the executable runtime chain through Settlement:
+Stage 14 adds the deployment/release boundary around the executable runtime.
+
+The runtime remains:
 
 - `POST /v1/track`
 - `POST /v1/offer`
 - `GET /v1/click/:delivery_token`
 
-Stage 9/10/12/13 also implement:
+The release path now includes:
 
-- publisher integration credential resolution
-- Event idempotency enforcement
-- Event → Moment worker processing
-- Decision → Delivery creation
-- Click idempotency enforcement
-- delivery expiry validation
-- runtime rate limiting
-- PGMQ-backed asynchronous processing
-- server-authoritative destination and Offer selection
-- trusted server-side click redirect
-- Qualification Policy v1
-- synchronous Qualified Click creation
-- qualification evidence versioning
-- atomic Settlement execution
-- advertiser debit ledger entry
-- publisher credit ledger entry
-- platform revenue ledger entry
-- advertiser capacity consumption
-- database-enforced settlement idempotency
+- Cloudflare deployment configuration;
+- separate staging and production Workers;
+- staging health check;
+- staging click/replay smoke;
+- production approval gate;
+- production health smoke.
 
 The following remain intentionally unimplemented:
 
 - DNS-aware SSRF controls for a future server-side URL scanner
-- automated deployment into a real staging environment
+- automated production promotion without the explicit CircleCI approval gate
 
 ## 19. Authentication callback contract
 
