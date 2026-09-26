@@ -65,3 +65,6 @@ STAGING_MOMENT_KEY
 Never commit Supabase secrets, Cloudflare API tokens, or `.env` files.
 
 The release workflow is opt-in through the CircleCI `run_release_gate` pipeline parameter. Staging deploy + smoke must pass before the production approval gate can proceed.
+
+
+Stage 14 health verification uses a build-time target identity (NEXT_PUBLIC_APP_ENV). The smoke then exercises the real API path separately to prove runtime Supabase credentials and bindings.
