@@ -39,6 +39,16 @@ if (
   healthBody?.environment !== expectedEnvironment
 ) {
   console.error("Health check returned an unexpected deployment identity.");
+  console.error(
+    JSON.stringify(
+      {
+        expected_environment: expectedEnvironment,
+        health_body: healthBody,
+      },
+      null,
+      2,
+    ),
+  );
   process.exit(1);
 }
 
