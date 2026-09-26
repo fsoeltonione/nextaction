@@ -47,9 +47,7 @@ function normalizeScannerUrl(input: string | URL): URL {
     throw new ProductScannerError("invalid_url", "A valid product URL is required.", 400);
   }
 
-  const candidate = /^[a-z][a-z\\d+.-]*:\\/\\//i.test(raw)
-    ? raw
-    : "https://" + raw;
+  const candidate = raw.includes("://") ? raw : "https://" + raw;
 
   let parsed: URL;
   try {
@@ -58,7 +56,7 @@ function normalizeScannerUrl(input: string | URL): URL {
     throw new ProductScannerError("invalid_url", "A valid product URL is required.", 400);
   }
 
-  const hostname = parsed.hostname.replace(/^\\[/, "").replace(/\\]$/, "");
+  const hostname = parsed.hostname.replaceAll("[", "").replaceAll("]", "");
 
   if (isIpAddress(hostname)) {
     throw new ProductScannerError(
