@@ -85,6 +85,7 @@ const track = await request("/v1/track", {
 
 if (track.status !== 202) {
   console.error(`Track smoke expected HTTP 202, got ${track.status}`);
+  console.error("Track response body:", await track.text());
   process.exit(1);
 }
 
@@ -108,6 +109,7 @@ if (trackReplay.status !== 202) {
   console.error(
     `Track replay smoke expected HTTP 202, got ${trackReplay.status}`,
   );
+  console.error("Track replay response body:", await trackReplay.text());
   process.exit(1);
 }
 
