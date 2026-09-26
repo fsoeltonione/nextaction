@@ -158,9 +158,9 @@ BEGIN
   )
   VALUES (
     v_advertiser_workspace_id,
-    1,
+    1000,
     0,
-    1
+    1000
   );
 
   INSERT INTO stage14_seed_output (
