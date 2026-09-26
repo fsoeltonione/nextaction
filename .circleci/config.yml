@@ -96,7 +96,7 @@ jobs:
             export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
             export SUPABASE_SECRET_KEY="${STAGING_SUPABASE_SECRET_KEY}"
             npm run deploy:cloudflare -- staging
-            grep -Eo 'https://[A-Za-z0-9._-]+.workers.dev' /tmp/nextaction-release/wrangler-staging.ndjson \
+            grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-staging.ndjson \
               | tail -1 \
               > /tmp/nextaction-release/staging_base_url
             test -s /tmp/nextaction-release/staging_base_url
@@ -152,7 +152,7 @@ jobs:
             export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
             export SUPABASE_SECRET_KEY="${PRODUCTION_SUPABASE_SECRET_KEY}"
             npm run deploy:cloudflare -- production
-            grep -Eo 'https://[A-Za-z0-9._-]+.workers.dev' /tmp/nextaction-release/wrangler-production.ndjson \
+            grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-production.ndjson \
               | tail -1 \
               > /tmp/nextaction-release/production_base_url
             test -s /tmp/nextaction-release/production_base_url
