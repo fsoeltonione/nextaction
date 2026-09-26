@@ -13,7 +13,7 @@ export async function checkRateLimit(
   subject: string,
   limit: number,
 ): Promise<RateLimitResult> {
-  const admin = await createAdminClient();
+  const admin = createAdminClient();
   const subjectHash = await sha256Hex(subject);
 
   const { data, error } = await admin.rpc("check_runtime_rate_limit", {
