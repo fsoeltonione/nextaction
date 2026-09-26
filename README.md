@@ -58,10 +58,8 @@ PRODUCTION_SUPABASE_SECRET_KEY
 Required smoke variables:
 
 ```text
-STAGING_BASE_URL
 STAGING_INTEGRATION_TOKEN
 STAGING_MOMENT_KEY
-PRODUCTION_BASE_URL
 ```
 
 Never commit Supabase secrets, Cloudflare API tokens, or `.env` files.

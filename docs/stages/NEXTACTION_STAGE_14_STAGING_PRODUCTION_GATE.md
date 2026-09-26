@@ -97,6 +97,8 @@ It is cache-disabled and does not expose credentials, database identifiers, or f
 
 ## 5. Staging smoke
 
+The staging smoke harness derives the deployed staging Worker URL from Wrangler output; no manually configured Worker URL is required.
+
 The staging smoke harness:
 
 1. requires an HTTPS staging URL;
@@ -189,10 +191,10 @@ STAGING_SUPABASE_SECRET_KEY
 ### Staging smoke
 
 ~~~text
-STAGING_BASE_URL
 STAGING_INTEGRATION_TOKEN
 STAGING_MOMENT_KEY
 ~~~
+
 
 ### Production
 
@@ -200,7 +202,6 @@ STAGING_MOMENT_KEY
 PRODUCTION_NEXT_PUBLIC_SUPABASE_URL
 PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 PRODUCTION_SUPABASE_SECRET_KEY
-PRODUCTION_BASE_URL
 ~~~
 
 The connected Supabase Free organization now contains:
@@ -290,9 +291,8 @@ Not yet executable end-to-end:
 
 Those now require:
 - Cloudflare account credentials;
-- CircleCI environment/secrets;
-- the seeded staging integration token and Moment key stored as protected CI variables;
-- the staging Worker base URL after Cloudflare deployment.
+- CircleCI contexts/secrets;
+- the seeded staging Integration token and Moment key stored as protected CI variables.
 
 ## 12. Exit criteria
 

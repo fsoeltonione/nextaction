@@ -90,28 +90,42 @@ jobs:
       - run:
           name: Deploy staging
           command: |
+            mkdir -p /tmp/nextaction-release
+            export WRANGLER_OUTPUT_FILE_PATH="/tmp/nextaction-release/wrangler-staging.ndjson"
             export NEXT_PUBLIC_SUPABASE_URL="${STAGING_NEXT_PUBLIC_SUPABASE_URL}"
             export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
             export SUPABASE_SECRET_KEY="${STAGING_SUPABASE_SECRET_KEY}"
             npm run deploy:cloudflare -- staging
+            grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-staging.ndjson \
+              | tail -1 \
+              > /tmp/nextaction-release/staging_base_url
+            test -s /tmp/nextaction-release/staging_base_url
+      - persist_to_workspace:
+          root: /tmp/nextaction-release
+          paths:
+            - staging_base_url
 
   staging_smoke:
     docker:
       - image: cimg/node:24.21.0
     steps:
       - checkout
+      - attach_workspace:
+          at: /tmp/nextaction-release
       - run:
           name: Install
           command: npm ci
       - run:
           name: Validate staging smoke inputs
           command: |
-            test -n "${STAGING_BASE_URL}"
+            test -s /tmp/nextaction-release/staging_base_url
             test -n "${STAGING_INTEGRATION_TOKEN}"
             test -n "${STAGING_MOMENT_KEY}"
       - run:
           name: Run staging smoke
-          command: npm run staging:smoke
+          command: |
+            export STAGING_BASE_URL="$(cat /tmp/nextaction-release/staging_base_url)"
+            npm run staging:smoke
 
   deploy_production:
     docker:
@@ -132,24 +146,37 @@ jobs:
       - run:
           name: Deploy production
           command: |
+            mkdir -p /tmp/nextaction-release
+            export WRANGLER_OUTPUT_FILE_PATH="/tmp/nextaction-release/wrangler-production.ndjson"
             export NEXT_PUBLIC_SUPABASE_URL="${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"
             export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
             export SUPABASE_SECRET_KEY="${PRODUCTION_SUPABASE_SECRET_KEY}"
             npm run deploy:cloudflare -- production
+            grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-production.ndjson \
+              | tail -1 \
+              > /tmp/nextaction-release/production_base_url
+            test -s /tmp/nextaction-release/production_base_url
+      - persist_to_workspace:
+          root: /tmp/nextaction-release
+          paths:
+            - production_base_url
 
   production_smoke:
     docker:
       - image: cimg/node:24.21.0
     steps:
       - checkout
+      - attach_workspace:
+          at: /tmp/nextaction-release
       - run:
           name: Install
           command: npm ci
       - run:
           name: Production health smoke
           command: |
-            test -n "${PRODUCTION_BASE_URL}"
-            STAGING_BASE_URL="${PRODUCTION_BASE_URL}" EXPECTED_ENVIRONMENT="production" npm run staging:smoke
+            test -s /tmp/nextaction-release/production_base_url
+            export STAGING_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
+            EXPECTED_ENVIRONMENT="production" npm run staging:smoke
 
 workflows:
   quality-gate:
@@ -167,11 +194,16 @@ workflows:
           requires:
             - cloudflare_compatibility
       - deploy_staging:
+          context:
+            - nextaction-cloudflare
+            - nextaction-staging
           requires:
             - quality
             - cloudflare_compatibility
             - cloudflare_build
       - staging_smoke:
+          context:
+            - nextaction-staging
           requires:
             - deploy_staging
       - hold_production:
@@ -179,8 +211,13 @@ workflows:
           requires:
             - staging_smoke
       - deploy_production:
+          context:
+            - nextaction-cloudflare
+            - nextaction-production
           requires:
             - hold_production
       - production_smoke:
+          context:
+            - nextaction-production
           requires:
             - deploy_production
