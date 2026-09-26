@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "cloudflare:check": "npx --yes vinext@1.0.0-beta.11 check",
-    "cloudflare:build": "npx --yes @opennextjs/cloudflare@1.20.6 build",
+    "cloudflare:check": "npx --yes vinext@1.0.0-beta.12 check",
+    "cloudflare:build": "node scripts/cloudflare-vinext-build.mjs",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "staging:smoke": "node scripts/staging-smoke.mjs"
   },

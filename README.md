@@ -38,7 +38,7 @@ The repository uses an explicit Wrangler environment contract:
 - `staging` → `nextaction-staging`
 - `production` → `nextaction`
 
-The application keeps the existing Next.js build path while Stage 14 validates Cloudflare compatibility. Cloudflare currently recommends vinext for Next.js on Workers; Stage 14 runs `vinext check` in the release gate before deployment. OpenNext remains the deployment adapter in this stage to minimize application-toolchain changes while compatibility is validated.
+The application keeps the existing Next.js source/runtime semantics while Stage 14 uses vinext for the Cloudflare build/deployment path. Cloudflare currently recommends vinext for Next.js on Workers, and vinext supports both Next.js 16 `proxy.ts` and App Router deployments. The normal `next build` path remains available for application quality checks.
 
 Required deployment variables are provided outside Git:
 

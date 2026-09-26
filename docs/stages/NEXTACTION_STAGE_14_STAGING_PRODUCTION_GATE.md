@@ -38,21 +38,25 @@ NextAction does not use Vercel.
 
 The Stage 14 deployment target is Cloudflare Workers.
 
-Cloudflare's current Next.js documentation recommends vinext for new/default Workers deployments and provides a compatibility-check workflow. For this existing application, Stage 14 keeps the current Next.js toolchain and uses OpenNext for the deployment adapter while running `vinext check` as a compatibility gate. This avoids silently converting the application's build system during a release-hardening stage.
+Cloudflare's current Next.js documentation recommends vinext as the default Workers deployment path. Stage 14 now uses vinext for the Cloudflare build/deployment path while retaining the normal Next.js build for the existing application quality gate. This is necessary because the application uses Next.js 16 `proxy.ts`, which runs on the Node.js runtime; the current OpenNext Cloudflare adapter documentation states that Node.js in Middleware is not yet supported, while vinext supports `proxy.ts` and `middleware.ts`.
 
-OpenNext configuration is explicit in `wrangler.jsonc` and targets:
+vinext configuration is explicit in `vite.config.mjs` and `wrangler.jsonc` and targets:
 
 ~~~text
-.open-next/worker.js
-.open-next/assets
+vinext/server/fetch-handler
+dist/client
 ~~~
 
-The deployment adapter and Wrangler CLI versions are pinned in repository scripts:
+The Cloudflare build toolchain is pinned by `scripts/cloudflare-vinext-build.mjs`:
 
 ~~~text
-@opennextjs/cloudflare 1.20.6
+vinext 1.0.0-beta.12
+@vinext/cloudflare 1.0.0-beta.10
+@cloudflare/vite-plugin 1.54.11
+vite 8.3.0
+@vitejs/plugin-rsc 0.5.35
+react-server-dom-webpack 19.2.8
 wrangler 4.139.0
-vinext 1.0.0-beta.11  (compatibility check only)
 ~~~
 
 ## 3. Cloudflare environments
@@ -279,7 +283,7 @@ Validated directly:
 
 - Cloudflare's current deployment model and environment semantics;
 - current Cloudflare recommendation for vinext;
-- current OpenNext package version used by the deployment script;
+- current vinext package version used by the deployment path.
 - live production database is clean after Stage 13 smoke;
 - production runtime settlement privileges remain service-role-only.
 
@@ -319,3 +323,10 @@ production health
 ~~~
 
 Only after that gate should the project move to the DNS-aware SSRF/product-scanner hardening milestone.
+
+
+## 12. Why the Cloudflare adapter is vinext
+
+The real Stage 14 release gate exposed an incompatibility between the application's Next.js 16 `proxy.ts` and `@opennextjs/cloudflare@1.20.6`. The OpenNext build reached bundle generation and then failed while handling the middleware output; separate runs also showed its configuration validator constraints. The authoritative issue is not a missing application route or database object: Next.js 16 renamed Middleware to `proxy.ts`, and that Proxy runs on the Node.js runtime. Current Cloudflare documentation says Node.js in Middleware is not yet supported by the OpenNext adapter. Current Cloudflare documentation recommends vinext for Next.js on Workers, and its compatibility table lists both `middleware.ts` and `proxy.ts` as supported.
+
+Therefore Stage 14 uses vinext for Cloudflare while retaining the existing Next.js build as the application-level quality check. This is a deployment-path change, not a domain/runtime business-logic change.
