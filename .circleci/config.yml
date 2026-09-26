@@ -182,6 +182,13 @@ workflows:
   quality-gate:
     jobs:
       - quality
+      - cloudflare_compatibility:
+          requires:
+            - quality
+      - cloudflare_build:
+          requires:
+            - quality
+            - cloudflare_compatibility
 
   release-gate:
     when: << pipeline.parameters.run_release_gate >>
