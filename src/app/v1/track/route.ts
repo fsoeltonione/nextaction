@@ -50,8 +50,10 @@ export function OPTIONS() {
 
 export async function POST(request: Request) {
   const requestId = createRequestId();
+  let runtimeStage = "start";
 
   try {
+    runtimeStage = "auth_rate_limit";
     // Cheap IP guard runs before credential lookup to reduce brute-force
     // pressure on the integration_secrets lookup.
     const authGuard = await checkRateLimit(
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
       return rateLimited(requestId, authGuard.retry_after_seconds);
     }
 
+    runtimeStage = "credential_extraction";
     const token = extractBearerToken(request);
     if (!token) {
       return failure(
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
       );
     }
 
+    runtimeStage = "integration_resolution";
     const resolved = await resolveRuntimeIntegration(token);
     if (!resolved.ok) {
       return failure(
@@ -84,6 +88,7 @@ export async function POST(request: Request) {
       );
     }
 
+    runtimeStage = "integration_rate_limit";
     const rateLimit = await checkRateLimit(
       "runtime:track",
       resolved.integration.id,
@@ -94,6 +99,7 @@ export async function POST(request: Request) {
       return rateLimited(requestId, rateLimit.retry_after_seconds);
     }
 
+    runtimeStage = "body_parse";
     const body = await readJsonBody(request);
 
     if (!isRecord(body)) {
@@ -151,6 +157,7 @@ export async function POST(request: Request) {
       occurredAt = parsed.toISOString();
     }
 
+    runtimeStage = "event_acceptance_rpc";
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("runtime_accept_event", {
       p_integration_id: resolved.integration.id,
@@ -240,7 +247,32 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error("Runtime track route failed", { requestId, error });
+    console.error("Runtime track route failed", {
+      requestId,
+      runtimeStage,
+      error,
+    });
+
+    const isStaging =
+      process.env.NEXT_PUBLIC_APP_ENV === "staging" ||
+      process.env.APP_ENV === "staging";
+
+    if (isStaging) {
+      return withRuntimeCors(
+        jsonSuccess(
+          {
+            error: {
+              code: "runtime_error",
+              message: "Unable to accept the event.",
+              debug_stage: runtimeStage,
+            },
+          },
+          requestId,
+          500,
+        ),
+      );
+    }
+
     return failure(
       requestId,
       500,
