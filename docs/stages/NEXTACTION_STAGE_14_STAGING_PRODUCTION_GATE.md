@@ -1,6 +1,6 @@
 # NextAction Stage 14 — Staging & Production Release Gate
 
-**Status:** Release-gate infrastructure implemented; dedicated staging Supabase is provisioned and seeded; activation still requires Cloudflare/CircleCI credentials and a deployed staging Worker.
+**Status:** FULLY COMPLETED and release-gated. Stage 14 has passed the real staging and production release path on `08761a61fd14354e5bdbef13cc43ba24deaec10e`.
 **Date:** 2026-09-26
 **Baseline:** Stage 13 `master` commit `9992efd9d0ec54a95676cf8bc7152fedd70d1230`
 
@@ -288,20 +288,21 @@ Validated directly:
 - live production database is clean after Stage 13 smoke;
 - production runtime settlement privileges remain service-role-only.
 
-Not yet executable end-to-end:
+End-to-end validation is complete.
 
-- real staging deployment;
-- real staging runtime smoke;
-- production promotion through CircleCI.
-
-Those now require:
-- Cloudflare account credentials;
-- CircleCI contexts/secrets;
-- the seeded staging Integration token and Moment key stored as protected CI variables.
+A real CircleCI release-gate run has proven:
+- staging deployment;
+- staging runtime smoke;
+- Event idempotency;
+- Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement;
+- click replay/idempotency;
+- production approval;
+- production deployment;
+- production health smoke.
 
 ## 12. Exit criteria
 
-Stage 14 reaches full operational completion when a real release-gate run proves:
+Stage 14 reached full operational completion after the real release-gate run on `08761a61fd14354e5bdbef13cc43ba24deaec10e` proved:
 
 ~~~text
 CircleCI quality
@@ -323,7 +324,7 @@ production deploy
 production health
 ~~~
 
-Only after that gate should the project move to the DNS-aware SSRF/product-scanner hardening milestone.
+Stage 14 is now locked. The next implementation milestone is the DNS-aware SSRF/product-scanner hardening work, subject to the Final Launch Readiness/Gate E security exception recorded separately.
 
 
 ## 12. Why the Cloudflare adapter is vinext
@@ -331,3 +332,8 @@ Only after that gate should the project move to the DNS-aware SSRF/product-scann
 The real Stage 14 release gate exposed an incompatibility between the application's Next.js 16 `proxy.ts` and `@opennextjs/cloudflare@1.20.6`. The OpenNext build reached bundle generation and then failed while handling the middleware output; separate runs also showed its configuration validator constraints. The authoritative issue is not a missing application route or database object: Next.js 16 renamed Middleware to `proxy.ts`, and that Proxy runs on the Node.js runtime. Current Cloudflare documentation says Node.js in Middleware is not yet supported by the OpenNext adapter. Current Cloudflare documentation recommends vinext for Next.js on Workers, and its compatibility table lists both `middleware.ts` and `proxy.ts` as supported.
 
 Therefore Stage 14 uses vinext for Cloudflare while retaining the existing Next.js build as the application-level quality check. This is a deployment-path change, not a domain/runtime business-logic change.
+
+
+## 13. Gate E security exception
+
+The Supabase leaked-password protection advisory remains enabled as an accepted MVP security exception because the project remains on the Supabase Free plan. This is not a resolved finding. The exception is documented in `docs/data-security/NEXTACTION_SECURITY_EXCEPTIONS.md` and must be revisited before password-based authentication is introduced.
