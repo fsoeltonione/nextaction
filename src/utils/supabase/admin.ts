@@ -1,5 +1,6 @@
 import "server-only";
 
+import { env as cloudflareEnv } from "cloudflare:workers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 type RuntimeBindings = {
@@ -8,28 +9,23 @@ type RuntimeBindings = {
   SUPABASE_SERVICE_ROLE_KEY?: string;
 };
 
-async function getRuntimeBindings(): Promise<RuntimeBindings> {
+function getRuntimeBindings(): RuntimeBindings {
   const processBindings: RuntimeBindings = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
 
-  try {
-    const cloudflareWorkers = await import("cloudflare:workers");
-    const workerBindings = cloudflareWorkers.env as RuntimeBindings;
+  const workerBindings = cloudflareEnv as RuntimeBindings;
 
-    return {
-      ...processBindings,
-      ...workerBindings,
-    };
-  } catch {
-    return processBindings;
-  }
+  return {
+    ...processBindings,
+    ...workerBindings,
+  };
 }
 
-export async function createAdminClient() {
-  const bindings = await getRuntimeBindings();
+export function createAdminClient() {
+  const bindings = getRuntimeBindings();
   const url = bindings.NEXT_PUBLIC_SUPABASE_URL;
   const secretKey =
     bindings.SUPABASE_SECRET_KEY ?? bindings.SUPABASE_SERVICE_ROLE_KEY;
