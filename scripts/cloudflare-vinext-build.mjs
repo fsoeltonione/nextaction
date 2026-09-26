@@ -28,7 +28,15 @@ function run(command, args, env = process.env) {
   }
 }
 
-console.log("Preparing pinned vinext/Cloudflare build toolchain...");
+const cloudflareEnv = process.env.CLOUDFLARE_ENV;
+if (cloudflareEnv !== "staging" && cloudflareEnv !== "production") {
+  console.error(
+    "CLOUDFLARE_ENV must be explicitly set to staging or production for a Cloudflare build.",
+  );
+  process.exit(2);
+}
+
+console.log(`Preparing pinned vinext/Cloudflare build toolchain for ${cloudflareEnv}...`);
 run(process.platform === "win32" ? "npm.cmd" : "npm", [
   "install",
   "--no-save",
