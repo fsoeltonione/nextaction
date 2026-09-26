@@ -87,13 +87,14 @@ Stage 14 adds:
 GET /api/health
 ~~~
 
-The endpoint returns only deployment identity information:
+The endpoint returns deployment identity information. The environment field is target-specific build metadata supplied by the deployment script; runtime_environment_configured reports whether the Worker exposes the runtime APP_ENV binding:
 
 ~~~json
 {
   "status": "ok",
   "service": "nextaction",
-  "environment": "staging"
+  "environment": "staging",
+  "runtime_environment_configured": true
 }
 ~~~
 
