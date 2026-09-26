@@ -151,7 +151,7 @@ export async function POST(request: Request) {
       occurredAt = parsed.toISOString();
     }
 
-    const admin = await createAdminClient();
+    const admin = createAdminClient();
     const { data, error } = await admin.rpc("runtime_accept_event", {
       p_integration_id: resolved.integration.id,
       p_idempotency_key: idempotencyKey,
