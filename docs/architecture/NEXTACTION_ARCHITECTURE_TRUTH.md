@@ -664,3 +664,13 @@ Architecture work is considered complete only when the next implementation phase
 - How is the behavior tested?
 
 If an implementation cannot answer those questions, it is not ready to be built.
+
+## 31. Stage 15 product scanner implementation
+
+The Product Analysis architecture now has an executable server-side scanner boundary.
+
+The scanner uses Cloudflare Workers-compatible node:dns resolution for A and AAAA validation, followed by controlled Fetch API retrieval with manual redirects, bounded HTML parsing, and explicit resource limits.
+
+The architecture deliberately distinguishes DNS preflight validation from connection-level destination pinning. Standard Worker fetch does not provide a general mechanism to force an arbitrary public hostname to the exact IP returned by a prior DNS query, so the implementation does not claim that guarantee.
+
+Strict IP-pinned egress remains a separate future infrastructure decision if product requirements make that guarantee necessary.
