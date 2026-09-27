@@ -74,6 +74,28 @@ if (typeof latestVersionId !== "string" || latestVersionId.length === 0) {
   throw new Error("Latest Worker deployment did not expose a version id.");
 }
 
+const secretBindings = await cloudflareRequest(
+  `/workers/scripts/${encodeURIComponent(workerName)}/secrets`,
+);
+
+if (!Array.isArray(secretBindings)) {
+  throw new Error(`Cloudflare returned an invalid secret-binding list for ${workerName}.`);
+}
+
+const secretNames = new Set(
+  secretBindings
+    .filter((binding) => binding && typeof binding.name === "string")
+    .map((binding) => binding.name),
+);
+
+for (const requiredSecret of ["SUPABASE_SECRET_KEY", "ANALYSIS_API_KEY"]) {
+  if (!secretNames.has(requiredSecret)) {
+    throw new Error(
+      `Required Cloudflare Worker secret binding is missing: ${requiredSecret}`,
+    );
+  }
+}
+
 const latestVersions = await cloudflareRequest(
   `/workers/scripts/${encodeURIComponent(workerName)}/versions?per_page=5`,
 );
@@ -127,8 +149,13 @@ console.log(
         ? domains.map((domain) => ({
             hostname: domain.hostname,
             environment: domain.environment,
+            service: domain.service,
           }))
         : [],
+      secret_bindings_checked: [
+        "SUPABASE_SECRET_KEY",
+        "ANALYSIS_API_KEY",
+      ],
       expected_hostname_checked: Boolean(expectedHostname),
     },
     null,
