@@ -146,7 +146,7 @@ try {
 
   let payload;
   try {
-    payload = await parseProviderResponse(body.text);
+    payload = parseAnalysisProviderResponse(body.text);
   } catch {
     console.error(
       "Analysis provider preflight returned a non-JSON response:",
