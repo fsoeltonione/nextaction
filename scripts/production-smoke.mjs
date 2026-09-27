@@ -131,6 +131,49 @@ try {
 
   console.log("Production analysis → scanner/provider path: OK");
 
+  const unauthTrack = await appRequest("/v1/track", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      type: "production.smoke.auth_guard",
+      data: {},
+    }),
+  });
+
+  if (unauthTrack.status !== 401) {
+    throw new Error(
+      `Production track auth guard expected HTTP 401, got ${unauthTrack.status}`,
+    );
+  }
+
+  const unauthOffer = await appRequest("/v1/offer", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ moment_key: "production_smoke_auth_guard" }),
+  });
+
+  if (unauthOffer.status !== 401) {
+    throw new Error(
+      `Production offer auth guard expected HTTP 401, got ${unauthOffer.status}`,
+    );
+  }
+
+  const missingClick = await appRequest(
+    "/v1/click/production-smoke-invalid-token",
+  );
+
+  if (missingClick.status !== 404) {
+    throw new Error(
+      `Production click missing-delivery guard expected HTTP 404, got ${missingClick.status}`,
+    );
+  }
+
+  console.log("Production public API auth/negative-path guards: OK");
+
   const members = await supabaseRequest(
     "/rest/v1/workspace_members?select=user_id&order=created_at.asc&limit=1",
   );
