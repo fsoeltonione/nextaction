@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Check, Globe, Plus, RefreshCw, ShieldCheck, Target, Trash2, Zap } from "lucide-react";
 
-const CAPABILITIES = ["make_money", "reach_customers"] as const;
-type Capability = (typeof CAPABILITIES)[number];
+type Capability = "make_money" | "reach_customers";
 type ActivationStep = "url" | "product_understanding" | "intent" | "capability_setup" | "verification" | "ready";
 
 type MomentDraft = { key: string; label: string; description: string };
@@ -56,6 +56,7 @@ function savePending(url: string, draft: ProductDraft | null) {
   try {
     if (url) sessionStorage.setItem("nextaction.pending_url", url);
     if (draft) sessionStorage.setItem("nextaction.pending_draft", JSON.stringify(draft));
+    else sessionStorage.removeItem("nextaction.pending_draft");
   } catch {}
 }
 function restorePending(): { url: string; draft: ProductDraft | null } {
@@ -88,6 +89,7 @@ function OnboardingContent() {
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoAnalysisUrlRef = useRef<string | null>(null);
 
   const applyState = useCallback((nextState: ActivationState) => {
     setState(nextState);
@@ -137,12 +139,17 @@ function OnboardingContent() {
 
   useEffect(() => {
     let active = true;
+    // This effect synchronizes initial client state with the authenticated server state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadState().catch((err) => { if (active) setError(err instanceof Error ? err.message : "Unable to load activation state."); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [loadState]);
 
   useEffect(() => {
-    if (!urlInput || draft || analysisRunning) return;
+    if (!urlInput || draft || analysisRunning || autoAnalysisUrlRef.current === urlInput) return;
+    autoAnalysisUrlRef.current = urlInput;
+    // This effect intentionally starts an async URL-driven analysis; the handler owns the UI state transition.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void runAnalysis(urlInput);
   }, [analysisRunning, draft, runAnalysis, urlInput]);
 
@@ -165,7 +172,22 @@ function OnboardingContent() {
       return next;
     });
   }
-  function removeMoment(index: number) { setDraft((current) => current ? { ...current, moments: current.moments.filter((_, i) => i !== index) } : current); }
+  function removeMoment(index: number) {
+    setDraft((current) => {
+      if (!current) return current;
+      const next = { ...current, moments: current.moments.filter((_, i) => i !== index) };
+      savePending(next.url, next);
+      return next;
+    });
+  }
+  function updateProduct(patch: Partial<Pick<ProductDraft, "name" | "description">>) {
+    setDraft((current) => {
+      if (!current) return current;
+      const next = { ...current, ...patch };
+      savePending(next.url, next);
+      return next;
+    });
+  }
 
   async function confirmProduct() {
     if (!draft || saving) return;
@@ -241,11 +263,11 @@ function OnboardingContent() {
   return (
     <Shell>
       <div className="w-full max-w-4xl mx-auto px-4 py-10">
-        <header className="flex items-center justify-between mb-8"><a href="/" className="font-bold text-xl text-white">NextAction</a><div className="text-xs text-neutral-500 uppercase tracking-widest">Activation</div></header>
+        <header className="flex items-center justify-between mb-8"><Link href="/" className="font-bold text-xl text-white">NextAction</Link><div className="text-xs text-neutral-500 uppercase tracking-widest">Activation</div></header>
         {workspaceOptions.length > 1 && <div className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-4"><label className="block text-sm font-medium text-neutral-300 mb-2">Workspace</label><select value={selectedWorkspaceId ?? ""} onChange={(event) => { const id = event.target.value || null; setSelectedWorkspaceId(id); if (id) void loadState(id); }} className="w-full rounded-xl bg-neutral-950 border border-neutral-700 px-4 py-3 text-white"><option value="">Select a workspace</option>{workspaceOptions.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.id} ({workspace.role})</option>)}</select><p className="text-xs text-neutral-500 mt-2">Workspace membership is checked server-side for every activation mutation.</p></div>}
         {error && <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>}
         {currentStep === "url" && !draft && <Card icon={<Globe className="w-5 h-5" />} title="Understand your SaaS"><p className="text-neutral-400 mb-5">Enter your public SaaS URL. We analyze it before asking you to sign in.</p><div className="flex gap-2"><input value={urlInput} onChange={(event) => setUrlInput(event.target.value)} placeholder="https://your-saas.com" className="flex-1 rounded-xl bg-neutral-950 border border-neutral-700 px-4 py-3 text-white" /><button disabled={!urlInput || analysisRunning} onClick={() => void runAnalysis(urlInput)} className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white disabled:opacity-50">{analysisRunning ? "Analyzing..." : "Analyze"}</button></div></Card>}
-        {currentStep === "product_understanding" && draft && <Card icon={<Zap className="w-5 h-5" />} title="Product Understanding"><p className="text-neutral-400 mb-6">Review the proposal. Nothing is persisted until you confirm it.</p><div className="space-y-4"><Field label="Product name"><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className="input" /></Field><Field label="Description"><textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="input min-h-24" /></Field><div><div className="flex items-center justify-between mb-3"><label className="text-sm font-medium text-neutral-300">Moments</label><button onClick={addMoment} className="text-sm text-indigo-400 flex items-center gap-1"><Plus className="w-4 h-4" /> Add Moment</button></div><div className="space-y-3">{draft.moments.map((moment, index) => <div key={index} className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 space-y-2"><div className="flex gap-2"><input value={moment.label} onChange={(event) => updateMoment(index, { label: event.target.value })} placeholder="Moment label" className="input" /><button onClick={() => removeMoment(index)} className="px-3 text-neutral-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button></div><input value={moment.key} onChange={(event) => updateMoment(index, { key: event.target.value })} placeholder="moment_key (lower_snake_case)" className="input font-mono text-sm" /><textarea value={moment.description} onChange={(event) => updateMoment(index, { description: event.target.value })} placeholder="What does this Moment mean?" className="input min-h-16 text-sm" /></div>)}</div></div><div className="flex gap-3 pt-2"><button onClick={() => void runAnalysis(urlInput)} disabled={analysisRunning} className="button-secondary"><RefreshCw className="w-4 h-4" /> Re-analyze</button><button onClick={() => void confirmProduct()} disabled={saving} className="button-primary">{saving ? "Saving..." : isAnonymous ? "Sign in & save" : "Confirm product"}<ArrowRight className="w-4 h-4" /></button></div>{isAnonymous && <p className="text-xs text-neutral-500">Sign-in is required only now because this action persists your Product and Moments.</p>}</div></Card>}
+        {currentStep === "product_understanding" && draft && <Card icon={<Zap className="w-5 h-5" />} title="Product Understanding"><p className="text-neutral-400 mb-6">Review the proposal. Nothing is persisted until you confirm it.</p><div className="space-y-4"><Field label="Product name"><input value={draft.name} onChange={(event) => updateProduct({ name: event.target.value })} className="input" /></Field><Field label="Description"><textarea value={draft.description} onChange={(event) => updateProduct({ description: event.target.value })} className="input min-h-24" /></Field><div><div className="flex items-center justify-between mb-3"><label className="text-sm font-medium text-neutral-300">Moments</label><button onClick={addMoment} className="text-sm text-indigo-400 flex items-center gap-1"><Plus className="w-4 h-4" /> Add Moment</button></div><div className="space-y-3">{draft.moments.map((moment, index) => <div key={index} className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 space-y-2"><div className="flex gap-2"><input value={moment.label} onChange={(event) => updateMoment(index, { label: event.target.value })} placeholder="Moment label" className="input" /><button onClick={() => removeMoment(index)} className="px-3 text-neutral-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button></div><input value={moment.key} onChange={(event) => updateMoment(index, { key: event.target.value })} placeholder="moment_key (lower_snake_case)" className="input font-mono text-sm" /><textarea value={moment.description} onChange={(event) => updateMoment(index, { description: event.target.value })} placeholder="What does this Moment mean?" className="input min-h-16 text-sm" /></div>)}</div></div><div className="flex gap-3 pt-2"><button onClick={() => void runAnalysis(urlInput)} disabled={analysisRunning} className="button-secondary"><RefreshCw className="w-4 h-4" /> Re-analyze</button><button onClick={() => void confirmProduct()} disabled={saving} className="button-primary">{saving ? "Saving..." : isAnonymous ? "Sign in & save" : "Confirm product"}<ArrowRight className="w-4 h-4" /></button></div>{isAnonymous && <p className="text-xs text-neutral-500">Sign-in is required only now because this action persists your Product and Moments.</p>}</div></Card>}
         {currentStep === "intent" && <Card icon={<Target className="w-5 h-5" />} title="What do you want to do?"><p className="text-neutral-400 mb-5">Choose one or both capabilities for this workspace.</p><div className="grid md:grid-cols-2 gap-3 mb-5"><CapabilityButton active={capabilitySelection.includes("make_money")} onClick={() => setCapabilitySelection((current) => current.includes("make_money") ? current.filter((item) => item !== "make_money") : [...current, "make_money"])} title="Make Money" description="Connect moments in your SaaS to commercial opportunities." /><CapabilityButton active={capabilitySelection.includes("reach_customers")} onClick={() => setCapabilitySelection((current) => current.includes("reach_customers") ? current.filter((item) => item !== "reach_customers") : [...current, "reach_customers"])} title="Reach Customers" description="Prepare offers to reach relevant Moments." /></div><button onClick={() => void saveCapabilities()} disabled={saving || capabilitySelection.length < 1} className="button-primary">{saving ? "Saving..." : "Continue"}<ArrowRight className="w-4 h-4" /></button></Card>}
         {currentStep === "capability_setup" && <div className="space-y-5">{capabilitySelection.includes("make_money") && !state?.setup.make_money.exists && <Card icon={<Zap className="w-5 h-5" />} title="Make Money setup"><p className="text-neutral-400 mb-5">Create the NextAction Runtime connection for this Product.</p><button onClick={() => void createIntegration()} disabled={saving} className="button-primary">{saving ? "Creating..." : "Create connection"}<ArrowRight className="w-4 h-4" /></button></Card>}{capabilitySelection.includes("make_money") && state?.setup.make_money.exists && !state.setup.make_money.verified && <Card icon={<ShieldCheck className="w-5 h-5" />} title="Verify connection"><p className="text-neutral-400 mb-4">Paste the credential into your integration, then verify it here.</p>{integrationToken && <div className="rounded-xl bg-neutral-950 border border-neutral-800 p-3 mb-4 font-mono text-xs break-all text-neutral-300">{integrationToken}</div>}<button onClick={() => void verifyIntegration()} disabled={!integrationToken || verifying} className="button-primary">{verifying ? "Verifying..." : "Verify connection"}<Check className="w-4 h-4" /></button></Card>}{capabilitySelection.includes("reach_customers") && !state?.setup.reach_customers.configured && <Card icon={<Target className="w-5 h-5" />} title="Reach Customers setup"><p className="text-neutral-400 mb-5">Create a starter activation offer. This is setup readiness, not final cross-workspace targeting.</p><div className="space-y-3"><Field label="Offer title"><input value={offerForm.title} onChange={(event) => setOfferForm({ ...offerForm, title: event.target.value })} className="input" /></Field><Field label="Destination URL"><input value={offerForm.destination_url} onChange={(event) => setOfferForm({ ...offerForm, destination_url: event.target.value })} className="input" /></Field><Field label="Description"><textarea value={offerForm.description} onChange={(event) => setOfferForm({ ...offerForm, description: event.target.value })} className="input min-h-20" /></Field><div><p className="text-sm text-neutral-400 mb-2">Starter Moments</p><div className="space-y-2">{moments.map((moment) => <label key={moment.id} className="flex items-center gap-2 text-sm text-neutral-300"><input type="checkbox" checked={offerForm.moment_ids.includes(moment.id)} onChange={() => setOfferForm((current) => ({ ...current, moment_ids: current.moment_ids.includes(moment.id) ? current.moment_ids.filter((id) => id !== moment.id) : [...current.moment_ids, moment.id] }))} />{moment.label} <span className="text-neutral-600 font-mono">{moment.moment_key}</span></label>)}</div></div><button onClick={() => void createOffer()} disabled={saving} className="button-primary">{saving ? "Saving..." : "Save starter setup"}<ArrowRight className="w-4 h-4" /></button></div></Card>}</div>}
         {currentStep === "verification" && <Card icon={<ShieldCheck className="w-5 h-5" />} title="Verification"><p className="text-neutral-400 mb-5">The selected Make Money integration exists but has not been verified.</p>{integrationToken && <div className="rounded-xl bg-neutral-950 border border-neutral-800 p-3 mb-4 font-mono text-xs break-all text-neutral-300">{integrationToken}</div>}<button onClick={() => void verifyIntegration()} disabled={!integrationToken || verifying} className="button-primary">{verifying ? "Verifying..." : "Verify connection"}<Check className="w-4 h-4" /></button></Card>}
