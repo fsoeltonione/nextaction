@@ -1,11 +1,11 @@
 # NextAction — Roadmap Audit & Official MVP-to-Launch Roadmap
 
 **Status:** Official post-Stage-15 roadmap  
-**Audit date:** 2026-09-27  
+**Audit date:** 2026-09-28  
 **Repository:** `fsoeltonione/nextaction`  
-**Roadmap baseline master:** `c7f771417784c5dd6bb1dfc4b2a9bd5ec5ffc48b`  
+**Roadmap baseline master:** `f9cb8442214e7c840076682c5ec10c2b9536924e`  
 **Completed through:** Stage 15  
-**Next milestone:** Stage 16 — Activation Flow v2 Completion
+**Next milestone:** Stage 16 — Activation Flow v2 Completion (contract locked; implementation not started)
 
 ---
 
@@ -278,51 +278,86 @@ Stage 15 is complete only when:
 
 ## Objective
 
-Make the live user experience match the locked activation contract exactly.
+Make the live user experience match the locked activation contract:
 
-## Target flow
-
-```
+~~~
 URL
-→ product understanding
-→ conditional auth
-→ confirmed product
-→ intent
+→ Product Understanding Proposal
+→ Conditional Auth
+→ Confirmed Product
+→ Intent
 → Make Money / Reach Customers / Both
-→ capability setup
-→ verification
-→ truly ready
-→ dashboard
-```
+→ Capability-Specific Setup
+→ Verification (when required)
+→ Truly Ready
+→ Dashboard
+~~~
 
-## Scope
+The flow is explicitly two-phase:
 
-- anonymous/pre-auth URL state;
-- server-safe preservation of pending URL;
-- product analysis before authentication where allowed by the security model;
-- product understanding proposal;
-- Moment discovery and review;
-- add/remove/edit Moment;
-- canonical URL confirmation;
-- conditional Google auth at the persistence boundary;
-- atomic product confirmation;
-- capability persistence;
-- Make Money activation;
-- Reach Customers activation;
-- verification state;
-- recovery from failed analysis;
-- retry/restart behavior;
-- deep-link handling;
-- activation-state rehydration from server truth;
-- removal of client-only authority;
-- explicit ready state;
-- dashboard handoff.
+- Proposal phase: URL → Product Understanding Proposal, without requiring authentication.
+- Persistence/activation phase: conditional authentication → Product confirmation → intent → capability setup → verification → ready.
+
+## Locked scope
+
+### URL-first proposal
+- anonymous Product analysis remains permitted;
+- authenticated users may analyze a new URL without being redirected away first;
+- pending normalized URL survives login, auth failure, refresh, and retry;
+- Product analysis never persists Product truth.
+
+### Conditional authentication
+- anonymous users authenticate only at the persistence boundary;
+- authenticated users do not see a redundant login wall;
+- generic login without activation context returns to dashboard;
+- OAuth callback remains limited to approved internal paths;
+- authentication failure preserves pending activation context.
+
+### Product Understanding
+- Product name/description editable;
+- Moment label/key/description editable;
+- Moment add/remove supported;
+- canonical Moment keys must be stable, machine-readable, and semantically meaningful;
+- generic placeholders such as moment_1 cannot become confirmed Product Moments.
+
+### Workspace context
+- zero memberships → first confirmation may create the initial workspace atomically;
+- one membership → automatic current workspace;
+- multiple memberships → explicit workspace selection;
+- every protected activation operation uses the same server-validated current workspace;
+- no silent first-membership fallback.
+
+### Server-derived activation state
+States remain url, product_understanding, intent, capability_setup, verification, ready.
+
+Every successful mutation must apply/reload authoritative server state. A discarded state reload is not allowed.
+
+### Capability activation
+The UI has exactly Make Money, Reach Customers, Both.
+
+Make Money requires integration issuance/verification.
+
+Reach Customers may use a starter activation offer, but Stage 16 must not silently define final cross-workspace commercial targeting. Final network targeting belongs to Stage 17.
+
+### Failure/recovery
+Analysis failure, confirmation failure, capability failure, setup failure, verification failure, session expiry, refresh, deep links, and browser navigation must remain recoverable.
+
+## Contract blockers from the Stage 16 audit
+
+1. pre-auth analysis sequencing;
+2. mutation-to-server-state synchronization;
+3. current workspace context for multi-workspace users;
+4. authenticated URL-first entry;
+5. OAuth pending-URL preservation on failure;
+6. pending URL recovery on refresh;
+7. semantic Moment-key creation;
+8. live-vs-migration activation RPC reconciliation.
 
 ## Exit criteria
 
-A new user can start from a SaaS URL and reach a server-derived ready state without seeing infrastructure concepts, and every transition is recoverable from server state.
+A new user can submit a SaaS URL, receive Product Understanding before login when anonymous, authenticate only when saving is required, confirm Product and Moments, select capabilities, complete selected activation setup, reach a server-derived ready state, refresh safely, and open the dashboard.
 
----
+All Stage 16 contract tests must be green.
 
 # 6. Stage 17 — Control Plane & Commercial UX Completion
 
