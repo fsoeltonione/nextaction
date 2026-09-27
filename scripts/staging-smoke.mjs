@@ -3,6 +3,7 @@ const integrationToken = process.env.STAGING_INTEGRATION_TOKEN;
 const momentKey = process.env.STAGING_MOMENT_KEY ?? "stage14_smoke_moment";
 const expectedEnvironment =
   process.env.EXPECTED_ENVIRONMENT ?? "staging";
+const defaultAnalyzeSmokeUrl = "https://carrd.com";
 
 if (!baseUrl) {
   console.error("Missing STAGING_BASE_URL.");
@@ -189,7 +190,7 @@ console.log(
 
 if (expectedEnvironment === "staging") {
   const analyzeTarget =
-    process.env.STAGING_ANALYZE_SMOKE_URL ?? "https://example.com";
+    process.env.STAGING_ANALYZE_SMOKE_URL ?? defaultAnalyzeSmokeUrl;
 
   const analyze = await request("/api/analyze", {
     method: "POST",
