@@ -87,7 +87,14 @@ function diagnosticPayload({ response, elapsedMs, responseText, responseTruncate
     status: response.status,
     statusText: response.statusText,
     contentType: response.headers.get("content-type") ?? "(missing)",
-    responseUrl: response.url,
+    responseUrl: (() => {
+      try {
+        const url = new URL(response.url);
+        return url.origin + url.pathname;
+      } catch {
+        return "(invalid response URL)";
+      }
+    })(),
     redirected: response.redirected,
     elapsedMs,
     bodyPreview: redactSecrets(
