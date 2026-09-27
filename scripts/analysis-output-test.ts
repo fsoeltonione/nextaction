@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseAnalysisOutput } from "../src/lib/runtime/analysis-output.ts";
+import {
+  parseAnalysisOutput,
+  AnalysisOutputValidationError,
+} from "../src/lib/runtime/analysis-output.ts";
+
+function assertValidationFailure(
+  fn: () => unknown,
+  reason: AnalysisOutputValidationError["reason"],
+) {
+  assert.throws(
+    fn,
+    (error) =>
+      error instanceof AnalysisOutputValidationError &&
+      error.reason === reason,
+  );
+}
 
 const valid = {
   url: "https://carrd.com",
@@ -46,14 +61,14 @@ test("uses scanner metadata only for missing top-level name/description", () => 
 });
 
 test("rejects an analysis with no Moments", () => {
-  assert.throws(
+  assertValidationFailure(
     () =>
       parseAnalysisOutput({
         name: "Example",
         description: "A placeholder site.",
         moments: [],
       }),
-    /invalid result/i,
+    "moments_missing",
   );
 });
 
@@ -73,7 +88,7 @@ test("rejects duplicate normalized Moment keys", () => {
 });
 
 test("rejects oversized labels and descriptions", () => {
-  assert.throws(
+  assertValidationFailure(
     () =>
       parseAnalysisOutput({
         name: "Example",
@@ -84,10 +99,10 @@ test("rejects oversized labels and descriptions", () => {
           },
         ],
       }),
-    /invalid result/i,
+    "moment_label_too_long",
   );
 
-  assert.throws(
+  assertValidationFailure(
     () =>
       parseAnalysisOutput({
         name: "Example",
@@ -99,10 +114,22 @@ test("rejects oversized labels and descriptions", () => {
           },
         ],
       }),
-    /invalid result/i,
+    "moment_description_too_long",
   );
 });
 
+
+test("rejects Moments whose explicit key cannot become a semantic runtime key", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput({
+        name: "Example",
+        description: "A site.",
+        moments: [{ key: "!!!", label: "Invoice Created" }],
+      }),
+    "moment_key_empty",
+  );
+});
 
 test("accepts a provider analysis wrapper", () => {
   const result = parseAnalysisOutput({
