@@ -203,6 +203,22 @@ jobs:
           paths:
             - production_base_url
 
+
+  cloudflare_production_audit:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Validate Cloudflare audit inputs
+          command: |
+            test -n "${CLOUDFLARE_API_TOKEN}"
+            test -n "${CLOUDFLARE_ACCOUNT_ID}"
+      - run:
+          name: Audit active production Worker
+          command: |
+            CLOUDFLARE_ENVIRONMENT=production npm run cloudflare:production-audit
+
   production_smoke:
     docker:
       - image: cimg/node:24.21.0
@@ -293,8 +309,14 @@ workflows:
             - nextaction-production
           requires:
             - hold_production
+      - cloudflare_production_audit:
+          context:
+            - nextaction-cloudflare
+          requires:
+            - deploy_production
       - production_smoke:
           context:
             - nextaction-production
           requires:
             - deploy_production
+            - cloudflare_production_audit
