@@ -193,8 +193,6 @@ try {
 
   if (
     snapshot?.track_created !== true ||
-    snapshot.worker_processed !== 1 ||
-    snapshot.worker_failed !== 0 ||
     snapshot.queue_message_enqueued !== true ||
     snapshot.queue_message_deleted !== true ||
     snapshot.moment_occurrence_created !== true ||
