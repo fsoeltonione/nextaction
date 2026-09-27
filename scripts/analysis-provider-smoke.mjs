@@ -1,25 +1,8 @@
+import { parseAnalysisProviderResponse } from "../src/lib/runtime/analysis-provider-response.ts";
+
 const apiKey = process.env.ANALYSIS_API_KEY?.trim();
 const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
 const model = process.env.ANALYSIS_MODEL?.trim();
-
-async function parseProviderResponse(responseText) {
-  const trimmed = responseText.trim();
-
-  try {
-    return JSON.parse(trimmed);
-  } catch (error) {
-    const doneMarker = "data: [DONE]";
-    const markerIndex = trimmed.lastIndexOf(doneMarker);
-
-    if (markerIndex <= 0 || trimmed.slice(markerIndex + doneMarker.length).trim() !== "") {
-      throw error;
-    }
-
-    const jsonCandidate = trimmed.slice(0, markerIndex).trimEnd();
-    if (jsonCandidate.length === 0) throw error;
-    return JSON.parse(jsonCandidate);
-  }
-}
 
 const MAX_RESPONSE_BODY_BYTES = 128 * 1024;
 const MAX_BODY_PREVIEW_BYTES = 4 * 1024;
