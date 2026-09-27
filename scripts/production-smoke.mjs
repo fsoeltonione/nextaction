@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 const baseUrl = process.env.PRODUCTION_BASE_URL;
 const supabaseUrl = process.env.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL;
@@ -135,7 +135,7 @@ async function waitFor(fn, timeoutMs, intervalMs, description) {
   throw new Error(`Timed out waiting for ${description}`);
 }
 
-const smokeId = crypto.randomUUID().replaceAll("-", "");
+const smokeId = randomUUID().replaceAll("-", "");
 const smokeEventType = `production_smoke_${smokeId.slice(0, 24)}`;
 const momentKey = smokeEventType;
 const destinationUrl =
