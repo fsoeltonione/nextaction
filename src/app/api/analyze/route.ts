@@ -10,6 +10,7 @@ import { normalizeProductUrl } from "@/lib/url";
 import { scanProductUrl, ProductScannerError } from "@/lib/product-scanner";
 import { checkRateLimit } from "@/lib/runtime/rate-limit";
 import { getRequestIp } from "@/lib/runtime/http";
+import { getAnalysisProviderConfig } from "@/lib/analysis-provider-config";
 
 const MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;
 const ANALYSIS_TIMEOUT_MS = 12_000;
@@ -179,9 +180,7 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const apiKey = process.env.ANALYSIS_API_KEY?.trim();
-    const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
-    const model = process.env.ANALYSIS_MODEL?.trim();
+    const { apiKey, baseUrl, model } = await getAnalysisProviderConfig();
 
     if (!apiKey || !baseUrl || !model) {
       throw new HttpError(
