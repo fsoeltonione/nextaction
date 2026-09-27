@@ -99,9 +99,9 @@ jobs:
             test -n "${STAGING_NEXT_PUBLIC_SUPABASE_URL}"
             test -n "${STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
             test -n "${STAGING_SUPABASE_SECRET_KEY}"
-            test -n "${OPENAI_API_KEY}"
-            test -n "${OPENAI_BASE_URL}"
-            test -n "${OPENAI_MODEL}"
+            test -n "${ANALYSIS_API_KEY}"
+            test -n "${ANALYSIS_BASE_URL}"
+            test -n "${ANALYSIS_MODEL}"
       - run:
           name: Deploy staging
           command: |
@@ -158,9 +158,9 @@ jobs:
             test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"
             test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
             test -n "${PRODUCTION_SUPABASE_SECRET_KEY}"
-            test -n "${OPENAI_API_KEY}"
-            test -n "${OPENAI_BASE_URL}"
-            test -n "${OPENAI_MODEL}"
+            test -n "${ANALYSIS_API_KEY}"
+            test -n "${ANALYSIS_BASE_URL}"
+            test -n "${ANALYSIS_MODEL}"
       - run:
           name: Deploy production
           command: |

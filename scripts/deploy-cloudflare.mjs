@@ -14,9 +14,9 @@ const required = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SECRET_KEY",
-  "OPENAI_API_KEY",
-  "OPENAI_BASE_URL",
-  "OPENAI_MODEL",
+  "ANALYSIS_API_KEY",
+  "ANALYSIS_BASE_URL",
+  "ANALYSIS_MODEL",
 ];
 
 const missing = required.filter((name) => !process.env[name]);
@@ -74,11 +74,11 @@ run(
     "wrangler@4.139.0",
     "secret",
     "put",
-    "OPENAI_API_KEY",
+    "ANALYSIS_API_KEY",
     "--env",
     target,
   ],
-  process.env.OPENAI_API_KEY,
+  process.env.ANALYSIS_API_KEY,
 );
 
 run(
@@ -90,8 +90,8 @@ run(
     "--env",
     target,
     "--var",
-    "OPENAI_BASE_URL:" + process.env.OPENAI_BASE_URL,
+    "ANALYSIS_BASE_URL:" + process.env.ANALYSIS_BASE_URL,
     "--var",
-    "OPENAI_MODEL:" + process.env.OPENAI_MODEL,
+    "ANALYSIS_MODEL:" + process.env.ANALYSIS_MODEL,
   ],
 );
