@@ -39,9 +39,12 @@ async function cloudflareRequest(path) {
   return body.result;
 }
 
-const deployments = await cloudflareRequest(
-  `/workers/scripts/${encodeURIComponent(workerName)}/deployments`,
+const deploymentResponse = await cloudflareRequest(
+  `/workers/scripts/${encodeURIComponent(workerName)}/deployments?per_page=5`,
 );
+const deployments = Array.isArray(deploymentResponse)
+  ? deploymentResponse
+  : deploymentResponse?.deployments;
 
 if (!Array.isArray(deployments) || deployments.length === 0) {
   throw new Error(`No active deployments found for Worker ${workerName}.`);
@@ -96,9 +99,12 @@ for (const requiredSecret of ["SUPABASE_SECRET_KEY", "ANALYSIS_API_KEY"]) {
   }
 }
 
-const latestVersions = await cloudflareRequest(
+const latestVersionResponse = await cloudflareRequest(
   `/workers/scripts/${encodeURIComponent(workerName)}/versions?per_page=5`,
 );
+const latestVersions = Array.isArray(latestVersionResponse)
+  ? latestVersionResponse
+  : latestVersionResponse?.items;
 
 if (!Array.isArray(latestVersions) || latestVersions.length === 0) {
   throw new Error(`No Worker versions found for ${workerName}.`);
