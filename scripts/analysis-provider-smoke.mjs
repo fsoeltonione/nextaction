@@ -1,5 +1,6 @@
 import { parseAnalysisProviderResponse } from "../src/lib/runtime/analysis-provider-response.ts";
 import { parseAnalysisOutput } from "../src/lib/runtime/analysis-output.ts";
+import { parseAnalysisProviderContent } from "../src/lib/runtime/analysis-provider-content.ts";
 
 const apiKey = process.env.ANALYSIS_API_KEY?.trim();
 const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
@@ -200,16 +201,20 @@ try {
 
   let parsedContent;
   try {
-    parsedContent = JSON.parse(content.trim());
-  } catch {
+    parsedContent = parseAnalysisProviderContent(content);
+  } catch (error) {
     console.error(
       "Analysis provider preflight assistant content was not JSON:",
-      diagnosticPayload({
-        response,
-        elapsedMs,
-        responseText: body.text,
-        responseTruncated: body.truncated,
-      }),
+      {
+        ...diagnosticPayload({
+          response,
+          elapsedMs,
+          responseText: body.text,
+          responseTruncated: body.truncated,
+        }),
+        validation_reason:
+          error instanceof Error ? error.message : "unknown",
+      },
     );
     process.exit(1);
   }
