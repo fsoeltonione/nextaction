@@ -186,3 +186,44 @@ if (replayLocation !== location) {
 console.log(
   "Click → Qualified Click → Settlement + replay smoke: OK",
 );
+
+if (expectedEnvironment === "staging") {
+  const analyzeTarget =
+    process.env.STAGING_ANALYZE_SMOKE_URL ?? "https://example.com";
+
+  const analyze = await request("/api/analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url: analyzeTarget }),
+  });
+
+  if (analyze.status !== 200) {
+    console.error(
+      `Analyze smoke expected HTTP 200, got ${analyze.status}`,
+    );
+    console.error("Analyze response body:", await analyze.text());
+    process.exit(1);
+  }
+
+  const analyzeBody = await analyze.json();
+  const analysis = analyzeBody?.analysis;
+
+  if (
+    !analysis ||
+    typeof analysis.name !== "string" ||
+    analysis.name.trim().length === 0 ||
+    typeof analysis.description !== "string" ||
+    analysis.description.trim().length === 0 ||
+    !Array.isArray(analysis.moments) ||
+    analysis.moments.length < 1 ||
+    analysis.moments.length > 10
+  ) {
+    console.error("Analyze smoke returned an invalid analysis shape.");
+    console.error(JSON.stringify(analyzeBody, null, 2));
+    process.exit(1);
+  }
+
+  console.log("Product analysis → scanner live-path smoke: OK");
+}

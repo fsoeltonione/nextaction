@@ -5,6 +5,7 @@ import {
   PRODUCT_SCANNER_LIMITS,
   ProductScannerError,
   scanProductUrl,
+  resolveDnsAddresses,
 } from "../src/lib/product-scanner.ts";
 
 const publicAddresses = async () => ["93.184.216.34"];
@@ -39,6 +40,33 @@ test("scanner rejects IP-literal targets, including alternate IPv4 notation", as
         error.code === "ip_literal_not_allowed",
     );
   }
+});
+
+test("DNS resolver classifies no-record and transient failures", async () => {
+  await assert.rejects(
+    () => resolveDnsAddresses("internal.example", noAddresses, noAddresses),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "dns_no_address",
+  );
+
+  const dnsTransientFailure = async () => {
+    const error = new Error("temporary DNS failure") as Error & { code: string };
+    error.code = "EAI_AGAIN";
+    throw error;
+  };
+
+  await assert.rejects(
+    () =>
+      resolveDnsAddresses(
+        "internal.example",
+        dnsTransientFailure,
+        async () => ["93.184.216.34"],
+      ),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "dns_unavailable",
+  );
 });
 
 test("scanner rejects non-public DNS answers before fetch", async () => {
@@ -162,6 +190,82 @@ test("scanner rejects an observed DNS rebind to a non-public address", async () 
   );
 });
 
+test("scanner rejects embedded credentials and unsupported ports", async () => {
+  await assert.rejects(
+    () => scanProductUrl("https://user:pass@example.com"),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "invalid_url",
+  );
+
+  for (const url of ["https://example.com:444", "http://example.com:8080"]) {
+    await assert.rejects(
+      () => scanProductUrl(url),
+      (error: unknown) =>
+        error instanceof ProductScannerError &&
+        error.code === "unsupported_port",
+    );
+  }
+});
+
+test("scanner enforces fetch timeout", async () => {
+  const hangingFetch = async (
+    _url: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> =>
+    await new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      const abort = () => reject(new DOMException("Aborted", "AbortError"));
+
+      if (signal?.aborted) {
+        abort();
+        return;
+      }
+
+      signal?.addEventListener("abort", abort, { once: true });
+    });
+
+  await assert.rejects(
+    () =>
+      scanProductUrl(
+        "https://example.com",
+        hangingFetch,
+        publicAddresses,
+      ),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "fetch_timeout",
+  );
+});
+
+test("scanner enforces streaming response byte limit", async () => {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(
+        new Uint8Array(PRODUCT_SCANNER_LIMITS.maxResponseBytes),
+      );
+      controller.enqueue(new Uint8Array(1));
+      controller.close();
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      scanProductUrl(
+        "https://example.com",
+        async () =>
+          new Response(body, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+        publicAddresses,
+      ),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "response_too_large",
+  );
+});
+
 test("scanner enforces content type and response size", async () => {
   await assert.rejects(
     () =>
@@ -199,7 +303,27 @@ test("scanner enforces content type and response size", async () => {
   );
 });
 
-test("scanner limits redirects and detects loops", async () => {
+test("scanner rejects redirect targets containing credentials", async () => {
+  await assert.rejects(
+    () =>
+      scanProductUrl(
+        "https://example.com",
+        async () =>
+          new Response(null, {
+            status: 302,
+            headers: {
+              location: "https://user:pass@example.com/final",
+            },
+          }),
+        publicAddresses,
+      ),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "invalid_url",
+  );
+});
+
+test("scanner limits redirects", async () => {
   let redirectCount = 0;
   await assert.rejects(
     () =>
@@ -218,4 +342,40 @@ test("scanner limits redirects and detects loops", async () => {
       error instanceof ProductScannerError &&
       error.code === "redirect_limit",
   );
+});
+
+test("scanner detects a real redirect loop", async () => {
+  const calls: string[] = [];
+
+  await assert.rejects(
+    () =>
+      scanProductUrl(
+        "https://example.com/a",
+        async (url) => {
+          const current = String(url);
+          calls.push(current);
+
+          if (calls.length === 1) {
+            return new Response(null, {
+              status: 302,
+              headers: { location: "https://example.com/b" },
+            });
+          }
+
+          return new Response(null, {
+            status: 302,
+            headers: { location: "https://example.com/a" },
+          });
+        },
+        publicAddresses,
+      ),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "redirect_loop",
+  );
+
+  assert.deepEqual(calls, [
+    "https://example.com/a",
+    "https://example.com/b",
+  ]);
 });

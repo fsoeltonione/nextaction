@@ -62,6 +62,8 @@ STAGING_INTEGRATION_TOKEN
 STAGING_MOMENT_KEY
 ```
 
+Staging smoke also exercises `POST /api/analyze` through the deployed Worker. It uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
+
 Never commit Supabase secrets, Cloudflare API tokens, or `.env` files.
 
 The release workflow is opt-in through the CircleCI `run_release_gate` pipeline parameter. Staging deploy + smoke must pass before the production approval gate can proceed.
