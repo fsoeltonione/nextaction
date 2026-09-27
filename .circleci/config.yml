@@ -304,6 +304,7 @@ workflows:
             - quality
             - cloudflare_build
             - analysis_provider_contract
+            - analysis_output_contract
       - deploy_staging:
           context:
             - nextaction-cloudflare
