@@ -44,4 +44,4 @@ Supabase currently reports:
 
 ## Cleanup rule
 
-Production smoke fixtures must be isolated, uniquely marked, and removed before the smoke job passes. Existing production workspaces, products, and other non-smoke data must not be treated as disposable without explicit provenance.
+Production runtime smoke is transactional: its temporary fixture and all runtime/financial writes are rolled back inside the database subtransaction before the smoke call returns. Existing production workspaces, products, and other non-smoke data are not treated as disposable without explicit provenance.
