@@ -24,13 +24,13 @@ export async function getAnalysisProviderConfig(): Promise<{
 
   return {
     apiKey:
-      process.env.ANALYSIS_API_KEY?.trim() ??
+      process.env.ANALYSIS_API_KEY?.trim() ||
       bindings.ANALYSIS_API_KEY?.trim(),
     baseUrl:
-      process.env.ANALYSIS_BASE_URL?.trim() ??
+      process.env.ANALYSIS_BASE_URL?.trim() ||
       bindings.ANALYSIS_BASE_URL?.trim(),
     model:
-      process.env.ANALYSIS_MODEL?.trim() ??
+      process.env.ANALYSIS_MODEL?.trim() ||
       bindings.ANALYSIS_MODEL?.trim(),
   };
 }
