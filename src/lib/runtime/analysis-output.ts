@@ -23,6 +23,7 @@ export type AnalysisOutputFailureReason =
   | "moment_label_too_long"
   | "moment_description_too_long"
   | "moment_key_empty"
+  | "duplicate_moment_key"
   | "name_missing"
   | "name_too_long"
   | "description_missing"
@@ -265,24 +266,12 @@ export function parseAnalysisOutput(
     });
   }
 
-  const usedKeys = new Set<string>();
-  for (const moment of moments) {
-    if (!usedKeys.has(moment.key)) {
-      usedKeys.add(moment.key);
-      continue;
-    }
-
-    const base = moment.key;
-    let suffix = 2;
-    let candidate = base + "_" + String(suffix);
-
-    while (usedKeys.has(candidate)) {
-      suffix += 1;
-      candidate = base + "_" + String(suffix);
-    }
-
-    moment.key = candidate;
-    usedKeys.add(candidate);
+  const uniqueKeys = new Set(moments.map((moment) => moment.key));
+  if (uniqueKeys.size !== moments.length) {
+    throw new AnalysisOutputValidationError(
+      "duplicate_moment_key",
+      "Analysis provider output contained duplicate Moment keys.",
+    );
   }
 
   const providerName = firstString(root, NAME_KEYS);
