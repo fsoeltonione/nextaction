@@ -179,12 +179,34 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
-    const model = process.env.OPENAI_MODEL || "deepseek-v4.1-flash-free";
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    const baseUrl = process.env.OPENAI_BASE_URL?.trim();
+    const model = process.env.OPENAI_MODEL?.trim();
 
-    if (!apiKey) {
-      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
+    if (!apiKey || !baseUrl || !model) {
+      throw new HttpError(
+        503,
+        "analysis_provider_not_configured",
+        "Product analysis provider is not configured.",
+      );
+    }
+
+    let providerEndpoint: URL;
+    try {
+      const providerBase = new URL(baseUrl);
+      if (providerBase.protocol !== "https:" && providerBase.protocol !== "http:") {
+        throw new Error("unsupported provider protocol");
+      }
+      if (!providerBase.pathname.endsWith("/")) {
+        providerBase.pathname += "/";
+      }
+      providerEndpoint = new URL("chat/completions", providerBase);
+    } catch {
+      throw new HttpError(
+        503,
+        "analysis_provider_not_configured",
+        "Product analysis provider is not configured.",
+      );
     }
 
     let scan;
@@ -218,7 +240,7 @@ export async function POST(request: Request) {
     let response: Response;
 
     try {
-      response = await fetch(baseUrl + "/chat/completions", {
+      response = await fetch(providerEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

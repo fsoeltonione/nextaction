@@ -53,6 +53,10 @@ STAGING_SUPABASE_SECRET_KEY
 PRODUCTION_NEXT_PUBLIC_SUPABASE_URL
 PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 PRODUCTION_SUPABASE_SECRET_KEY
+
+OPENAI_API_KEY
+OPENAI_BASE_URL
+OPENAI_MODEL
 ```
 
 Required smoke variables:
@@ -62,7 +66,7 @@ STAGING_INTEGRATION_TOKEN
 STAGING_MOMENT_KEY
 ```
 
-Staging smoke also exercises `POST /api/analyze` through the deployed Worker. It uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
+Staging smoke also exercises `POST /api/analyze` through the deployed Worker. The staging and production deployment contexts must provide `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL`. The API key is stored as a Worker secret; the base URL and model are injected as Worker variables. The smoke uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
 
 Never commit Supabase secrets, Cloudflare API tokens, or `.env` files.
 
