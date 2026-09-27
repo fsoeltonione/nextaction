@@ -98,10 +98,14 @@ function normalizeScannerUrl(input: string | URL): URL {
   return new URL(normalized.value);
 }
 
-async function resolveDnsAddresses(hostname: string): Promise<string[]> {
+export async function resolveDnsAddresses(
+  hostname: string,
+  resolve4: DnsFamilyResolver = (host) => dns.promises.resolve4(host),
+  resolve6: DnsFamilyResolver = (host) => dns.promises.resolve6(host),
+): Promise<string[]> {
   const results = await Promise.allSettled([
-    dns.promises.resolve4(hostname),
-    dns.promises.resolve6(hostname),
+    resolve4(hostname),
+    resolve6(hostname),
   ]);
 
   const addresses: string[] = [];
@@ -239,7 +243,8 @@ function isHttpsDowngrade(from: URL, to: URL): boolean {
   return from.protocol === "https:" && to.protocol === "http:";
 }
 
-type ResolveAddresses = (hostname: string) => Promise<string[]>;
+export type ResolveAddresses = (hostname: string) => Promise<string[]>;
+type DnsFamilyResolver = (hostname: string) => Promise<string[]>;
 
 export async function scanProductUrl(
   input: string,
