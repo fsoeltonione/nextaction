@@ -2,6 +2,7 @@ const apiKey = process.env.ANALYSIS_API_KEY?.trim();
 const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
 const model = process.env.ANALYSIS_MODEL?.trim();
 
+const MAX_RESPONSE_BODY_BYTES = 128 * 1024;
 const MAX_BODY_PREVIEW_BYTES = 4 * 1024;
 
 if (!apiKey || !baseUrl || !model) {
@@ -22,7 +23,7 @@ try {
   process.exit(2);
 }
 
-async function readBoundedBodyPreview(response, maxBytes) {
+async function readBoundedText(response, maxBytes) {
   if (!response.body) {
     const text = await response.text();
     const bytes = new TextEncoder().encode(text);
@@ -76,7 +77,23 @@ async function readBoundedBodyPreview(response, maxBytes) {
 function redactSecrets(value) {
   return value
     .replaceAll(apiKey, "[REDACTED]")
-    .replace(/Bearer\\s+[A-Za-z0-9._~+\\/-]+/gi, "Bearer [REDACTED]");
+    .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+/gi, "Bearer [REDACTED]");
+}
+
+function diagnosticPayload({ response, elapsedMs, responseText, responseTruncated }) {
+  return {
+    status: response.status,
+    statusText: response.statusText,
+    contentType: response.headers.get("content-type") ?? "(missing)",
+    responseUrl: response.url,
+    redirected: response.redirected,
+    elapsedMs,
+    bodyPreview: redactSecrets(
+      responseText.slice(0, MAX_BODY_PREVIEW_BYTES),
+    ),
+    bodyPreviewTruncated:
+      responseTruncated || responseText.length > MAX_BODY_PREVIEW_BYTES,
+  };
 }
 
 const controller = new AbortController();
@@ -106,54 +123,37 @@ try {
   });
 
   const elapsedMs = Date.now() - startedAt;
-  const contentType = response.headers.get("content-type") ?? "(missing)";
-
-  let responsePreview = null;
-  let responsePreviewTruncated = false;
+  const body = await readBoundedText(
+    response,
+    MAX_RESPONSE_BODY_BYTES,
+  );
 
   if (!response.ok) {
-    const preview = await readBoundedBodyPreview(
-      response,
-      MAX_BODY_PREVIEW_BYTES,
+    console.error(
+      "Analysis provider preflight failed:",
+      diagnosticPayload({
+        response,
+        elapsedMs,
+        responseText: body.text,
+        responseTruncated: body.truncated,
+      }),
     );
-    responsePreview = redactSecrets(preview.text);
-    responsePreviewTruncated = preview.truncated;
-
-    console.error("Analysis provider preflight failed:", {
-      status: response.status,
-      statusText: response.statusText,
-      contentType,
-      responseUrl: response.url,
-      redirected: response.redirected,
-      elapsedMs,
-      bodyPreview: responsePreview,
-      bodyPreviewTruncated: responsePreviewTruncated,
-    });
     process.exit(1);
   }
 
   let payload;
   try {
-    const responseText = await response.text();
-    payload = JSON.parse(responseText);
+    payload = JSON.parse(body.text);
   } catch {
-    const preview = await readBoundedBodyPreview(
-      response,
-      MAX_BODY_PREVIEW_BYTES,
+    console.error(
+      "Analysis provider preflight returned a non-JSON response:",
+      diagnosticPayload({
+        response,
+        elapsedMs,
+        responseText: body.text,
+        responseTruncated: body.truncated,
+      }),
     );
-    responsePreview = redactSecrets(preview.text);
-    responsePreviewTruncated = preview.truncated;
-
-    console.error("Analysis provider preflight returned a non-JSON response:", {
-      status: response.status,
-      statusText: response.statusText,
-      contentType,
-      responseUrl: response.url,
-      redirected: response.redirected,
-      elapsedMs,
-      bodyPreview: responsePreview,
-      bodyPreviewTruncated: responsePreviewTruncated,
-    });
     process.exit(1);
   }
 
@@ -161,14 +161,15 @@ try {
     payload?.choices?.[0]?.message?.content;
 
   if (typeof content !== "string" || content.trim().length === 0) {
-    console.error("Analysis provider preflight returned no assistant content:", {
-      status: response.status,
-      statusText: response.statusText,
-      contentType,
-      responseUrl: response.url,
-      redirected: response.redirected,
-      elapsedMs,
-    });
+    console.error(
+      "Analysis provider preflight returned no assistant content:",
+      diagnosticPayload({
+        response,
+        elapsedMs,
+        responseText: body.text,
+        responseTruncated: body.truncated,
+      }),
+    );
     process.exit(1);
   }
 
