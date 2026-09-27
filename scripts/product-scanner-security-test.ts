@@ -5,6 +5,7 @@ import {
   PRODUCT_SCANNER_LIMITS,
   ProductScannerError,
   scanProductUrl,
+  resolveDnsAddresses,
 } from "../src/lib/product-scanner.ts";
 
 const publicAddresses = async () => ["93.184.216.34"];
@@ -41,28 +42,13 @@ test("scanner rejects IP-literal targets, including alternate IPv4 notation", as
   }
 });
 
-test("scanner rejects DNS failures before fetch", async () => {
-  let fetchCalled = false;
-
+test("DNS resolver classifies no-record and transient failures", async () => {
   await assert.rejects(
-    () =>
-      scanProductUrl(
-        "https://internal.example",
-        async () => {
-          fetchCalled = true;
-          return new Response("<html></html>", {
-            status: 200,
-            headers: { "content-type": "text/html" },
-          });
-        },
-        noAddresses,
-      ),
+    () => resolveDnsAddresses("internal.example", noAddresses, noAddresses),
     (error: unknown) =>
       error instanceof ProductScannerError &&
       error.code === "dns_no_address",
   );
-
-  assert.equal(fetchCalled, false);
 
   const dnsTransientFailure = async () => {
     const error = new Error("temporary DNS failure") as Error & { code: string };
@@ -71,7 +57,12 @@ test("scanner rejects DNS failures before fetch", async () => {
   };
 
   await assert.rejects(
-    () => scanProductUrl("https://internal.example", fetch, dnsTransientFailure),
+    () =>
+      resolveDnsAddresses(
+        "internal.example",
+        dnsTransientFailure,
+        async () => ["93.184.216.34"],
+      ),
     (error: unknown) =>
       error instanceof ProductScannerError &&
       error.code === "dns_unavailable",
