@@ -12,7 +12,8 @@
     "cloudflare:build": "node scripts/cloudflare-vinext-build.mjs",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "staging:smoke": "node scripts/staging-smoke.mjs",
-    "test:scanner": "node --experimental-strip-types --test scripts/product-scanner-security-test.ts"
+    "test:scanner": "node --experimental-strip-types --test scripts/product-scanner-security-test.ts",
+    "analysis:provider-smoke": "node scripts/analysis-provider-smoke.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
