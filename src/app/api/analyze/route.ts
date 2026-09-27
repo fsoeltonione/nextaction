@@ -12,7 +12,7 @@ import { checkRateLimit } from "@/lib/runtime/rate-limit";
 import { getRequestIp } from "@/lib/runtime/http";
 
 const MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;
-const ANALYSIS_TIMEOUT_MS = 12_000;
+const ANALYSIS_TIMEOUT_MS = 25_000;
 const ANALYZE_RATE_LIMIT_PER_MINUTE = 10;
 const MAX_ANALYSIS_CONTEXT_CHARS = 12_000;
 
@@ -273,6 +273,7 @@ export async function POST(request: Request) {
             },
           ],
           temperature: 0.2,
+          max_tokens: 1200,
         }),
         signal: controller.signal,
       });
