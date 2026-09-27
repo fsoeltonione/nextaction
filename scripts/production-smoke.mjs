@@ -186,6 +186,38 @@ try {
 
   console.log("Production health: OK");
 
+  const analyze = await appRequest("/api/analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url: "https://example.com" }),
+  });
+
+  if (analyze.status !== 200) {
+    throw new Error(
+      `Production product analysis expected HTTP 200, got ${analyze.status}`,
+    );
+  }
+
+  const analyzeBody = await analyze.json();
+  const analysis = analyzeBody?.analysis;
+
+  if (
+    !analysis ||
+    typeof analysis.name !== "string" ||
+    analysis.name.trim().length === 0 ||
+    typeof analysis.description !== "string" ||
+    analysis.description.trim().length === 0 ||
+    !Array.isArray(analysis.moments) ||
+    analysis.moments.length < 1 ||
+    analysis.moments.length > 10
+  ) {
+    throw new Error("Production product analysis returned an invalid analysis shape.");
+  }
+
+  console.log("Production product analysis → scanner/provider path: OK");
+
   const existingMembers = await getRows(
     "/rest/v1/workspace_members?select=user_id&order=created_at.asc&limit=1",
   );
@@ -512,6 +544,10 @@ try {
   );
   created.qualifiedClicks = qualifiedRows.map((row) => row.id);
 
+  if (clickRows.length !== 1 || clickRows[0].qualification_status !== "qualified") {
+    throw new Error("Production smoke did not produce exactly one qualified Click.");
+  }
+
   if (created.qualifiedClicks.length !== 1) {
     throw new Error("Production smoke did not produce exactly one Qualified Click.");
   }
@@ -652,18 +688,18 @@ try {
       await deleteByIds("products", "id", created.products);
     }
     if (created.capabilities.length > 0) {
-      const capabilityQuery = created.capabilities
-        .map(
-          (row) =>
-            `and=(workspace_id.eq.${row.workspace_id},capability.eq.${row.capability})`,
-        )
-        .join("&");
-      if (capabilityQuery) {
-        await supabaseRequest(
-          `/rest/v1/workspace_capabilities?${capabilityQuery}`,
-          { method: "DELETE" },
-        );
-      }
+      const workspaceIds = [
+        ...new Set(created.capabilities.map((row) => row.workspace_id)),
+      ];
+      const capabilityNames = [
+        ...new Set(created.capabilities.map((row) => row.capability)),
+      ];
+      await supabaseRequest(
+        `/rest/v1/workspace_capabilities?workspace_id=in.(${workspaceIds
+          .map((id) => `"${id}"`)
+          .join(",")})&capability=in.(${capabilityNames.join(",")})`,
+        { method: "DELETE" },
+      );
     }
     if (created.workspaceMembers.length > 0) {
       const workspaceIds = [...new Set(created.workspaceMembers.map((row) => row.workspace_id))];
