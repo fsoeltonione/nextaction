@@ -183,6 +183,29 @@ try {
     process.exit(1);
   }
 
+  try {
+    const parsedContent = JSON.parse(content.trim());
+    if (
+      parsedContent === null ||
+      typeof parsedContent !== "object" ||
+      Array.isArray(parsedContent) ||
+      parsedContent.ok !== true
+    ) {
+      throw new Error("unexpected assistant payload");
+    }
+  } catch {
+    console.error(
+      "Analysis provider preflight assistant content was not the expected JSON contract:",
+      diagnosticPayload({
+        response,
+        elapsedMs,
+        responseText: body.text,
+        responseTruncated: body.truncated,
+      }),
+    );
+    process.exit(1);
+  }
+
   console.log(
     `Analysis provider preflight: OK (${elapsedMs}ms, model=${model})`,
   );
