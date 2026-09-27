@@ -30,7 +30,7 @@ const providerResponse =
         cached_tokens: 0,
       },
     },
-  }) + "data: [DONE]\\n";
+  }) + "data: [DONE]\n";
 
 test("parses a normal JSON provider response", () => {
   const value = parseAnalysisProviderResponse('{"ok":true}');
@@ -49,7 +49,7 @@ test("parses OpenAgentic JSON followed by the exact DONE trailer", () => {
 });
 
 test("allows whitespace before the exact DONE trailer", () => {
-  const value = parseAnalysisProviderResponse('{"ok":true}\\n\\ndata: [DONE]\\n');
+  const value = parseAnalysisProviderResponse('{"ok":true}\n\ndata: [DONE]\n');
   assert.deepEqual(value, { ok: true });
 });
 
@@ -61,7 +61,7 @@ test("rejects malformed JSON before the DONE trailer", () => {
 
 test("rejects content after the DONE trailer", () => {
   assert.throws(() =>
-    parseAnalysisProviderResponse('{"ok":true}data: [DONE]\\njunk'),
+    parseAnalysisProviderResponse('{"ok":true}data: [DONE]\njunk'),
   );
 });
 
