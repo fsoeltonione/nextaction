@@ -179,9 +179,9 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const apiKey = process.env.OPENAI_API_KEY?.trim();
-    const baseUrl = process.env.OPENAI_BASE_URL?.trim();
-    const model = process.env.OPENAI_MODEL?.trim();
+    const apiKey = process.env.ANALYSIS_API_KEY?.trim();
+    const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
+    const model = process.env.ANALYSIS_MODEL?.trim();
 
     if (!apiKey || !baseUrl || !model) {
       throw new HttpError(
