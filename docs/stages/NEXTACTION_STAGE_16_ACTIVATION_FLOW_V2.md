@@ -280,7 +280,7 @@ Because final cross-workspace targeting belongs to Stage 17, Stage 16 must not e
 
 ### A10 — Capability removal semantics differ between Stage 8 documentation and live write behavior
 
-**Severity:** MEDIUM**
+**Severity:** MEDIUM
 
 Stage 8 documentation describes unselected capabilities as becoming disabled.
 
@@ -297,7 +297,7 @@ For activation-state derivation, only active selected capabilities are currently
 
 ### A11 — Product Understanding is correctly proposal-oriented
 
-**Severity:** PASS**
+**Severity:** PASS
 
 The analysis result is a proposal. The confirmation endpoint is the persistence boundary.
 
