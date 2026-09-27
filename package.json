@@ -14,7 +14,8 @@
     "staging:smoke": "node scripts/staging-smoke.mjs",
     "test:scanner": "node --experimental-strip-types --test scripts/product-scanner-security-test.ts",
     "analysis:provider-smoke": "node --experimental-strip-types scripts/analysis-provider-smoke.mjs",
-    "test:analysis-provider": "node --experimental-strip-types --test scripts/analysis-provider-response-test.ts"
+    "test:analysis-provider": "node --experimental-strip-types --test scripts/analysis-provider-response-test.ts",
+    "production:smoke": "node scripts/production-smoke.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
