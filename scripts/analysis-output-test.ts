@@ -57,19 +57,18 @@ test("rejects an analysis with no Moments", () => {
   );
 });
 
-test("resolves duplicate normalized Moment keys", () => {
-  const result = parseAnalysisOutput({
-    name: "Example",
-    description: "A site.",
-    moments: [
-      { key: "site-created", label: "Site Created" },
-      { key: "site_created", label: "Another label" },
-    ],
-  });
-
-  assert.deepEqual(
-    result.moments.map((moment) => moment.key),
-    ["site_created", "site_created_2"],
+test("rejects duplicate normalized Moment keys", () => {
+  assert.throws(
+    () =>
+      parseAnalysisOutput({
+        name: "Example",
+        description: "A site.",
+        moments: [
+          { key: "site-created", label: "Site Created" },
+          { key: "site_created", label: "Another label" },
+        ],
+      }),
+    /duplicate/i,
   );
 });
 
@@ -164,19 +163,3 @@ test("derives a compact description when the provider omits one", () => {
   assert.match(result.description, /Payment Received/);
 });
 
-test("resolves duplicate normalized Moment keys deterministically with suffixes", () => {
-  const result = parseAnalysisOutput({
-    name: "Example",
-    description: "A site.",
-    moments: [
-      { key: "site-created", label: "Site Created" },
-      { key: "site_created", label: "Another Site Event" },
-      { key: "site_created", label: "Third Site Event" },
-    ],
-  });
-
-  assert.deepEqual(
-    result.moments.map((moment) => moment.key),
-    ["site_created", "site_created_2", "site_created_3"],
-  );
-});
