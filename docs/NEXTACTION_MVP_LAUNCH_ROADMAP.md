@@ -3,7 +3,7 @@
 **Status:** Official post-Stage-15 roadmap  
 **Audit date:** 2026-09-27  
 **Repository:** `fsoeltonione/nextaction`  
-**Current master:** `c7f771417784c5dd6bb1dfc4b2a9bd5ec5ffc48b`  
+**Roadmap baseline master:** `c7f771417784c5dd6bb1dfc4b2a9bd5ec5ffc48b`  
 **Completed through:** Stage 15  
 **Next milestone:** Stage 16 — Activation Flow v2 Completion
 
@@ -102,7 +102,7 @@ The repository documents and current application source expose several remaining
 
 `src/lib/external-url.ts` validates HTTP(S) destination syntax and rejects embedded credentials / obvious blocked hosts.
 
-`src/app/api/analyze/route.ts` currently sends the normalized URL to the model provider and applies provider timeout/response/output validation. It does **not** yet perform arbitrary remote page retrieval itself.
+`src/app/api/analyze/route.ts` now uses the Stage 15 server-side scanner before sending a bounded page snapshot to the model provider. Provider timeout/response/output validation remains in place.
 
 Therefore Stage 15 has now closed this trust-boundary gap. The current implementation performs controlled server-side retrieval with the security controls recorded in the Stage 15 contract. The historical pre-Stage-15 finding is retained here only to explain why Stage 15 existed.
 
