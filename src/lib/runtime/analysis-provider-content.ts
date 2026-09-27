@@ -1,5 +1,3 @@
-import { isRecord } from "../http.ts";
-
 export type AnalysisContentParseFailureReason =
   | "empty_content"
   | "malformed_json"
@@ -58,6 +56,3 @@ export function parseAnalysisProviderContent(content: string): unknown {
   }
 }
 
-export function isObjectAnalysisContent(value: unknown): boolean {
-  return isRecord(value);
-}
