@@ -13,10 +13,12 @@ test("parses a normal JSON provider response", () => {
 test("parses OpenAgentic JSON followed by the exact DONE trailer", () => {
   const value = parseAnalysisProviderResponse(providerResponse);
   assert.equal(typeof value, "object");
-  assert.deepEqual(
-    value?.choices?.[0]?.message?.content,
-    '{"ok":true}',
-  );
+  const payload = value as {
+    choices?: Array<{
+      message?: { content?: string };
+    }>;
+  };
+  assert.equal(payload.choices?.[0]?.message?.content, '{"ok":true}');
 });
 
 test("allows whitespace before the exact DONE trailer", () => {
