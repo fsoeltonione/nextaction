@@ -12,6 +12,10 @@ import { checkRateLimit } from "@/lib/runtime/rate-limit";
 import { getRequestIp } from "@/lib/runtime/http";
 import { parseAnalysisProviderResponse } from "@/lib/runtime/analysis-provider-response";
 import {
+  parseAnalysisProviderContent,
+  AnalysisContentParseError,
+} from "@/lib/runtime/analysis-provider-content";
+import {
   parseAnalysisOutput,
   AnalysisOutputValidationError,
   type AnalysisResult,
@@ -247,17 +251,27 @@ export async function POST(request: Request) {
       throw new HttpError(502, "invalid_provider_response", "Analysis provider returned an invalid response envelope.");
     }
 
-    let content = providerPayload.choices[0].message.content.trim();
-
-    if (content.startsWith("```json")) content = content.slice(7);
-    else if (content.startsWith("```")) content = content.slice(3);
-    if (content.endsWith("```")) content = content.slice(0, -3);
+    const content = providerPayload.choices[0].message.content;
 
     let parsedOutput: unknown;
     try {
-      parsedOutput = JSON.parse(content.trim());
-    } catch {
-      throw new HttpError(502, "invalid_provider_content", "Analysis provider assistant content was not valid JSON.");
+      parsedOutput = parseAnalysisProviderContent(content);
+    } catch (error) {
+      const reason =
+        error instanceof AnalysisContentParseError
+          ? error.reason
+          : "unknown";
+
+      console.error("Analysis provider assistant content parse failed", {
+        requestId,
+        validation_reason: reason,
+      });
+
+      throw new HttpError(
+        502,
+        "invalid_provider_content",
+        "Analysis provider assistant content was not valid JSON.",
+      );
     }
 
     let analysis: AnalysisResult;
