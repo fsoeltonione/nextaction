@@ -278,6 +278,9 @@ workflows:
       - analysis_output_contract:
           requires:
             - quality
+      - analysis_provider_content_contract:
+          requires:
+            - quality
       - cloudflare_compatibility:
           requires:
             - quality
