@@ -1,6 +1,11 @@
+import { parseAnalysisProviderResponse } from "../src/lib/runtime/analysis-provider-response.ts";
+
 const apiKey = process.env.ANALYSIS_API_KEY?.trim();
 const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
 const model = process.env.ANALYSIS_MODEL?.trim();
+
+const MAX_RESPONSE_BODY_BYTES = 128 * 1024;
+const MAX_BODY_PREVIEW_BYTES = 4 * 1024;
 
 if (!apiKey || !baseUrl || !model) {
   console.error("Missing ANALYSIS_API_KEY, ANALYSIS_BASE_URL, or ANALYSIS_MODEL.");
@@ -18,6 +23,86 @@ try {
 } catch {
   console.error("ANALYSIS_BASE_URL is invalid.");
   process.exit(2);
+}
+
+async function readBoundedText(response, maxBytes) {
+  if (!response.body) {
+    const text = await response.text();
+    const bytes = new TextEncoder().encode(text);
+    return {
+      text: new TextDecoder().decode(bytes.slice(0, maxBytes)),
+      truncated: bytes.byteLength > maxBytes,
+    };
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  let truncated = false;
+
+  try {
+    while (totalBytes < maxBytes) {
+      const result = await reader.read();
+      if (result.done) break;
+
+      const value = result.value;
+      const remaining = maxBytes - totalBytes;
+
+      if (value.byteLength > remaining) {
+        chunks.push(value.slice(0, remaining));
+        totalBytes += remaining;
+        truncated = true;
+        await reader.cancel();
+        break;
+      }
+
+      chunks.push(value);
+      totalBytes += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return {
+    text: new TextDecoder().decode(merged),
+    truncated,
+  };
+}
+
+function redactSecrets(value) {
+  return value
+    .replaceAll(apiKey, "[REDACTED]")
+    .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+/gi, "Bearer [REDACTED]");
+}
+
+function diagnosticPayload({ response, elapsedMs, responseText, responseTruncated }) {
+  return {
+    status: response.status,
+    statusText: response.statusText,
+    contentType: response.headers.get("content-type") ?? "(missing)",
+    responseUrl: (() => {
+      try {
+        const url = new URL(response.url);
+        return url.origin + url.pathname;
+      } catch {
+        return "(invalid response URL)";
+      }
+    })(),
+    redirected: response.redirected,
+    elapsedMs,
+    bodyPreview: redactSecrets(
+      responseText.slice(0, MAX_BODY_PREVIEW_BYTES),
+    ),
+    bodyPreviewTruncated:
+      responseTruncated || responseText.length > MAX_BODY_PREVIEW_BYTES,
+  };
 }
 
 const controller = new AbortController();
@@ -42,25 +127,42 @@ try {
       ],
       temperature: 0,
       max_tokens: 32,
+      stream: false,
     }),
     signal: controller.signal,
   });
 
   const elapsedMs = Date.now() - startedAt;
+  const body = await readBoundedText(
+    response,
+    MAX_RESPONSE_BODY_BYTES,
+  );
 
   if (!response.ok) {
     console.error(
-      `Analysis provider preflight failed: HTTP ${response.status} after ${elapsedMs}ms.`,
+      "Analysis provider preflight failed:",
+      diagnosticPayload({
+        response,
+        elapsedMs,
+        responseText: body.text,
+        responseTruncated: body.truncated,
+      }),
     );
     process.exit(1);
   }
 
   let payload;
   try {
-    payload = await response.json();
+    payload = parseAnalysisProviderResponse(body.text);
   } catch {
     console.error(
-      `Analysis provider preflight returned a non-JSON response after ${elapsedMs}ms.`,
+      "Analysis provider preflight returned a non-JSON response:",
+      diagnosticPayload({
+        response,
+        elapsedMs,
+        responseText: body.text,
+        responseTruncated: body.truncated,
+      }),
     );
     process.exit(1);
   }
@@ -70,7 +172,13 @@ try {
 
   if (typeof content !== "string" || content.trim().length === 0) {
     console.error(
-      `Analysis provider preflight returned no assistant content after ${elapsedMs}ms.`,
+      "Analysis provider preflight returned no assistant content:",
+      diagnosticPayload({
+        response,
+        elapsedMs,
+        responseText: body.text,
+        responseTruncated: body.truncated,
+      }),
     );
     process.exit(1);
   }

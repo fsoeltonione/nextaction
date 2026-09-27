@@ -10,6 +10,7 @@ import { normalizeProductUrl } from "@/lib/url";
 import { scanProductUrl, ProductScannerError } from "@/lib/product-scanner";
 import { checkRateLimit } from "@/lib/runtime/rate-limit";
 import { getRequestIp } from "@/lib/runtime/http";
+import { parseAnalysisProviderResponse } from "@/lib/runtime/analysis-provider-response";
 
 const MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;
 const ANALYSIS_TIMEOUT_MS = 25_000;
@@ -274,6 +275,7 @@ export async function POST(request: Request) {
           ],
           temperature: 0.2,
           max_tokens: 1200,
+          stream: false,
         }),
         signal: controller.signal,
       });
@@ -299,9 +301,9 @@ export async function POST(request: Request) {
     let providerPayload: unknown;
 
     try {
-      providerPayload = JSON.parse(responseText);
+      providerPayload = parseAnalysisProviderResponse(responseText);
     } catch {
-      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");
+      throw new HttpError(502, "invalid_provider_response", "Analysis provider returned an invalid response envelope.");
     }
 
     if (
@@ -311,7 +313,7 @@ export async function POST(request: Request) {
       !isRecord(providerPayload.choices[0].message) ||
       typeof providerPayload.choices[0].message.content !== "string"
     ) {
-      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");
+      throw new HttpError(502, "invalid_provider_response", "Analysis provider returned an invalid response envelope.");
     }
 
     let content = providerPayload.choices[0].message.content.trim();
@@ -324,10 +326,29 @@ export async function POST(request: Request) {
     try {
       parsedOutput = JSON.parse(content.trim());
     } catch {
-      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
+      throw new HttpError(502, "invalid_provider_content", "Analysis provider assistant content was not valid JSON.");
     }
 
-    const analysis = parseAnalysisOutput(parsedOutput);
+    let analysis: AnalysisResult;
+    try {
+      analysis = parseAnalysisOutput(parsedOutput);
+    } catch {
+      const summary = isRecord(parsedOutput)
+        ? {
+            keys: Object.keys(parsedOutput).slice(0, 20),
+            moment_count: Array.isArray(parsedOutput.moments)
+              ? parsedOutput.moments.length
+              : null,
+          }
+        : {
+            parsed_type: Array.isArray(parsedOutput) ? "array" : typeof parsedOutput,
+          };
+      console.error("Analysis provider returned invalid analysis shape", {
+        requestId,
+        ...summary,
+      });
+      throw new HttpError(502, "invalid_provider_analysis", "Analysis provider returned an invalid analysis result.");
+    }
     const normalizedAnalysis = {
       ...analysis,
       url: normalized.value,
