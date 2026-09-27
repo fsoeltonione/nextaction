@@ -123,18 +123,39 @@ The Stage 15 security suite covers:
 - IPv6 rejection/acceptance cases;
 - IPv4-mapped IPv6 handling;
 - IP-literal rejection;
+- DNS failure rejection before fetch;
 - private DNS rejection before fetch;
+- embedded-credential and unsupported-port rejection;
+- fetch timeout;
+- streaming response-size enforcement;
 - manual redirects;
 - header isolation;
 - HTTPS downgrade rejection;
 - private redirect target rejection;
+- redirect targets containing credentials;
 - unsupported content-type rejection;
-- response-size rejection;
-- redirect-loop detection.
+- Content-Length response-size rejection;
+- redirect-limit enforcement;
+- real redirect-loop detection.
 
 The tests do not depend on the public network.
 
-## 10. CI gate
+## 10. Live staging verification
+
+The staging smoke now exercises `POST /api/analyze` through the deployed Worker in addition to the existing runtime chain.
+
+The analyze smoke validates:
+
+- the deployed endpoint returns HTTP 200;
+- the response contains a structured `analysis` object;
+- product name and description are non-empty;
+- the returned Moment list contains 1 to 10 items.
+
+The fixture defaults to `https://example.com` and may be overridden by the controlled `STAGING_ANALYZE_SMOKE_URL` environment variable.
+
+This smoke validates the deployed scanner/analyzer path without asserting fragile LLM content.
+
+## 11. CI gate
 
 A dedicated CircleCI product_scanner_security job runs the Stage 15 suite.
 
@@ -150,7 +171,7 @@ cloudflare_build
 
 The same dependency is applied to the opt-in release gate.
 
-## 11. Exit criteria
+## 12. Exit criteria
 
 Stage 15 can be merged when:
 
@@ -179,7 +200,7 @@ Final post-merge CI gates were green:
 - `cloudflare_compatibility`
 - `cloudflare_build`
 
-## 12. External references used
+## 13. External references used
 
 OWASP SSRF Prevention Cheat Sheet:
 https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
