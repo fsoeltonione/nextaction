@@ -263,3 +263,24 @@ URL
 ```
 
 without relying on the removed prototype product-save path or client-only onboarding state.
+
+## Stage 16 supersession note
+
+Stage 8 remains the historical control-plane implementation record. Its activation sequencing reflects the implementation at that stage and is superseded where it conflicts with the Stage 16 contract.
+
+The current authoritative activation interpretation is:
+
+~~~
+URL
+→ Product Understanding Proposal
+→ Conditional Auth
+→ Confirmed Product
+→ Intent
+→ Make Money / Reach Customers / Both
+→ Capability-Specific Setup
+→ Verification (when required)
+→ Truly Ready
+→ Dashboard
+~~~
+
+Stage 16 also supersedes the Stage 8 assumption that activation can permanently rely on first-membership ordering. Multiple accessible workspaces require an explicit server-validated current workspace context.
