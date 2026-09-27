@@ -45,3 +45,13 @@ Supabase currently reports:
 ## Cleanup rule
 
 Production runtime smoke is transactional: its temporary fixture and all runtime/financial writes are rolled back inside the database subtransaction before the smoke call returns. Existing production workspaces, products, and other non-smoke data are not treated as disposable without explicit provenance.
+
+## Migration history alignment
+
+The three post-release smoke migrations were applied to both live Supabase projects before this PR was opened. Their repository filenames are deliberately aligned to the exact remote migration versions:
+
+- `20260927195830_stage_15_production_smoke_harness`;
+- `20260927200018_stage_15_transactional_production_smoke`;
+- `20260927200219_stage_15_production_smoke_queue_isolation`.
+
+This prevents the repository migration source of truth from describing the same live migrations under different version identifiers.
