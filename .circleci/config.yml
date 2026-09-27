@@ -227,10 +227,14 @@ workflows:
       - product_scanner_security:
           requires:
             - quality
+      - analysis_provider_contract:
+          requires:
+            - quality
       - cloudflare_compatibility:
           requires:
             - quality
             - product_scanner_security
+            - analysis_provider_contract
       - cloudflare_build:
           requires:
             - quality
