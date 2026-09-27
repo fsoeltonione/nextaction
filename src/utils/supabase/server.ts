@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { Database } from "@/lib/database.types";
+import type { Stage16Database } from "@/lib/stage16-database.types";
 
 function getSupabasePublicKey(): string {
   const key =
@@ -24,7 +24,7 @@ export async function createClient() {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL.");
   }
 
-  return createServerClient<Database>(url, getSupabasePublicKey(), {
+  return createServerClient<Stage16Database>(url, getSupabasePublicKey(), {
     cookies: {
       getAll() {
         return cookieStore.getAll();
