@@ -173,7 +173,7 @@ The same dependency is applied to the opt-in release gate.
 
 ## 12. Exit criteria
 
-Stage 15 can be merged when:
+Stage 15 was merged after the following exit criteria were satisfied:
 
 - scanner implementation is present;
 - DNS/IP checks are tested;
