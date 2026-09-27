@@ -214,11 +214,16 @@ jobs:
           name: Install
           command: npm ci
       - run:
-          name: Production health smoke
+          name: Validate production smoke inputs
           command: |
             test -s /tmp/nextaction-release/production_base_url
-            export STAGING_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
-            EXPECTED_ENVIRONMENT="production" npm run staging:smoke
+            test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"
+            test -n "${PRODUCTION_SUPABASE_SECRET_KEY}"
+      - run:
+          name: Run production runtime smoke
+          command: |
+            export PRODUCTION_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
+            npm run production:smoke
 
 workflows:
   quality-gate:
