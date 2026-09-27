@@ -1,6 +1,8 @@
 const baseUrl = process.env.PRODUCTION_BASE_URL;
 const supabaseUrl = process.env.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecretKey = process.env.PRODUCTION_SUPABASE_SECRET_KEY;
+const analyzeSmokeUrl =
+  process.env.PRODUCTION_ANALYZE_SMOKE_URL ?? "https://carrd.com";
 
 const missing = [
   ["PRODUCTION_BASE_URL", baseUrl],
@@ -19,6 +21,11 @@ if (missing.length > 0) {
 
 const applicationUrl = new URL(baseUrl);
 const databaseUrl = new URL(supabaseUrl);
+const analysisUrl = new URL(analyzeSmokeUrl);
+if (analysisUrl.protocol !== "https:") {
+  console.error("PRODUCTION_ANALYZE_SMOKE_URL must use HTTPS.");
+  process.exit(2);
+}
 
 if (applicationUrl.protocol !== "https:" || databaseUrl.protocol !== "https:") {
   console.error("Production smoke endpoints must use HTTPS.");
@@ -97,7 +104,7 @@ try {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ url: "https://example.com" }),
+    body: JSON.stringify({ url: analysisUrl.toString() }),
   });
 
   if (analyze.status !== 200) {
