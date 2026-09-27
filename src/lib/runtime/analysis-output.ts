@@ -1,4 +1,4 @@
-import { isRecord } from "@/lib/http";
+import { isRecord } from "../http.ts";
 
 export type AnalysisMoment = {
   key: string;
