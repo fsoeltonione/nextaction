@@ -67,26 +67,6 @@ run(
   process.env.SUPABASE_SECRET_KEY,
 );
 
-function putAnalysisSecret(name) {
-  run(
-    npx,
-    [
-      "--yes",
-      "wrangler@4.139.0",
-      "secret",
-      "put",
-      name,
-      "--env",
-      target,
-    ],
-    process.env[name],
-  );
-}
-
-putAnalysisSecret("ANALYSIS_API_KEY");
-putAnalysisSecret("ANALYSIS_BASE_URL");
-putAnalysisSecret("ANALYSIS_MODEL");
-
 run(
   npx,
   [
@@ -95,5 +75,9 @@ run(
     "deploy",
     "--env",
     target,
+    "--var",
+    "ANALYSIS_BASE_URL:" + process.env.ANALYSIS_BASE_URL,
+    "--var",
+    "ANALYSIS_MODEL:" + process.env.ANALYSIS_MODEL,
   ],
 );
