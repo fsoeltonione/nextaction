@@ -56,11 +56,12 @@ BEGIN
   v_moment_key := 'production_smoke_' || left(p_smoke_id, 24);
 
   INSERT INTO public.workspaces (name, user_id, created_by)
-  VALUES
-    (v_prefix || '_publisher', p_user_id, p_user_id),
-    (v_prefix || '_advertiser', p_user_id, p_user_id)
-  RETURNING id, id
-  INTO v_publisher_workspace_id, v_advertiser_workspace_id;
+  VALUES (v_prefix || '_publisher', p_user_id, p_user_id)
+  RETURNING id INTO v_publisher_workspace_id;
+
+  INSERT INTO public.workspaces (name, user_id, created_by)
+  VALUES (v_prefix || '_advertiser', p_user_id, p_user_id)
+  RETURNING id INTO v_advertiser_workspace_id;
 
   INSERT INTO public.workspace_members (workspace_id, user_id, role)
   VALUES
