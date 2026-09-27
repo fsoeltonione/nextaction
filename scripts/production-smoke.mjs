@@ -142,6 +142,7 @@ const destinationUrl =
   `https://example.com/?nextaction_production_smoke=${smokeId}`;
 const publisherWorkspaceIds = [];
 const advertiserWorkspaceIds = [];
+let baselinePlatformFinancialAccountIds = [];
 const created = {
   workspaces: [],
   workspaceMembers: [],
@@ -218,8 +219,17 @@ try {
 
   console.log("Production product analysis → scanner/provider path: OK");
 
-  const existingMembers = await getRows(
-    "/rest/v1/workspace_members?select=user_id&order=created_at.asc&limit=1",
+  const [existingMembers, baselinePlatformAccounts] = await Promise.all([
+    getRows(
+      "/rest/v1/workspace_members?select=user_id&order=created_at.asc&limit=1",
+    ),
+    getRows(
+      "/rest/v1/financial_accounts?select=id&owner_type=eq.platform&account_type=eq.platform_revenue",
+    ),
+  ]);
+
+  baselinePlatformFinancialAccountIds = baselinePlatformAccounts.map(
+    (row) => row.id,
   );
 
   testUserId = existingMembers[0]?.user_id;
@@ -718,9 +728,23 @@ try {
             .join(",")})`
         : "/rest/v1/financial_accounts?select=id&workspace_id=eq.null",
     );
-    const financialIds = workspaceFinancialAccounts.map((row) => row.id);
-    if (financialIds.length > 0) {
-      await deleteByIds("financial_accounts", "id", financialIds);
+    const workspaceFinancialIds = workspaceFinancialAccounts.map((row) => row.id);
+    if (workspaceFinancialIds.length > 0) {
+      await deleteByIds("financial_accounts", "id", workspaceFinancialIds);
+    }
+
+    const platformAccounts = await getRows(
+      "/rest/v1/financial_accounts?select=id&owner_type=eq.platform&account_type=eq.platform_revenue",
+    );
+    const newlyCreatedPlatformIds = platformAccounts
+      .map((row) => row.id)
+      .filter((id) => !baselinePlatformFinancialAccountIds.includes(id));
+    if (newlyCreatedPlatformIds.length > 0) {
+      await deleteByIds(
+        "financial_accounts",
+        "id",
+        newlyCreatedPlatformIds,
+      );
     }
 
     if (created.workspaces.length > 0) {
