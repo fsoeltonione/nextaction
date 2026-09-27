@@ -107,6 +107,18 @@ jobs:
           name: Run analysis output contract tests
           command: npm run test:analysis-output
 
+  analysis_provider_content_contract:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run analysis provider content contract tests
+          command: npm run test:analysis-provider-content
+
   analysis_provider_smoke:
     docker:
       - image: cimg/node:24.21.0
@@ -272,6 +284,8 @@ workflows:
             - product_scanner_security
             - analysis_provider_contract
             - analysis_output_contract
+            - analysis_provider_content_contract
+            - analysis_provider_content_contract
       - cloudflare_build:
           requires:
             - quality
@@ -295,6 +309,9 @@ workflows:
           requires:
             - quality
       - analysis_output_contract:
+          requires:
+            - quality
+      - analysis_provider_content_contract:
           requires:
             - quality
       - analysis_provider_smoke:
