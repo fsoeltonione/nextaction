@@ -28,7 +28,7 @@ test("parses BOM-prefixed JSON assistant content", () => {
 
 test("rejects prose around the JSON document", () => {
   assert.throws(
-    () => parseAnalysisProviderContent("Here is the JSON: {"name":"Example"}"),
+    () => parseAnalysisProviderContent('Here is the JSON: {"name":"Example"}'),
     (error) =>
       error instanceof AnalysisContentParseError &&
       error.reason === "malformed_json",
