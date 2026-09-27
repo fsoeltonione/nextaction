@@ -1,4 +1,5 @@
 import { parseAnalysisProviderResponse } from "../src/lib/runtime/analysis-provider-response.ts";
+import { parseAnalysisOutput } from "../src/lib/runtime/analysis-output.ts";
 
 const apiKey = process.env.ANALYSIS_API_KEY?.trim();
 const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
@@ -121,12 +122,26 @@ try {
       model,
       messages: [
         {
+          role: "system",
+          content: [
+            "Return exactly one JSON object for a SaaS product.",
+            "The object must contain name, description, and moments.",
+            "moments must be an array of 2 or more objects.",
+            "Each Moment must have a label string and may have a key and description.",
+            "Return no Markdown or prose.",
+          ].join("\n"),
+        },
+        {
           role: "user",
-          content: 'Return exactly {"ok":true}.',
+          content: [
+            "Product name: Synthetic SaaS",
+            "Product description: A small fictional SaaS used for a contract test.",
+            "Generate two commercially relevant Moments.",
+          ].join("\n"),
         },
       ],
       temperature: 0,
-      max_tokens: 32,
+      max_tokens: 192,
       stream: false,
     }),
     signal: controller.signal,
@@ -183,19 +198,12 @@ try {
     process.exit(1);
   }
 
+  let parsedContent;
   try {
-    const parsedContent = JSON.parse(content.trim());
-    if (
-      parsedContent === null ||
-      typeof parsedContent !== "object" ||
-      Array.isArray(parsedContent) ||
-      parsedContent.ok !== true
-    ) {
-      throw new Error("unexpected assistant payload");
-    }
+    parsedContent = JSON.parse(content.trim());
   } catch {
     console.error(
-      "Analysis provider preflight assistant content was not the expected JSON contract:",
+      "Analysis provider preflight assistant content was not JSON:",
       diagnosticPayload({
         response,
         elapsedMs,
@@ -206,8 +214,34 @@ try {
     process.exit(1);
   }
 
+  try {
+    const analysis = parseAnalysisOutput(parsedContent, {
+      name: "Synthetic SaaS",
+      description: "Synthetic product used for provider contract validation.",
+    });
+
+    if (analysis.moments.length < 1 || analysis.moments.length > 10) {
+      throw new Error("unexpected Moment count");
+    }
+  } catch (error) {
+    console.error(
+      "Analysis provider preflight assistant content failed the analysis output contract:",
+      {
+        ...diagnosticPayload({
+          response,
+          elapsedMs,
+          responseText: body.text,
+          responseTruncated: body.truncated,
+        }),
+        validation_reason:
+          error instanceof Error ? error.message : "unknown",
+      },
+    );
+    process.exit(1);
+  }
+
   console.log(
-    `Analysis provider preflight: OK (${elapsedMs}ms, model=${model})`,
+    `Analysis provider preflight + analysis output contract: OK (${elapsedMs}ms, model=${model})`,
   );
 } catch (error) {
   const elapsedMs = Date.now() - startedAt;
