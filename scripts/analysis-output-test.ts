@@ -102,3 +102,79 @@ test("rejects oversized labels and descriptions", () => {
     /invalid result/i,
   );
 });
+
+
+test("accepts a provider analysis wrapper", () => {
+  const result = parseAnalysisOutput({
+    analysis: {
+      name: "Example",
+      description: "A site.",
+      moments: [{ key: "invoice-created", label: "Invoice Created" }],
+    },
+  });
+
+  assert.equal(result.name, "Example");
+  assert.equal(result.moments[0].key, "invoice_created");
+});
+
+test("accepts common field aliases without changing the canonical output", () => {
+  const result = parseAnalysisOutput({
+    product_name: "Example",
+    overview: "A site.",
+    key_moments: {
+      invoice_created: "Invoice Created",
+      site_published: { title: "Site Published", summary: "Site goes live." },
+    },
+  });
+
+  assert.equal(result.name, "Example");
+  assert.equal(result.description, "A site.");
+  assert.deepEqual(
+    result.moments.map((moment) => moment.key),
+    ["invoice_created", "site_published"],
+  );
+});
+
+test("accepts string Moments and derives human labels from keys", () => {
+  const result = parseAnalysisOutput({
+    name: "Example",
+    description: "A site.",
+    moments: [
+      "Checkout Completed",
+      { key: "invoice_created" },
+    ],
+  });
+
+  assert.equal(result.moments[0].label, "Checkout Completed");
+  assert.equal(result.moments[0].key, "checkout_completed");
+  assert.equal(result.moments[1].label, "Invoice Created");
+});
+
+test("derives a compact description when the provider omits one", () => {
+  const result = parseAnalysisOutput({
+    name: "Example",
+    moments: [
+      { label: "Invoice Created" },
+      { label: "Payment Received" },
+    ],
+  });
+
+  assert.match(result.description, /Invoice Created/);
+  assert.match(result.description, /Payment Received/);
+});
+
+test("resolves duplicate normalized Moment keys deterministically", () => {
+  const result = parseAnalysisOutput({
+    name: "Example",
+    description: "A site.",
+    moments: [
+      { key: "site-created", label: "Site Created" },
+      { key: "site_created", label: "Another Site Event" },
+    ],
+  });
+
+  assert.deepEqual(
+    result.moments.map((moment) => moment.key),
+    ["site_created", "site_created_2"],
+  );
+});
