@@ -285,7 +285,6 @@ workflows:
             - analysis_provider_contract
             - analysis_output_contract
             - analysis_provider_content_contract
-            - analysis_provider_content_contract
       - cloudflare_build:
           requires:
             - quality
@@ -322,6 +321,7 @@ workflows:
             - cloudflare_build
             - analysis_provider_contract
             - analysis_output_contract
+            - analysis_provider_content_contract
       - deploy_staging:
           context:
             - nextaction-cloudflare
