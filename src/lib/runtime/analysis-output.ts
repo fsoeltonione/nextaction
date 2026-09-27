@@ -23,7 +23,6 @@ export type AnalysisOutputFailureReason =
   | "moment_label_too_long"
   | "moment_description_too_long"
   | "moment_key_empty"
-  | "duplicate_moment_key"
   | "name_missing"
   | "name_too_long"
   | "description_missing"
