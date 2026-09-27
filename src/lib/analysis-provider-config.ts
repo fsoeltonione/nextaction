@@ -1,36 +1,23 @@
+import { env } from "cloudflare:workers";
+
 type RuntimeBindings = Record<string, string | undefined>;
 
-async function readCloudflareBindings(): Promise<RuntimeBindings> {
-  try {
-    const module = await import(
-      /* @vite-ignore */
-      /* webpackIgnore: true */
-      "cloudflare:workers"
-    );
+const cloudflareEnv = env as RuntimeBindings;
 
-    const bindings = module.env as RuntimeBindings;
-    return bindings ?? {};
-  } catch {
-    return {};
-  }
-}
-
-export async function getAnalysisProviderConfig(): Promise<{
+export function getAnalysisProviderConfig(): {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
-}> {
-  const bindings = await readCloudflareBindings();
-
+} {
   return {
     apiKey:
       process.env.ANALYSIS_API_KEY?.trim() ||
-      bindings.ANALYSIS_API_KEY?.trim(),
+      cloudflareEnv.ANALYSIS_API_KEY?.trim(),
     baseUrl:
       process.env.ANALYSIS_BASE_URL?.trim() ||
-      bindings.ANALYSIS_BASE_URL?.trim(),
+      cloudflareEnv.ANALYSIS_BASE_URL?.trim(),
     model:
       process.env.ANALYSIS_MODEL?.trim() ||
-      bindings.ANALYSIS_MODEL?.trim(),
+      cloudflareEnv.ANALYSIS_MODEL?.trim(),
   };
 }
