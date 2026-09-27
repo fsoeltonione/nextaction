@@ -2,6 +2,25 @@ const apiKey = process.env.ANALYSIS_API_KEY?.trim();
 const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
 const model = process.env.ANALYSIS_MODEL?.trim();
 
+async function parseProviderResponse(responseText) {
+  const trimmed = responseText.trim();
+
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    const doneMarker = "data: [DONE]";
+    const markerIndex = trimmed.lastIndexOf(doneMarker);
+
+    if (markerIndex <= 0 || trimmed.slice(markerIndex + doneMarker.length).trim() !== "") {
+      throw error;
+    }
+
+    const jsonCandidate = trimmed.slice(0, markerIndex).trimEnd();
+    if (jsonCandidate.length === 0) throw error;
+    return JSON.parse(jsonCandidate);
+  }
+}
+
 const MAX_RESPONSE_BODY_BYTES = 128 * 1024;
 const MAX_BODY_PREVIEW_BYTES = 4 * 1024;
 
@@ -118,6 +137,7 @@ try {
       ],
       temperature: 0,
       max_tokens: 32,
+      stream: false,
     }),
     signal: controller.signal,
   });
@@ -143,7 +163,7 @@ try {
 
   let payload;
   try {
-    payload = JSON.parse(body.text);
+    payload = await parseProviderResponse(body.text);
   } catch {
     console.error(
       "Analysis provider preflight returned a non-JSON response:",
