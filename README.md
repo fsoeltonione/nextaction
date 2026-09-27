@@ -74,3 +74,10 @@ The release workflow is opt-in through the CircleCI `run_release_gate` pipeline 
 
 
 Stage 14 health verification uses a build-time target identity (NEXT_PUBLIC_APP_ENV). The smoke then exercises the real API path separately to prove runtime Supabase credentials and bindings.
+## Production release verification
+
+The release gate uses a dedicated production runtime smoke after deployment. It exercises the live production Worker for health and product analysis, then runs a service-role-only transactional production runtime contract that creates an isolated publisher/advertiser fixture, executes Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement plus settlement replay, verifies the financial ledger and queue drain, and rolls back the entire database subtransaction before returning.
+
+Production smoke also calls `/api/analyze` against `https://example.com` to verify the deployed scanner/provider path.
+
+A separate Cloudflare production audit verifies that the active Worker deployment exists, has a valid 100% traffic allocation, and reports the configured Worker domains. Set `CLOUDFLARE_EXPECTED_HOSTNAME` in the production context to make the release gate assert a specific custom hostname.

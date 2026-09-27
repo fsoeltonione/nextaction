@@ -95,6 +95,30 @@ jobs:
           name: Run analysis provider response contract tests
           command: npm run test:analysis-provider
 
+  analysis_output_contract:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run analysis output contract tests
+          command: npm run test:analysis-output
+
+  analysis_provider_content_contract:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run analysis provider content contract tests
+          command: npm run test:analysis-provider-content
+
   analysis_provider_smoke:
     docker:
       - image: cimg/node:24.21.0
@@ -203,6 +227,22 @@ jobs:
           paths:
             - production_base_url
 
+
+  cloudflare_production_audit:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Validate Cloudflare audit inputs
+          command: |
+            test -n "${CLOUDFLARE_API_TOKEN}"
+            test -n "${CLOUDFLARE_ACCOUNT_ID}"
+      - run:
+          name: Audit active production Worker
+          command: |
+            CLOUDFLARE_ENVIRONMENT=production npm run cloudflare:production-audit
+
   production_smoke:
     docker:
       - image: cimg/node:24.21.0
@@ -214,11 +254,16 @@ jobs:
           name: Install
           command: npm ci
       - run:
-          name: Production health smoke
+          name: Validate production smoke inputs
           command: |
             test -s /tmp/nextaction-release/production_base_url
-            export STAGING_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
-            EXPECTED_ENVIRONMENT="production" npm run staging:smoke
+            test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"
+            test -n "${PRODUCTION_SUPABASE_SECRET_KEY}"
+      - run:
+          name: Run production runtime smoke
+          command: |
+            export PRODUCTION_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
+            npm run production:smoke
 
 workflows:
   quality-gate:
@@ -230,11 +275,19 @@ workflows:
       - analysis_provider_contract:
           requires:
             - quality
+      - analysis_output_contract:
+          requires:
+            - quality
+      - analysis_provider_content_contract:
+          requires:
+            - quality
       - cloudflare_compatibility:
           requires:
             - quality
             - product_scanner_security
             - analysis_provider_contract
+            - analysis_output_contract
+            - analysis_provider_content_contract
       - cloudflare_build:
           requires:
             - quality
@@ -257,6 +310,12 @@ workflows:
       - analysis_provider_contract:
           requires:
             - quality
+      - analysis_output_contract:
+          requires:
+            - quality
+      - analysis_provider_content_contract:
+          requires:
+            - quality
       - analysis_provider_smoke:
           context:
             - nextaction-staging
@@ -264,6 +323,8 @@ workflows:
             - quality
             - cloudflare_build
             - analysis_provider_contract
+            - analysis_output_contract
+            - analysis_provider_content_contract
       - deploy_staging:
           context:
             - nextaction-cloudflare
@@ -288,8 +349,14 @@ workflows:
             - nextaction-production
           requires:
             - hold_production
+      - cloudflare_production_audit:
+          context:
+            - nextaction-cloudflare
+          requires:
+            - deploy_production
       - production_smoke:
           context:
             - nextaction-production
           requires:
             - deploy_production
+            - cloudflare_production_audit
