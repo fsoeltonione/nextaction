@@ -597,7 +597,7 @@ The CI system must gate merges on at least:
 - critical browser E2E
 - security-sensitive checks
 
-The repository now contains `.circleci/config.yml`, including the Stage 15 `product_scanner_security` gate and the existing Cloudflare compatibility/build and release-gate jobs. The latest `master` commit has successful CircleCI status checks for `quality`, `product_scanner_security`, `cloudflare_compatibility`, and `cloudflare_build`.
+The repository now contains `.circleci/config.yml`, including the Stage 15 `product_scanner_security` gate and the existing Cloudflare compatibility/build and release-gate jobs. The verified Stage 15 `master` baseline had successful CircleCI status checks for `quality`, `product_scanner_security`, `cloudflare_compatibility`, and `cloudflare_build`.
 
 The earlier “CI state unknown” statement was part of the pre-Stage-14 baseline and is no longer current.
 
