@@ -67,7 +67,7 @@ test("rejects content after the DONE trailer", () => {
 
 test("rejects SSE framing instead of treating it as a JSON envelope", () => {
   assert.throws(() =>
-    parseAnalysisProviderResponse('data: {"ok":true}\\n\\ndata: [DONE]'),
+    parseAnalysisProviderResponse('data: {"ok":true}\n\ndata: [DONE]'),
   );
 });
 
