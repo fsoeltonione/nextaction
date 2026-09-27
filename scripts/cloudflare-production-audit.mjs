@@ -104,12 +104,8 @@ if (!Array.isArray(latestVersions) || latestVersions.length === 0) {
   throw new Error(`No Worker versions found for ${workerName}.`);
 }
 
-const deployedVersionIds = new Set(
-  versions.map((version) => version.version_id),
-);
-
-if (!deployedVersionIds.has(latestVersionId)) {
-  throw new Error("Cloudflare deployment/version relationship is inconsistent.");
+if (!latestVersions.some((version) => version.id === latestVersionId)) {
+  throw new Error("Latest active deployment version is not present in the Worker version list.");
 }
 
 const domainParams = new URLSearchParams({
