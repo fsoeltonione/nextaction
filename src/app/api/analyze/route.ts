@@ -11,24 +11,16 @@ import { scanProductUrl, ProductScannerError } from "@/lib/product-scanner";
 import { checkRateLimit } from "@/lib/runtime/rate-limit";
 import { getRequestIp } from "@/lib/runtime/http";
 import { parseAnalysisProviderResponse } from "@/lib/runtime/analysis-provider-response";
+import {
+  parseAnalysisOutput,
+  type AnalysisMoment,
+  type AnalysisResult,
+} from "@/lib/runtime/analysis-output";
 
 const MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;
 const ANALYSIS_TIMEOUT_MS = 25_000;
 const ANALYZE_RATE_LIMIT_PER_MINUTE = 10;
 const MAX_ANALYSIS_CONTEXT_CHARS = 12_000;
-
-type AnalysisMoment = {
-  key: string;
-  label: string;
-  description?: string;
-};
-
-type AnalysisResult = {
-  url: string;
-  name: string;
-  description: string;
-  moments: AnalysisMoment[];
-};
 
 async function readLimitedText(response: Response, maxBytes: number): Promise<string> {
   if (!response.body) {
@@ -69,65 +61,6 @@ async function readLimitedText(response: Response, maxBytes: number): Promise<st
   }
 
   return new TextDecoder().decode(merged);
-}
-
-function parseAnalysisOutput(value: unknown): AnalysisResult {
-  if (!isRecord(value)) {
-    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
-  }
-
-  const rawMoments = Array.isArray(value.moments) ? value.moments : [];
-  if (
-    typeof value.name !== "string" ||
-    typeof value.description !== "string" ||
-    value.name.trim().length === 0 ||
-    value.description.trim().length === 0 ||
-    rawMoments.length < 1 ||
-    rawMoments.length > 10
-  ) {
-    throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
-  }
-
-  const moments: AnalysisMoment[] = [];
-
-  for (const rawMoment of rawMoments) {
-    if (!isRecord(rawMoment)) {
-      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
-    }
-
-    const key =
-      typeof rawMoment.key === "string"
-        ? rawMoment.key.trim()
-        : typeof rawMoment.id === "string"
-          ? rawMoment.id.trim()
-          : "";
-    const label = typeof rawMoment.label === "string" ? rawMoment.label.trim() : "";
-    const description =
-      typeof rawMoment.description === "string" ? rawMoment.description.trim() : undefined;
-
-    if (
-      !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(key) ||
-      key.length > 80 ||
-      label.length === 0 ||
-      label.length > 120 ||
-      (description !== undefined && description.length > 400)
-    ) {
-      throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid result.");
-    }
-
-    moments.push({
-      key,
-      label,
-      ...(description ? { description } : {}),
-    });
-  }
-
-  return {
-    url: typeof value.url === "string" ? value.url : "",
-    name: value.name.trim().slice(0, 160),
-    description: value.description.trim().slice(0, 600),
-    moments,
-  };
 }
 
 export async function POST(request: Request) {
@@ -273,8 +206,8 @@ export async function POST(request: Request) {
               ].join("\n"),
             },
           ],
-          temperature: 0.2,
-          max_tokens: 1200,
+          temperature: 0,
+          max_tokens: 1600,
           stream: false,
         }),
         signal: controller.signal,
@@ -331,7 +264,10 @@ export async function POST(request: Request) {
 
     let analysis: AnalysisResult;
     try {
-      analysis = parseAnalysisOutput(parsedOutput);
+      analysis = parseAnalysisOutput(parsedOutput, {
+        name: scan.title,
+        description: scan.description,
+      });
     } catch {
       const summary = isRecord(parsedOutput)
         ? {
