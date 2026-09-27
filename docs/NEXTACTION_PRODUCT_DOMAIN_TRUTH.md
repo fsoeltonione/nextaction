@@ -45,18 +45,23 @@ Capabilities are workspace-level intent:
 Capability selection is part of activation and must be persisted as domain state.
 
 ## 5. Canonical activation flow
-The intended user-facing activation flow is:
+The canonical activation flow is now explicitly defined in two phases so the authentication boundary cannot be misread:
 
-**URL -> conditional auth -> product understanding -> intent -> Make Money / Reach Customers / Both -> capability-specific setup -> verification -> truly ready -> dashboard**
+**URL -> Product Understanding Proposal -> Conditional Auth -> Confirmed Product -> Intent -> Make Money / Reach Customers / Both -> capability-specific setup -> verification (when required) -> truly ready -> dashboard**
 
-Important UX truths:
-- URL is the entry point.
-- Product understanding happens before authentication in the intended flow.
-- Authentication is conditional and exists to persist workspace/product decisions.
-- The user confirms or edits inferred product identity and Moments before continuing.
-- Infrastructure concepts should remain hidden during activation.
+Meaning:
+- URL is the primary entry point.
+- Product Understanding is a proposal and may be generated before authentication.
+- Authentication is conditional: an existing session skips login; an anonymous user authenticates only at the persistence boundary.
+- Product/Moment proposals are reviewed and edited before confirmation.
+- Confirmed Product state is persisted only after authentication.
+- Intent is persisted as workspace capability state.
+- Capability-specific setup is required only for selected capabilities.
+- Verification is required when the selected setup has a verification prerequisite.
+- Ready is derived from server state, not from a browser-controlled step flag.
+- Infrastructure concepts remain hidden during activation.
 
-The current prototype partially demonstrates the desired experience but authenticates before analysis and exposes only two intents. That is a prototype gap, not a new product decision.
+This wording is a Stage 16 clarification of the previously ambiguous arrow sequence. It does not change the Product/domain model or the Event -> Moment -> Decision -> Delivery -> Click -> Qualified Click -> Settlement chain.
 
 ## 6. Product understanding
 Given a user-supplied SaaS URL, NextAction should derive:
@@ -194,3 +199,32 @@ Stage 15 introduces the server-side Product Scanner trust boundary required by t
 The scanner does not change the locked Event -> Moment -> Decision -> Delivery -> Click -> Qualified Click -> Settlement domain chain, capability semantics, or MVP economics.
 
 The Cloudflare Workers implementation does not claim connection-level DNS pinning for arbitrary internet hostnames. The residual DNS TOCTOU limitation is explicitly documented in the Stage 15 stage contract.
+
+## 18. Stage 16 activation amendment
+
+Stage 16 locks the activation sequencing and recovery rules described in docs/stages/NEXTACTION_STAGE_16_ACTIVATION_FLOW_V2.md.
+
+The authoritative interpretation is:
+
+~~~
+URL
+→ Product Understanding Proposal
+→ Conditional Auth
+→ Confirmed Product
+→ Intent
+→ Make Money / Reach Customers / Both
+→ Capability-Specific Setup
+→ Verification (when required)
+→ Truly Ready
+→ Dashboard
+~~~
+
+"Conditional Auth" means authentication is not required for the anonymous Product Understanding proposal. It becomes required at the persistence boundary. An already-authenticated user proceeds without a redundant login wall.
+
+Before confirmation, Product Understanding is proposal state only. The pending normalized URL must remain recoverable through authentication, refresh, and retry paths, while the proposal itself does not become Product truth until explicit confirmation.
+
+Stage 16 also locks current-workspace handling: zero accessible workspaces may create the first workspace during first confirmation; one workspace may be auto-selected; multiple workspaces require an explicit server-validated current workspace context. No activation operation may silently choose the first membership once multiple workspaces exist.
+
+The ready state remains server-derived. Client step state is never authoritative.
+
+Stage 16 does not change the locked domain chain, qualification rules, or MVP economics. Final cross-workspace commercial Moment targeting remains a later control-plane concern.
