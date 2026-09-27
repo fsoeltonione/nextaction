@@ -82,21 +82,15 @@ function prettyLabelFromKey(key: string): string {
     .join(" ");
 }
 
-function normalizeMomentKey(rawKey: string, label: string, index: number): string {
+function normalizeMomentKey(rawKey: string, label: string): string {
   const candidate = (rawKey || label).trim();
 
-  let key = candidate
+  return candidate
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .replace(/_+/g, "_")
     .slice(0, 80);
-
-  if (!key) {
-    key = "moment_" + String(index + 1);
-  }
-
-  return key;
 }
 
 function normalizeRawMoments(
@@ -252,7 +246,7 @@ export function parseAnalysisOutput(
       );
     }
 
-    const key = normalizeMomentKey(rawKey, normalizedLabel, index);
+    const key = normalizeMomentKey(rawKey, normalizedLabel);
     if (!key) {
       throw new AnalysisOutputValidationError(
         "moment_key_empty",
