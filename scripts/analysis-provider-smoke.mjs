@@ -142,7 +142,7 @@ try {
         },
       ],
       temperature: 0,
-      max_tokens: 192,
+      max_tokens: 512,
       stream: false,
     }),
     signal: controller.signal,
