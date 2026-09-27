@@ -1,11 +1,11 @@
 # NextAction — Roadmap Audit & Official MVP-to-Launch Roadmap
 
-**Status:** Proposed official roadmap for post-Stage-14 work  
+**Status:** Official post-Stage-15 roadmap  
 **Audit date:** 2026-09-27  
 **Repository:** `fsoeltonione/nextaction`  
-**Current master:** `0005358464b12eaffda6bc4c9d32e6a1e78a6829`  
-**Completed through:** Stage 14  
-**Next milestone:** Stage 15 — DNS-aware Product Scanner / SSRF Hardening
+**Current master:** `c7f771417784c5dd6bb1dfc4b2a9bd5ec5ffc48b`  
+**Completed through:** Stage 15  
+**Next milestone:** Stage 16 — Activation Flow v2 Completion
 
 ---
 
@@ -96,7 +96,7 @@ Stage 14 is therefore **closed**.
 
 The repository documents and current application source expose several remaining gaps that must shape the roadmap.
 
-#### A. Product analysis is not yet a complete server-side scanner
+#### A. Stage 15 scanner gap is now closed
 
 `src/lib/url.ts` performs URL normalization and rejects obvious blocked host forms.
 
@@ -104,7 +104,7 @@ The repository documents and current application source expose several remaining
 
 `src/app/api/analyze/route.ts` currently sends the normalized URL to the model provider and applies provider timeout/response/output validation. It does **not** yet perform arbitrary remote page retrieval itself.
 
-Therefore Stage 15 is a required **future trust-boundary milestone** before controlled server-side retrieval is introduced. The absence of current arbitrary page fetching must not be mistaken for completion of the scanner requirement.
+Therefore Stage 15 has now closed this trust-boundary gap. The current implementation performs controlled server-side retrieval with the security controls recorded in the Stage 15 contract. The historical pre-Stage-15 finding is retained here only to explain why Stage 15 existed.
 
 The authoritative data/security and architecture documents explicitly require:
 
@@ -182,11 +182,11 @@ The roadmap does not silently turn those into launch requirements unless explici
 
 ## 3. Official remaining milestone count
 
-There are **8 remaining milestones** from the end of Stage 14 to the defined public MVP launch:
+There are **7 remaining milestones** after the completion of Stage 15, leading to the defined public MVP launch:
 
 | Stage | Milestone | Primary outcome |
 |---|---|---|
-| **15** | DNS-aware Product Scanner / SSRF Hardening | Safe server-side product retrieval boundary |
+| **15** | DNS-aware Product Scanner / SSRF Hardening | **COMPLETED** — safe server-side product retrieval boundary |
 | **16** | Activation Flow v2 Completion | Fully URL-first, conditional-auth activation |
 | **17** | Control Plane & Commercial UX Completion | Real publisher/advertiser operating surfaces |
 | **18** | Runtime Reliability, Observability & Performance | Production-grade runtime behavior under load/failure |
@@ -200,7 +200,7 @@ So the roadmap is:
 ```
 Stage 14 ✅
    ↓
-15 Scanner / SSRF
+Stage 15 ✅ Scanner / SSRF
    ↓
 16 Activation v2
    ↓
@@ -219,7 +219,7 @@ Stage 14 ✅
 
 ---
 
-# 4. Stage 15 — DNS-aware Product Scanner / SSRF Hardening
+# 4. Stage 15 — DNS-aware Product Scanner / SSRF Hardening (COMPLETED)
 
 ## Objective
 
@@ -677,10 +677,10 @@ Roadmap
 
 ## 15. Final roadmap answer
 
-**Remaining: 8 milestones.**
+**Remaining after Stage 15: 7 milestones.**
 
 ```
-15  DNS-aware Product Scanner / SSRF Hardening
+15  DNS-aware Product Scanner / SSRF Hardening ✅ CLOSED
 16  Activation Flow v2 Completion
 17  Control Plane & Commercial UX Completion
 18  Runtime Reliability / Observability / Performance
@@ -690,4 +690,4 @@ Roadmap
 22  Public MVP Launch
 ```
 
-The next implementation target is therefore **Stage 15**, but Stage 15 itself begins with a short security/architecture audit of the current analyzer and Cloudflare egress constraints—not with immediately adding a fetch call.
+Stage 15 is now closed. The next implementation target is **Stage 16 — Activation Flow v2 Completion**.
