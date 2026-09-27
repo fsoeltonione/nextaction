@@ -10,6 +10,7 @@ import { normalizeProductUrl } from "@/lib/url";
 import { scanProductUrl, ProductScannerError } from "@/lib/product-scanner";
 import { checkRateLimit } from "@/lib/runtime/rate-limit";
 import { getRequestIp } from "@/lib/runtime/http";
+import { parseAnalysisProviderResponse } from "@/lib/runtime/analysis-provider-response";
 
 const MAX_PROVIDER_RESPONSE_BYTES = 128 * 1024;
 const ANALYSIS_TIMEOUT_MS = 25_000;
@@ -274,6 +275,7 @@ export async function POST(request: Request) {
           ],
           temperature: 0.2,
           max_tokens: 1200,
+          stream: false,
         }),
         signal: controller.signal,
       });
@@ -299,7 +301,7 @@ export async function POST(request: Request) {
     let providerPayload: unknown;
 
     try {
-      providerPayload = JSON.parse(responseText);
+      providerPayload = parseAnalysisProviderResponse(responseText);
     } catch {
       throw new HttpError(502, "invalid_provider_output", "Analysis provider returned an invalid response.");
     }
