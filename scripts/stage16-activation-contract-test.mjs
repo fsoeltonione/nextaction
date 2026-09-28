@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, databaseTypes] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -23,6 +23,7 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("supabase/migrations/20260928193000_stage_16_first_workspace_rls_bootstrap.sql"),
   read("supabase/migrations/20260928194500_stage_16_first_workspace_insert_returning_rls.sql"),
   read("supabase/migrations/20260928233000_stage_16_atomic_integration_credential_provisioning.sql"),
+  read("supabase/migrations/20260929000500_stage_16_private_credential_verification_boundary.sql"),
   read("src/lib/stage16-database.types.ts"),
 ]);
 
@@ -81,6 +82,8 @@ assert.match(integrationCreate, /workspace_id/);
 assert.match(integrationCreate, /provision_integration_credential_v2/);
 assert.doesNotMatch(integrationCreate, /schema\(["']private["']\)/);
 assert.match(integrationVerify, /workspace_id/);
+assert.match(integrationVerify, /resolve_integration_credential_v2/);
+assert.doesNotMatch(integrationVerify, /schema\(["']private["']\)/);
 assert.match(offers, /create_offer_activation_v2/);
 assert.match(offers, /reach_customers/);
 assert.match(migration, /workspace selection required/);
@@ -130,6 +133,11 @@ assert.match(atomicIntegrationCredentialMigration, /REVOKE ALL ON FUNCTION publi
 assert.match(atomicIntegrationCredentialMigration, /REVOKE ALL ON FUNCTION public\.provision_integration_credential_v2[\s\S]*FROM anon/);
 assert.match(atomicIntegrationCredentialMigration, /REVOKE ALL ON FUNCTION public\.provision_integration_credential_v2[\s\S]*FROM authenticated/);
 assert.match(atomicIntegrationCredentialMigration, /GRANT EXECUTE ON FUNCTION public\.provision_integration_credential_v2[\s\S]*TO service_role/);
+assert.match(atomicIntegrationCredentialVerificationMigration, /CREATE OR REPLACE FUNCTION public\.resolve_integration_credential_v2/);
+assert.match(atomicIntegrationCredentialVerificationMigration, /SECURITY DEFINER/);
+assert.match(atomicIntegrationCredentialVerificationMigration, /private\.integration_secrets/);
+assert.match(atomicIntegrationCredentialVerificationMigration, /REVOKE ALL ON FUNCTION public\.resolve_integration_credential_v2/);
+assert.match(atomicIntegrationCredentialVerificationMigration, /GRANT EXECUTE ON FUNCTION public\.resolve_integration_credential_v2[\s\S]*TO service_role/);
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
 assert.match(
