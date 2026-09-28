@@ -141,7 +141,7 @@ jobs:
           command: npm ci
       - run:
           name: Validate OpenAgentic provider
-          command: npm run analysis:provider-smoke
+          command: ANALYSIS_MODEL=kimi-k2.7-code npm run analysis:provider-smoke
 
   deploy_staging:
     docker:
