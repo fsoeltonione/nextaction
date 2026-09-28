@@ -145,7 +145,7 @@ assert.match(readOnlyControlPlaneMigration, /ALTER FUNCTION public\.confirm_prod
 assert.match(readOnlyControlPlaneMigration, /ALTER FUNCTION public\.set_workspace_capabilities_v2[\s\S]*SECURITY DEFINER/);
 assert.match(readOnlyControlPlaneMigration, /ALTER FUNCTION public\.create_offer_activation_v2[\s\S]*SECURITY DEFINER/);
 assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON TABLE[\s\S]*public\.offer_moments[\s\S]*FROM PUBLIC, anon, authenticated/);
-assert.match(readOnlyControlPlaneMigration, /GRANT SELECT ON TABLE[\s\S]*public\.offer_moments TO authenticated/);
+assert.match(readOnlyControlPlaneMigration, /GRANT SELECT ON TABLE[\s\S]*public\.offer_moments\s+TO authenticated/);
 assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.confirm_product_activation\(/);
 assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.set_workspace_capabilities\(/);
 assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.create_offer_activation\(/);
