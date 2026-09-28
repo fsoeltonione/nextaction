@@ -81,7 +81,7 @@ assert.match(initialWorkspaceMigration, /v_membership_count > 0/);
 assert.match(initialWorkspaceMigration, /confirm_product_activation\(/);
 assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.confirm_product_activation_v2/);
 assert.match(privilegeMigration, /FROM PUBLIC, anon/);
-assert.match(privilegeMigration, /GRANT EXECUTE ON FUNCTION public\.confirm_product_activation_v2[\\s\\S]*?TO authenticated/);
+assert.match(privilegeMigration, /GRANT EXECUTE ON FUNCTION public\.confirm_product_activation_v2[\s\S]*?TO authenticated/);
 assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.set_workspace_capabilities_v2/);
 assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.create_offer_activation_v2/);
 assert.match(privateDenyMigration, /ON private\.advertiser_credit_accounts/);
@@ -97,7 +97,7 @@ assert.match(privateDenyMigration, /ON private\.moment_occurrences/);
 assert.match(privateDenyMigration, /ON private\.qualified_clicks/);
 assert.match(privateDenyMigration, /ON private\.rate_limit_buckets/);
 assert.match(privateDenyMigration, /ON private\.settlements/);
-assert.match(privateDenyMigration, /FOR ALL[\\s\\S]*?TO anon, authenticated[\\s\\S]*?USING \(false\)[\\s\\S]*?WITH CHECK \(false\)/);
+assert.match(privateDenyMigration, /FOR ALL[\s\S]*?TO anon, authenticated[\s\S]*?USING \(false\)[\s\S]*?WITH CHECK \(false\)/);
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
 console.log("stage16 activation contract: OK");
