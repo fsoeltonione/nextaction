@@ -30,6 +30,8 @@ export async function POST(request: Request) {
     if (!user) return jsonError(requestId, 401, "unauthorized", "Authentication is required.");
     const { data: membership } = await supabase.from("workspace_members").select("workspace_id").eq("workspace_id", workspaceId).eq("user_id", user.id).maybeSingle();
     if (!membership) return jsonError(requestId, 403, "not_authorized", "You are not authorized for this workspace.");
+    const { data: capability } = await supabase.from("workspace_capabilities").select("capability").eq("workspace_id", workspaceId).eq("capability", "reach_customers").eq("status", "active").maybeSingle();
+    if (!capability) return jsonError(requestId, 409, "capability_not_selected", "Select Reach Customers before creating an offer.");
 
     let momentIds: string[] = [];
     if (rawMomentIds) {
@@ -37,12 +39,19 @@ export async function POST(request: Request) {
     } else if (rawTargetKeys) {
       const targetKeys = rawTargetKeys.map(asString);
       if (targetKeys.length < 1 || targetKeys.length > 20 || targetKeys.some((key) => !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(key)) || new Set(targetKeys).size !== targetKeys.length) throw new HttpError(400, "invalid_offer_moments", "Select one or more valid target moments.");
+      const { data: workspaceProducts, error: workspaceProductsError } = await supabase
+        .from("products")
+        .select("id")
+        .eq("workspace_id", workspaceId);
+      if (workspaceProductsError) throw new HttpError(500, "moment_lookup_failed", "Unable to resolve target moments.");
+      if (!workspaceProducts?.length) throw new HttpError(403, "invalid_offer_moments", "One or more target moments are not available in this workspace.");
+
       const { data: moments, error: momentsError } = await supabase
         .from("moments")
         .select("id, moment_key, status")
         .in("moment_key", targetKeys)
         .eq("status", "active")
-        .in("product_id", (await supabase.from("products").select("id").eq("workspace_id", workspaceId)).data?.map((product) => product.id) ?? []);
+        .in("product_id", workspaceProducts.map((product) => product.id));
       if (momentsError) throw new HttpError(500, "moment_lookup_failed", "Unable to resolve target moments.");
       const byKey = new Map((moments ?? []).map((moment) => [moment.moment_key, moment.id]));
       if (targetKeys.some((key) => !byKey.has(key))) throw new HttpError(403, "invalid_offer_moments", "One or more target moments are not available in this workspace.");
