@@ -19,10 +19,6 @@ export async function POST(request: Request) {
     const name = asString(body.name);
     const description = asString(body.description);
     const rawMoments = body.moments;
-    if (!workspaceId) throw new HttpError(409, "workspace_selection_required", "Select a workspace before saving the product.");
-
-    const { data: membership } = await supabase.from("workspace_members").select("workspace_id").eq("workspace_id", workspaceId).eq("user_id", user.id).maybeSingle();
-    if (!membership) return jsonError(requestId, 403, "not_authorized", "You are not authorized for this workspace.");
 
     const normalized = normalizeProductUrl(urlInput);
     if (!name || name.length > 160) throw new HttpError(400, "invalid_product_name", "Product name is invalid.");
@@ -42,8 +38,19 @@ export async function POST(request: Request) {
 
     if (new Set(moments.map((moment) => moment.key)).size !== moments.length) throw new HttpError(409, "duplicate_moment_key", "Moment keys must be unique.");
 
+    let selectedWorkspaceId: string | null = workspaceId || null;
+    if (selectedWorkspaceId) {
+      const { data: membership } = await supabase.from("workspace_members").select("workspace_id").eq("workspace_id", selectedWorkspaceId).eq("user_id", user.id).maybeSingle();
+      if (!membership) return jsonError(requestId, 403, "not_authorized", "You are not authorized for this workspace.");
+    } else {
+      const { data: memberships, error: membershipError } = await supabase.from("workspace_members").select("workspace_id").eq("user_id", user.id);
+      if (membershipError) return jsonError(requestId, 500, "workspace_lookup_failed", "Unable to determine your activation workspace.");
+      if ((memberships ?? []).length > 0) throw new HttpError(409, "workspace_selection_required", "Select a workspace before saving the product.");
+      // Zero memberships is the only case where the activation RPC may create the initial workspace.
+    }
+
     const { data, error } = await supabase.rpc("confirm_product_activation_v2", {
-      p_workspace_id: workspaceId,
+      p_workspace_id: selectedWorkspaceId,
       p_canonical_url: normalized.value,
       p_domain: normalized.hostname,
       p_name: name,
