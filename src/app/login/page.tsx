@@ -11,6 +11,7 @@ function LoginContent() {
   const router = useRouter();
 
   const pendingUrl = searchParams.get("url");
+  const pendingWorkspaceId = searchParams.get("workspace_id");
   const authError = searchParams.get("error");
 
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ function LoginContent() {
 
       if (data.session) {
         const target = pendingUrl
-          ? "/onboarding?url=" + encodeURIComponent(pendingUrl)
+          ? "/onboarding?url=" + encodeURIComponent(pendingUrl) + (pendingWorkspaceId ? "&workspace_id=" + encodeURIComponent(pendingWorkspaceId) : "")
           : "/dashboard";
         router.replace(target);
       } else {
@@ -46,7 +47,7 @@ function LoginContent() {
     redirectTo.searchParams.set(
       "next",
       pendingUrl
-        ? "/onboarding?url=" + encodeURIComponent(pendingUrl)
+        ? "/onboarding?url=" + encodeURIComponent(pendingUrl) + (pendingWorkspaceId ? "&workspace_id=" + encodeURIComponent(pendingWorkspaceId) : "")
         : "/dashboard",
     );
 
