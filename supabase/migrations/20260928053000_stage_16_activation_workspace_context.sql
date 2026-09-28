@@ -12,7 +12,7 @@ CREATE OR REPLACE FUNCTION public.confirm_product_activation(
   p_description TEXT,
   p_moments JSONB
 )
-RETURNS TABLE (workspace_id UUID, product_id UUID, moment_count INTEGER)
+RETURNS TABLE (result_workspace_id UUID, result_product_id UUID, result_moment_count INTEGER)
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public, pg_temp
@@ -114,7 +114,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.set_workspace_capabilities(
   p_capabilities TEXT[]
 )
-RETURNS TABLE (workspace_id UUID, capability TEXT)
+RETURNS TABLE (result_workspace_id UUID, result_capability TEXT)
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public, pg_temp
@@ -163,7 +163,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.create_offer_activation(
   p_title TEXT, p_description TEXT, p_cta_label TEXT, p_destination_url TEXT, p_moment_ids UUID[]
 )
-RETURNS TABLE (workspace_id UUID, offer_id UUID, moment_count INTEGER)
+RETURNS TABLE (result_workspace_id UUID, result_offer_id UUID, result_moment_count INTEGER)
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public, pg_temp
