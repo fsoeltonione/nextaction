@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     if (new Set(moments.map((moment) => moment.key)).size !== moments.length) throw new HttpError(409, "duplicate_moment_key", "Moment keys must be unique.");
 
-    let selectedWorkspaceId: string | null = workspaceId || null;
+    const selectedWorkspaceId: string | null = workspaceId || null;
     if (selectedWorkspaceId) {
       const { data: membership } = await supabase.from("workspace_members").select("workspace_id").eq("workspace_id", selectedWorkspaceId).eq("user_id", user.id).maybeSingle();
       if (!membership) return jsonError(requestId, 403, "not_authorized", "You are not authorized for this workspace.");
