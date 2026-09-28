@@ -247,7 +247,7 @@ function DashboardContent() {
                 <h1 className="text-3xl font-bold text-white mb-1">Your Products</h1>
                 <p className="text-neutral-400 text-sm">Install the tracking snippet to start monetizing moments.</p>
               </div>
-              <Link href="/onboarding" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-semibold transition-colors">
+              <Link href={selectedWorkspaceId ? "/onboarding?workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "/onboarding"} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-semibold transition-colors">
                 <Plus className="w-4 h-4" /> Add Product
               </Link>
             </div>
