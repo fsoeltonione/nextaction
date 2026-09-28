@@ -29,6 +29,8 @@ assert.match(onboarding, /sessionStorage/);
 assert.match(onboarding, /workspace_id/);
 assert.doesNotMatch(onboarding, /moment_1|moment_2/);
 assert.match(onboarding, /hasPendingProposal/);
+assert.match(onboarding, /initialWorkspaceId/);
+assert.match(dashboard, /\/onboarding\?workspace_id=/);
 assert.match(onboarding, /state\.capabilities\.includes\("make_money"\)/);
 assert.match(onboarding, /state\.capabilities\.includes\("reach_customers"\)/);
 assert.match(onboarding, /Issue new credential/);
