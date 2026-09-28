@@ -40,6 +40,9 @@ assert.match(onboarding, /if \(requestSequence !== loadStateRequestRef\.current\
 assert.match(onboarding, /if \(loading \|\| !urlInput \|\| draft \|\| analysisRunning \|\| autoAnalysisUrlRef\.current === urlInput\) return/);
 assert.match(onboarding, /if \(state\?\.product\?\.canonical_url === urlInput\) return/);
 assert.match(onboarding, /autoAnalysisUrlRef\.current = draft\.url/);
+assert.match(onboarding, /const nextState = await loadState\(selectedWorkspaceId\)/);
+assert.match(onboarding, /if \(!nextState\) throw new Error\("Unable to load activation state after confirming the product\."/);
+assert.match(onboarding, /const nextState = await loadState\(selectedWorkspaceId\);[\s\S]*?clearPending\(\);[\s\S]*?setDraft\(null\);/);
 assert.match(onboarding, /if \(nextState\.step !== "product_understanding"\) return null/);
 assert.doesNotMatch(onboarding, /setState\(\(current\) => current \? \{ \.\.\.current, step: "product_understanding"/);
 assert.match(onboarding, /disabled=\{analysisRunning\}/);
