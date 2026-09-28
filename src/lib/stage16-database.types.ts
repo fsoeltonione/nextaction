@@ -3,7 +3,7 @@ import type { Database, Json } from "@/lib/database.types";
 type Stage16Functions = {
   confirm_product_activation_v2: {
     Args: {
-      p_workspace_id: string;
+      p_workspace_id: string | null;
       p_canonical_url: string;
       p_domain: string;
       p_name: string;
