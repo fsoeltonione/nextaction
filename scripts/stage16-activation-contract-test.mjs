@@ -45,7 +45,7 @@ assert.match(globals, /\.btn \{/);
 assert.match(globals, /\.btn-secondary \{/);
 assert.match(circleci, /stage16_activation_contract/);
 assert.match(circleci, /npm run test:stage16-activation/);
-assert.match(circleci, /deploy_staging:[\\s\\S]*?stage16_activation_contract/);
+assert.match(circleci, /deploy_staging:[\s\S]*?stage16_activation_contract/);
 assert.match(onboarding, /hasPendingProposal/);
 assert.match(onboarding, /setDraft\(null\)/);
 assert.match(callback, /auth_failed/);
