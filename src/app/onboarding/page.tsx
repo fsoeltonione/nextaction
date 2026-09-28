@@ -149,7 +149,7 @@ function OnboardingContent() {
       setDraft(null);
       savePending(targetUrl, null);
     } finally { setAnalysisRunning(false); }
-  }, [draft, router]);
+  }, [draft, router, selectedWorkspaceId]);
 
   useEffect(() => {
     let active = true;
