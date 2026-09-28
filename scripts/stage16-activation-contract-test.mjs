@@ -24,6 +24,8 @@ assert.match(onboarding, /response\.status === 401/);
 assert.match(onboarding, /sessionStorage/);
 assert.match(onboarding, /workspace_id/);
 assert.doesNotMatch(onboarding, /moment_1|moment_2/);
+assert.match(onboarding, /draft && !state\\?\\.product \\? "product_understanding" : state\\?\\.step/);
+assert.match(onboarding, /Issue new credential/);
 assert.match(callback, /pendingUrl/);
 assert.match(callback, /auth_failed/);
 assert.match(callback, /errorUrl\.searchParams\.set\("url", pendingUrl\)/);
