@@ -114,5 +114,6 @@ assert.match(
   /v_workspace_id := extensions\.gen_random_uuid\(\);[\s\S]*INSERT INTO public\.workspaces \(id, name, user_id, created_by\)/
 );
 assert.doesNotMatch(firstWorkspaceReturningRlsMigration, /RETURNING id INTO v_workspace_id/);
+assert.match(firstWorkspaceReturningRlsMigration, /pg_advisory_xact_lock\(hashtextextended\(v_user_id::text, 0\)\)/);
 
 console.log("stage16 activation contract: OK");
