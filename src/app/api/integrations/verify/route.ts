@@ -22,10 +22,20 @@ export async function POST(request: Request) {
     let admin;
     try { admin = createAdminClient(); } catch { return jsonError(requestId, 503, "integration_not_configured", "Integration verification is not available yet."); }
     const credentialHash = await sha256Hex(token);
-    const { data: secret } = await admin.schema("private").from("integration_secrets").select("integration_id").eq("credential_hash", credentialHash).maybeSingle();
-    if (!secret) return jsonError(requestId, 401, "invalid_token", "The connection token is invalid.");
+    const { data: credentialResult, error: credentialError } = await admin.rpc("resolve_integration_credential_v2", {
+      p_credential_hash: credentialHash,
+    });
+    if (credentialError) {
+      console.error("Integration credential lookup failed", { requestId, code: credentialError.code });
+      return jsonError(requestId, 500, "verification_failed", "Unable to verify the connection.");
+    }
 
-    const { data: integration } = await admin.from("integrations").select("id, product_id, status").eq("id", secret.integration_id).maybeSingle();
+    const credential = credentialResult?.[0];
+    if (!credential || typeof credential.result_integration_id !== "string") {
+      return jsonError(requestId, 401, "invalid_token", "The connection token is invalid.");
+    }
+
+    const { data: integration } = await admin.from("integrations").select("id, product_id, status").eq("id", credential.result_integration_id).maybeSingle();
     if (!integration || integration.status !== "active") return jsonError(requestId, 403, "integration_revoked", "This connection is no longer active.");
 
     const { data: product } = await admin.from("products").select("id, workspace_id").eq("id", integration.product_id).eq("workspace_id", workspaceId).maybeSingle();
