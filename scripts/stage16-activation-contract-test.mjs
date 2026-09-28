@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, databaseTypes] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -19,6 +19,7 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("supabase/migrations/20260928053000_stage_16_activation_workspace_context.sql"),
   read("supabase/migrations/20260928061500_stage_16_initial_workspace_creation.sql"),
   read("supabase/migrations/20260928180000_stage_16_v2_function_privilege_hardening.sql"),
+  read("supabase/migrations/20260928180500_stage_16_private_table_deny_policies.sql"),
   read("src/lib/stage16-database.types.ts"),
 ]);
 
@@ -83,6 +84,20 @@ assert.match(privilegeMigration, /FROM PUBLIC, anon/);
 assert.match(privilegeMigration, /GRANT EXECUTE ON FUNCTION public\.confirm_product_activation_v2[\\s\\S]*?TO authenticated/);
 assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.set_workspace_capabilities_v2/);
 assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.create_offer_activation_v2/);
+assert.match(privateDenyMigration, /ON private\.advertiser_credit_accounts/);
+assert.match(privateDenyMigration, /ON private\.advertiser_credit_entries/);
+assert.match(privateDenyMigration, /ON private\.clicks/);
+assert.match(privateDenyMigration, /ON private\.decisions/);
+assert.match(privateDenyMigration, /ON private\.deliveries/);
+assert.match(privateDenyMigration, /ON private\.events/);
+assert.match(privateDenyMigration, /ON private\.financial_accounts/);
+assert.match(privateDenyMigration, /ON private\.financial_entries/);
+assert.match(privateDenyMigration, /ON private\.integration_secrets/);
+assert.match(privateDenyMigration, /ON private\.moment_occurrences/);
+assert.match(privateDenyMigration, /ON private\.qualified_clicks/);
+assert.match(privateDenyMigration, /ON private\.rate_limit_buckets/);
+assert.match(privateDenyMigration, /ON private\.settlements/);
+assert.match(privateDenyMigration, /FOR ALL[\\s\\S]*?TO anon, authenticated[\\s\\S]*?USING \(false\)[\\s\\S]*?WITH CHECK \(false\)/);
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
 console.log("stage16 activation contract: OK");
