@@ -353,6 +353,7 @@ workflows:
             - cloudflare_compatibility
             - cloudflare_build
             - analysis_provider_smoke
+            - stage16_activation_contract
       - staging_smoke:
           context:
             - nextaction-staging
