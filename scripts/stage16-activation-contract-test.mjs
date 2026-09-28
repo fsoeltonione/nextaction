@@ -50,6 +50,7 @@ assert.match(onboarding, /selectedWorkspaceId \? "&workspace_id="/);
 assert.match(dashboard, /\/onboarding\?workspace_id=/);
 assert.match(onboarding, /state\.capabilities\.includes\("make_money"\)/);
 assert.match(onboarding, /state\.capabilities\.includes\("reach_customers"\)/);
+assert.match(onboarding, /capabilitySelection\.length === 2 \? "rounded-2xl border border-white bg-white\/10 p-5 text-left" : "rounded-2xl border border-neutral-800 p-5 text-left"/);
 assert.match(onboarding, /Issue new credential/);
 assert.match(callback, /pendingUrl/);
 assert.match(login, /pendingWorkspaceId/);
