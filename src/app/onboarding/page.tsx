@@ -91,6 +91,7 @@ function OnboardingContent() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoAnalysisUrlRef = useRef<string | null>(null);
+  const loadStateRequestRef = useRef(0);
 
   const applyState = useCallback((nextState: ActivationState) => {
     setState(nextState);
@@ -102,6 +103,7 @@ function OnboardingContent() {
         return currentDraft;
       }
       if (!nextState.product) return currentDraft;
+      if (nextState.step !== "product_understanding") return null;
       return {
         url: nextState.product.canonical_url,
         name: nextState.product.name,
@@ -117,11 +119,13 @@ function OnboardingContent() {
   }, []);
 
   const loadState = useCallback(async (workspaceId?: string | null): Promise<ActivationState | null> => {
+    const requestSequence = ++loadStateRequestRef.current;
     const query = workspaceId ? "?workspace_id=" + encodeURIComponent(workspaceId) : "";
     const response = await fetch("/api/onboarding/state" + query, { method: "GET", cache: "no-store" });
     if (response.status === 401) return null;
     if (!response.ok) throw new Error(await readApiError(response, "Unable to load activation state."));
     const payload = await response.json();
+    if (requestSequence !== loadStateRequestRef.current) return null;
     const nextState = payload.state as ActivationState;
     applyState(nextState);
     return nextState;
@@ -143,7 +147,6 @@ function OnboardingContent() {
       savePending(nextDraft.url, nextDraft);
       const nextPath = "/onboarding?url=" + encodeURIComponent(nextDraft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "");
       router.replace(nextPath);
-      setState((current) => current ? { ...current, step: "product_understanding" } : current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Product analysis failed.");
       setDraft(null);
@@ -160,11 +163,12 @@ function OnboardingContent() {
   }, [initialWorkspaceId, loadState]);
 
   useEffect(() => {
-    if (!urlInput || draft || analysisRunning || autoAnalysisUrlRef.current === urlInput) return;
+    if (loading || !urlInput || draft || analysisRunning || autoAnalysisUrlRef.current === urlInput) return;
+    if (state?.product?.canonical_url === urlInput) return;
     autoAnalysisUrlRef.current = urlInput;
     // This effect intentionally starts an async URL-driven analysis; the handler owns the UI state transition.
     void runAnalysis(urlInput);
-  }, [analysisRunning, draft, runAnalysis, urlInput]);
+  }, [analysisRunning, draft, loading, runAnalysis, state, urlInput]);
 
   function updateMoment(index: number, patch: Partial<MomentDraft>) {
     setDraft((current) => {
@@ -216,6 +220,7 @@ function OnboardingContent() {
         return;
       }
       if (!response.ok) throw new Error(await readApiError(response, "Unable to confirm the product."));
+      autoAnalysisUrlRef.current = draft.url;
       clearPending();
       setDraft(null);
       await loadState(selectedWorkspaceId);
@@ -286,7 +291,7 @@ function OnboardingContent() {
         {workspaceOptions.length > 1 && <div className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-4"><label className="block text-sm font-medium text-neutral-300 mb-2">Workspace</label><select value={selectedWorkspaceId ?? ""} onChange={(event) => { const id = event.target.value || null; setSelectedWorkspaceId(id); if (id) void loadState(id); }} className="w-full rounded-xl bg-neutral-950 border border-neutral-700 px-4 py-3 text-white"><option value="">Select a workspace</option>{workspaceOptions.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.id} · {workspace.role}</option>)}</select></div>}
         {error && <div className="mb-6 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div>}
         <div className="mb-8 flex items-center gap-2 text-xs text-neutral-500">{["url", "product_understanding", "intent", "capability_setup", "verification", "ready"].map((step, index) => <div key={step} className={currentStep === step ? "text-white" : ""}>{index + 1}. {step.replaceAll("_", " ")}</div>)}</div>
-        {currentStep === "url" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Globe className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Connect your SaaS</h1></div><p className="mb-6 text-neutral-400">Paste your SaaS URL. NextAction will understand the product before asking you to configure activation.</p><div className="flex gap-3"><input value={urlInput} onChange={(event) => setUrlInput(event.target.value)} placeholder="https://your-saas.com" className="input flex-1" /><button disabled={!urlInput || analysisRunning} onClick={() => void runAnalysis(urlInput)} className="btn">{analysisRunning ? "Analyzing..." : "Analyze"}<ArrowRight className="h-4 w-4" /></button></div></section>}
+        {currentStep === "url" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Globe className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Connect your SaaS</h1></div><p className="mb-6 text-neutral-400">Paste your SaaS URL. NextAction will understand the product before asking you to configure activation.</p><div className="flex gap-3"><input value={urlInput} onChange={(event) => setUrlInput(event.target.value)} disabled={analysisRunning} placeholder="https://your-saas.com" className="input flex-1" /><button disabled={!urlInput || analysisRunning} onClick={() => void runAnalysis(urlInput)} className="btn">{analysisRunning ? "Analyzing..." : "Analyze"}<ArrowRight className="h-4 w-4" /></button></div></section>}
         {currentStep === "product_understanding" && draft && <section className="space-y-6"><div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><ShieldCheck className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Confirm product understanding</h1></div><Field label="Product name"><input value={draft.name} onChange={(event) => updateProduct({ name: event.target.value })} className="input" /></Field><Field label="Description"><textarea value={draft.description} onChange={(event) => updateProduct({ description: event.target.value })} className="input min-h-24" /></Field><div className="mt-6 space-y-4">{draft.moments.map((moment, index) => <div key={`${index}-${moment.key}`} className="rounded-2xl border border-neutral-800 p-4"><div className="grid gap-4 md:grid-cols-3"><Field label="Moment key"><input value={moment.key} onChange={(event) => updateMoment(index, { key: event.target.value })} className="input" /></Field><Field label="Label"><input value={moment.label} onChange={(event) => updateMoment(index, { label: event.target.value })} className="input" /></Field><Field label="Description"><input value={moment.description} onChange={(event) => updateMoment(index, { description: event.target.value })} className="input" /></Field></div><button onClick={() => removeMoment(index)} className="mt-3 text-sm text-neutral-400"><Trash2 className="inline h-4 w-4 mr-1" />Remove</button></div>)}</div><div className="mt-6 flex items-center justify-between"><button onClick={addMoment} className="btn-secondary"><Plus className="h-4 w-4" />Add Moment</button><button disabled={saving} onClick={() => void confirmProduct()} className="btn">{saving ? "Saving..." : "Confirm product"}<ArrowRight className="h-4 w-4" /></button></div></div></section>}
         {currentStep === "intent" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Target className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Choose your goal</h1></div><p className="mb-6 text-neutral-400">Choose how this workspace will use NextAction.</p><div className="grid gap-4 md:grid-cols-3">{(["make_money", "reach_customers"] as Capability[]).map((capability) => <button key={capability} onClick={() => setCapabilitySelection((current) => current.includes(capability) ? current.filter((item) => item !== capability) : [...current, capability])} className={capabilitySelection.includes(capability) ? "rounded-2xl border border-white bg-white/10 p-5 text-left" : "rounded-2xl border border-neutral-800 p-5 text-left"}><div className="font-medium text-white">{capability === "make_money" ? "Make money" : "Reach customers"}</div><div className="mt-2 text-sm text-neutral-400">{capability === "make_money" ? "Connect your product so NextAction can recognize moments." : "Prepare starter offers for relevant moments."}</div></button>)}<button onClick={() => setCapabilitySelection((current) => current.length === 2 ? [] : ["make_money", "reach_customers"])} className="rounded-2xl border border-neutral-800 p-5 text-left"><div className="font-medium text-white">Both</div><div className="mt-2 text-sm text-neutral-400">Enable both capabilities.</div></button></div><button disabled={saving || capabilitySelection.length < 1} onClick={() => void saveCapabilities()} className="btn mt-6">Save goal<ArrowRight className="h-4 w-4" /></button></section>}
         {currentStep === "capability_setup" && state && (
