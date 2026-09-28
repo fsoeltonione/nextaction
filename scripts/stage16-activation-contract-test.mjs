@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, databaseTypes] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -18,6 +18,7 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("src/app/api/offers/create/route.ts"),
   read("supabase/migrations/20260928053000_stage_16_activation_workspace_context.sql"),
   read("supabase/migrations/20260928061500_stage_16_initial_workspace_creation.sql"),
+  read("supabase/migrations/20260928180000_stage_16_v2_function_privilege_hardening.sql"),
   read("src/lib/stage16-database.types.ts"),
 ]);
 
@@ -77,6 +78,11 @@ assert.match(initialWorkspaceMigration, /p_workspace_id UUID/);
 assert.match(initialWorkspaceMigration, /p_workspace_id IS NULL/);
 assert.match(initialWorkspaceMigration, /v_membership_count > 0/);
 assert.match(initialWorkspaceMigration, /confirm_product_activation\(/);
+assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.confirm_product_activation_v2/);
+assert.match(privilegeMigration, /FROM PUBLIC, anon/);
+assert.match(privilegeMigration, /GRANT EXECUTE ON FUNCTION public\.confirm_product_activation_v2[\\s\\S]*?TO authenticated/);
+assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.set_workspace_capabilities_v2/);
+assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.create_offer_activation_v2/);
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
 console.log("stage16 activation contract: OK");
