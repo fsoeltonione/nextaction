@@ -165,10 +165,16 @@ function OnboardingContent() {
   useEffect(() => {
     if (loading || !urlInput || draft || analysisRunning || autoAnalysisUrlRef.current === urlInput) return;
     if (state?.product?.canonical_url === urlInput) return;
+
     autoAnalysisUrlRef.current = urlInput;
-    // This effect intentionally starts an async URL-driven analysis; the handler owns the UI state transition.
-    void runAnalysis(urlInput);
-  }, [analysisRunning, draft, loading, runAnalysis, state, urlInput]);
+    // Defer the async action until after the current effect completes so React does not
+    // treat the effect as synchronously cascading into local state updates.
+    const timer = window.setTimeout(() => {
+      void runAnalysis(urlInput);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [analysisRunning, draft, loading, runAnalysis, state?.product?.canonical_url, urlInput]);
 
   function updateMoment(index: number, patch: Partial<MomentDraft>) {
     setDraft((current) => {
