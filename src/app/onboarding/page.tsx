@@ -269,7 +269,7 @@ function OnboardingContent() {
   if (loading) return <Shell><Spinner /></Shell>;
 
   const hasPendingProposal =
-    Boolean(draft) && (!state?.product || draft.url !== state.product.canonical_url);
+    draft != null && (!state?.product || draft.url !== state.product.canonical_url);
   const currentStep = hasPendingProposal ? "product_understanding" : state?.step ?? "url";
   const moments = state?.product?.moments ?? [];
 
