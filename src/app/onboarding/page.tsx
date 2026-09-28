@@ -96,10 +96,22 @@ function OnboardingContent() {
     setWorkspaceOptions(nextState.workspaces ?? []);
     setSelectedWorkspaceId(nextState.workspace?.id ?? null);
     setCapabilitySelection(nextState.capabilities ?? []);
-    if (nextState.product) {
-      const nextDraft = { url: nextState.product.canonical_url, name: nextState.product.name, description: nextState.product.description ?? "", moments: nextState.product.moments.map((moment) => ({ key: moment.moment_key, label: moment.label, description: moment.description ?? "" })) };
-      setDraft(nextDraft);
-    }
+    setDraft((currentDraft) => {
+      if (currentDraft && (!nextState.product || currentDraft.url !== nextState.product.canonical_url)) {
+        return currentDraft;
+      }
+      if (!nextState.product) return currentDraft;
+      return {
+        url: nextState.product.canonical_url,
+        name: nextState.product.name,
+        description: nextState.product.description ?? "",
+        moments: nextState.product.moments.map((moment) => ({
+          key: moment.moment_key,
+          label: moment.label,
+          description: moment.description ?? "",
+        })),
+      };
+    });
     setOfferForm((current) => ({ ...current, moment_ids: current.moment_ids.filter((id) => nextState.product?.moments.some((moment) => moment.id === id)) }));
   }, []);
 
@@ -199,6 +211,7 @@ function OnboardingContent() {
       if (response.status === 401) { router.push("/login?url=" + encodeURIComponent(draft.url)); return; }
       if (!response.ok) throw new Error(await readApiError(response, "Unable to confirm the product."));
       clearPending();
+      setDraft(null);
       await loadState(selectedWorkspaceId);
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to confirm the product."); }
     finally { setSaving(false); }
@@ -255,9 +268,10 @@ function OnboardingContent() {
 
   if (loading) return <Shell><Spinner /></Shell>;
 
-  const currentStep = draft && !state?.product ? "product_understanding" : state?.step ?? "url";
+  const hasPendingProposal =
+    Boolean(draft) && (!state?.product || draft.url !== state.product.canonical_url);
+  const currentStep = hasPendingProposal ? "product_understanding" : state?.step ?? "url";
   const moments = state?.product?.moments ?? [];
-  const isAnonymous = !state;
 
   return (
     <Shell>
@@ -271,7 +285,7 @@ function OnboardingContent() {
         {currentStep === "intent" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Target className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Choose your goal</h1></div><p className="mb-6 text-neutral-400">Choose how this workspace will use NextAction.</p><div className="grid gap-4 md:grid-cols-3">{(["make_money", "reach_customers"] as Capability[]).map((capability) => <button key={capability} onClick={() => setCapabilitySelection((current) => current.includes(capability) ? current.filter((item) => item !== capability) : [...current, capability])} className={capabilitySelection.includes(capability) ? "rounded-2xl border border-white bg-white/10 p-5 text-left" : "rounded-2xl border border-neutral-800 p-5 text-left"}><div className="font-medium text-white">{capability === "make_money" ? "Make money" : "Reach customers"}</div><div className="mt-2 text-sm text-neutral-400">{capability === "make_money" ? "Connect your product so NextAction can recognize moments." : "Prepare starter offers for relevant moments."}</div></button>)}<button onClick={() => setCapabilitySelection((current) => current.length === 2 ? [] : ["make_money", "reach_customers"])} className="rounded-2xl border border-neutral-800 p-5 text-left"><div className="font-medium text-white">Both</div><div className="mt-2 text-sm text-neutral-400">Enable both capabilities.</div></button></div><button disabled={saving || capabilitySelection.length < 1} onClick={() => void saveCapabilities()} className="btn mt-6">Save goal<ArrowRight className="h-4 w-4" /></button></section>}
         {currentStep === "capability_setup" && state && <section className="grid gap-6 md:grid-cols-2"><div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-4 flex items-center gap-3"><Zap className="h-5 w-5" /><h2 className="text-xl font-semibold text-white">Make Money</h2></div><p className="mb-5 text-sm text-neutral-400">Create and verify the product connection.</p>{!state.setup.make_money.exists && <button disabled={saving || !selectedWorkspaceId} onClick={() => void createIntegration()} className="btn">Create connection</button>}{state.setup.make_money.exists && !state.setup.make_money.verified && <div className="space-y-3">{integrationToken && <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3 font-mono text-xs break-all text-neutral-300">{integrationToken}</div>}<div className="text-sm text-neutral-300">Connection created. Install the credential, then verify it.</div><div className="flex flex-wrap gap-2"><button disabled={saving || !selectedWorkspaceId} onClick={() => void createIntegration()} className="btn-secondary">Issue new credential</button><button disabled={verifying || !integrationToken || !selectedWorkspaceId} onClick={() => void verifyIntegration()} className="btn">Verify connection</button></div></div>}{state.setup.make_money.verified && <div className="text-sm text-green-300 flex items-center gap-2"><Check className="h-4 w-4" />Verified</div>}</div><div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-4 flex items-center gap-3"><Target className="h-5 w-5" /><h2 className="text-xl font-semibold text-white">Reach Customers</h2></div><p className="mb-5 text-sm text-neutral-400">Create a starter offer for the product moments. This is activation setup, not final network targeting.</p>{!state.setup.reach_customers.configured ? <div className="space-y-3"><input value={offerForm.title} onChange={(event) => setOfferForm({ ...offerForm, title: event.target.value })} placeholder="Offer title" className="input" /><textarea value={offerForm.description} onChange={(event) => setOfferForm({ ...offerForm, description: event.target.value })} placeholder="Offer description" className="input min-h-24" /><input value={offerForm.destination_url} onChange={(event) => setOfferForm({ ...offerForm, destination_url: event.target.value })} placeholder="https://..." className="input" /><div className="space-y-2">{moments.map((moment) => <label key={moment.id} className="flex items-center gap-2 text-sm text-neutral-300"><input type="checkbox" checked={offerForm.moment_ids.includes(moment.id)} onChange={() => setOfferForm((current) => ({ ...current, moment_ids: current.moment_ids.includes(moment.id) ? current.moment_ids.filter((id) => id !== moment.id) : [...current.moment_ids, moment.id] }))} />{moment.label}</label>)}</div><button disabled={saving || !selectedWorkspaceId} onClick={() => void createOffer()} className="btn">Create starter offer</button></div> : <div className="text-sm text-green-300 flex items-center gap-2"><Check className="h-4 w-4" />Starter offer configured</div>}</div></section>}
         {currentStep === "verification" && state && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><RefreshCw className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Verify your activation</h1></div><p className="mb-6 text-neutral-400">Complete any required verification, then continue to the dashboard.</p>{integrationToken && <div className="mb-4 rounded-xl border border-neutral-800 bg-neutral-950 p-3 font-mono text-xs break-all text-neutral-300">{integrationToken}</div>}<div className="flex flex-wrap gap-2"><button disabled={saving || !selectedWorkspaceId} onClick={() => void createIntegration()} className="btn-secondary">Issue new credential</button><button disabled={verifying || !integrationToken || !selectedWorkspaceId} onClick={() => void verifyIntegration()} className="btn">Verify connection</button><button onClick={() => void loadState(selectedWorkspaceId)} className="btn-secondary">Refresh status</button></div></section>}
-        {currentStep === "ready" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Check className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">You are ready</h1></div><p className="mb-6 text-neutral-400">Your activation is complete.</p><button onClick={() => router.push("/dashboard")} className="btn">Open dashboard<ArrowRight className="h-4 w-4" /></button></section>}
+        {currentStep === "ready" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Check className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">You are ready</h1></div><p className="mb-6 text-neutral-400">Your activation is complete.</p><button onClick={() => router.push("/dashboard?workspace_id=" + encodeURIComponent(selectedWorkspaceId ?? ""))} className="btn">Open dashboard<ArrowRight className="h-4 w-4" /></button></section>}
       </div>
     </Shell>
   );
