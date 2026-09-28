@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -24,6 +24,7 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("supabase/migrations/20260928194500_stage_16_first_workspace_insert_returning_rls.sql"),
   read("supabase/migrations/20260928233000_stage_16_atomic_integration_credential_provisioning.sql"),
   read("supabase/migrations/20260929000500_stage_16_private_credential_verification_boundary.sql"),
+  read("supabase/migrations/20260929010000_stage_16_read_only_control_plane.sql"),
   read("src/lib/stage16-database.types.ts"),
   read("scripts/cloudflare-vinext-build.mjs"),
   read("scripts/cloudflare-vinext-check.mjs"),
@@ -140,6 +141,14 @@ assert.match(atomicIntegrationCredentialVerificationMigration, /SECURITY DEFINER
 assert.match(atomicIntegrationCredentialVerificationMigration, /private\.integration_secrets/);
 assert.match(atomicIntegrationCredentialVerificationMigration, /REVOKE ALL ON FUNCTION public\.resolve_integration_credential_v2/);
 assert.match(atomicIntegrationCredentialVerificationMigration, /GRANT EXECUTE ON FUNCTION public\.resolve_integration_credential_v2[\s\S]*TO service_role/);
+assert.match(readOnlyControlPlaneMigration, /ALTER FUNCTION public\.confirm_product_activation_v2[\s\S]*SECURITY DEFINER/);
+assert.match(readOnlyControlPlaneMigration, /ALTER FUNCTION public\.set_workspace_capabilities_v2[\s\S]*SECURITY DEFINER/);
+assert.match(readOnlyControlPlaneMigration, /ALTER FUNCTION public\.create_offer_activation_v2[\s\S]*SECURITY DEFINER/);
+assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON TABLE[\s\S]*public\.offer_moments[\s\S]*FROM PUBLIC, anon, authenticated/);
+assert.match(readOnlyControlPlaneMigration, /GRANT SELECT ON TABLE[\s\S]*public\.offer_moments\s+TO authenticated/);
+assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.confirm_product_activation\(/);
+assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.set_workspace_capabilities\(/);
+assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.create_offer_activation\(/);
 assert.match(cloudflareBuild, /typescript-eslint@8\.70\.1/);
 assert.match(cloudflareCheck, /typescript-eslint@8\.70\.1/);
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
