@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, workspaceScopeMigration, databaseTypes] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, workspaceScopeMigration, initialWorkspaceContextFix, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -21,6 +21,7 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("supabase/migrations/20260928180000_stage_16_v2_function_privilege_hardening.sql"),
   read("supabase/migrations/20260928180500_stage_16_private_table_deny_policies.sql"),
   read("supabase/migrations/20260928183000_stage_16_v2_workspace_scope_qualification.sql"),
+  read("supabase/migrations/20260928185000_stage_16_v2_initial_workspace_context_fix.sql"),
   read("src/lib/stage16-database.types.ts"),
 ]);
 
