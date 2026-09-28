@@ -362,7 +362,7 @@ function DashboardContent() {
         )}
       </main>
 
-      {/* ===== CREATE OFFER MODAL ===== */
+      {/* ===== CREATE OFFER MODAL ===== */}
       {showCreateOffer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl p-8 relative shadow-2xl animate-in zoom-in-95 duration-200">
