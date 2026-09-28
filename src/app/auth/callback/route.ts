@@ -8,11 +8,14 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const safeNext = safeInternalRedirect(requestUrl.searchParams.get("next"), "/dashboard");
-  const pendingUrl = new URL(safeNext, requestUrl.origin).searchParams.get("url");
+  const safeNextUrl = new URL(safeNext, requestUrl.origin);
+  const pendingUrl = safeNextUrl.searchParams.get("url");
+  const pendingWorkspaceId = safeNextUrl.searchParams.get("workspace_id");
 
   function authFailure() {
     const errorUrl = new URL("/login", requestUrl.origin);
     if (pendingUrl) errorUrl.searchParams.set("url", pendingUrl);
+    if (pendingWorkspaceId) errorUrl.searchParams.set("workspace_id", pendingWorkspaceId);
     errorUrl.searchParams.set("error", "auth_failed");
     errorUrl.searchParams.set("request_id", requestId);
     return NextResponse.redirect(errorUrl);
