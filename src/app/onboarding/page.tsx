@@ -227,9 +227,10 @@ function OnboardingContent() {
       }
       if (!response.ok) throw new Error(await readApiError(response, "Unable to confirm the product."));
       autoAnalysisUrlRef.current = draft.url;
+      const nextState = await loadState(selectedWorkspaceId);
+      if (!nextState) throw new Error("Unable to load activation state after confirming the product.");
       clearPending();
       setDraft(null);
-      await loadState(selectedWorkspaceId);
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to confirm the product."); }
     finally { setSaving(false); }
   }
