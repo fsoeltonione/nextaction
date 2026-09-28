@@ -16,35 +16,63 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return jsonError(requestId, 401, "unauthorized", "Authentication is required.");
 
-    const { data: membership } = await supabase.from("workspace_members").select("workspace_id").eq("workspace_id", workspaceId).eq("user_id", user.id).maybeSingle();
+    const { data: membership } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", user.id)
+      .maybeSingle();
     if (!membership) return jsonError(requestId, 403, "not_authorized", "You are not authorized for this workspace.");
 
-    const { data: product } = await supabase.from("products").select("id, workspace_id").eq("id", productId).eq("workspace_id", workspaceId).maybeSingle();
+    const { data: product } = await supabase
+      .from("products")
+      .select("id, workspace_id")
+      .eq("id", productId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
     if (!product) return jsonError(requestId, 404, "product_not_found", "Product not found in the selected workspace.");
 
-    const { data: capability } = await supabase.from("workspace_capabilities").select("capability").eq("workspace_id", workspaceId).eq("capability", "make_money").eq("status", "active").maybeSingle();
+    const { data: capability } = await supabase
+      .from("workspace_capabilities")
+      .select("capability")
+      .eq("workspace_id", workspaceId)
+      .eq("capability", "make_money")
+      .eq("status", "active")
+      .maybeSingle();
     if (!capability) return jsonError(requestId, 409, "capability_not_selected", "Select Make Money before creating a product connection.");
 
     let admin;
-    try { admin = createAdminClient(); } catch { return jsonError(requestId, 503, "integration_not_configured", "Integration setup is not available yet."); }
-
-    const { data: existing } = await admin.from("integrations").select("id, last_seen_at, status").eq("product_id", product.id).eq("name", "NextAction Runtime").maybeSingle();
-    if (existing?.last_seen_at) return jsonError(requestId, 409, "integration_already_verified", "This product already has a verified connection.");
-
-    let integrationId = existing?.id;
-    if (!integrationId) {
-      const { data: created, error } = await admin.from("integrations").insert({ product_id: product.id, name: "NextAction Runtime", status: "active", last_seen_at: null }).select("id").single();
-      if (error || !created) { console.error("Integration creation failed", { requestId, code: error?.code }); return jsonError(requestId, 500, "integration_creation_failed", "Unable to create the integration."); }
-      integrationId = created.id;
+    try {
+      admin = createAdminClient();
+    } catch {
+      return jsonError(requestId, 503, "integration_not_configured", "Integration setup is not available yet.");
     }
 
     const token = generateIntegrationToken();
     const credentialHash = await sha256Hex(token);
-    const { error: secretError } = await admin.schema("private").from("integration_secrets").upsert({ integration_id: integrationId, credential_hash: credentialHash, rotated_at: new Date().toISOString() });
-    if (secretError) { console.error("Integration secret creation failed", { requestId, code: secretError.code }); return jsonError(requestId, 500, "integration_secret_failed", "Unable to finish integration setup."); }
+    const { data, error } = await admin.rpc("provision_integration_credential_v2", {
+      p_product_id: product.id,
+      p_credential_hash: credentialHash,
+    });
 
-    await admin.from("integrations").update({ last_seen_at: null, status: "active", revoked_at: null }).eq("id", integrationId);
-    return jsonSuccess({ integration: { id: integrationId, verified: false }, credential: { token } }, requestId, 201);
+    if (error) {
+      if (error.code === "P0001" || error.code === "23505") {
+        return jsonError(requestId, 409, "integration_already_verified", "This product already has a verified connection.");
+      }
+      console.error("Integration credential provisioning failed", { requestId, code: error.code });
+      return jsonError(requestId, 500, "integration_creation_failed", "Unable to finish integration setup.");
+    }
+
+    const result = data?.[0];
+    if (!result || typeof result.result_integration_id !== "string") {
+      console.error("Integration credential provisioning returned no result", { requestId });
+      return jsonError(requestId, 500, "integration_creation_failed", "Unable to finish integration setup.");
+    }
+
+    return jsonSuccess({
+      integration: { id: result.result_integration_id, verified: false },
+      credential: { token },
+    }, requestId, 201);
   } catch (error) {
     if (error instanceof HttpError) return jsonError(requestId, error.status, error.code, error.message);
     console.error("Integration creation route failed", { requestId, error });
