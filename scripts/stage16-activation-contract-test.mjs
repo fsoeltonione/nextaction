@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, workspaceScopeMigration, initialWorkspaceContextFix, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, databaseTypes] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -20,8 +20,6 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("supabase/migrations/20260928061500_stage_16_initial_workspace_creation.sql"),
   read("supabase/migrations/20260928180000_stage_16_v2_function_privilege_hardening.sql"),
   read("supabase/migrations/20260928180500_stage_16_private_table_deny_policies.sql"),
-  read("supabase/migrations/20260928183000_stage_16_v2_workspace_scope_qualification.sql"),
-  read("supabase/migrations/20260928185000_stage_16_v2_initial_workspace_context_fix.sql"),
   read("supabase/migrations/20260928193000_stage_16_first_workspace_rls_bootstrap.sql"),
   read("supabase/migrations/20260928194500_stage_16_first_workspace_insert_returning_rls.sql"),
   read("src/lib/stage16-database.types.ts"),
@@ -36,6 +34,15 @@ assert.match(onboarding, /workspace_id/);
 assert.doesNotMatch(onboarding, /moment_1|moment_2/);
 assert.match(onboarding, /hasPendingProposal/);
 assert.match(onboarding, /initialWorkspaceId/);
+assert.match(onboarding, /const loadStateRequestRef = useRef\(0\)/);
+assert.match(onboarding, /const requestSequence = \+\+loadStateRequestRef\.current/);
+assert.match(onboarding, /if \(requestSequence !== loadStateRequestRef\.current\) return null/);
+assert.match(onboarding, /if \(loading \|\| !urlInput \|\| draft \|\| analysisRunning \|\| autoAnalysisUrlRef\.current === urlInput\) return/);
+assert.match(onboarding, /if \(state\?\.product\?\.canonical_url === urlInput\) return/);
+assert.match(onboarding, /autoAnalysisUrlRef\.current = draft\.url/);
+assert.match(onboarding, /if \(nextState\.step !== "product_understanding"\) return null/);
+assert.doesNotMatch(onboarding, /setState\(\(current\) => current \? \{ \.\.\.current, step: "product_understanding"/);
+assert.match(onboarding, /disabled=\{analysisRunning\}/);
 assert.match(onboarding, /selectedWorkspaceId \? "&workspace_id="/);
 assert.match(dashboard, /\/onboarding\?workspace_id=/);
 assert.match(onboarding, /state\.capabilities\.includes\("make_money"\)/);
