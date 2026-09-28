@@ -101,6 +101,17 @@ assert.match(privateDenyMigration, /ON private\.qualified_clicks/);
 assert.match(privateDenyMigration, /ON private\.rate_limit_buckets/);
 assert.match(privateDenyMigration, /ON private\.settlements/);
 assert.match(privateDenyMigration, /FOR ALL[\s\S]*?TO anon, authenticated[\s\S]*?USING \(false\)[\s\S]*?WITH CHECK \(false\)/);
-assert.match(databaseTypes, /p_workspace_id: string \| null/);
+assert.match(firstWorkspaceRlsMigration, /CREATE OR REPLACE FUNCTION private\\.is_current_user_workspace_creator/);
+assert.match(firstWorkspaceRlsMigration, /SECURITY DEFINER/);
+assert.match(firstWorkspaceRlsMigration, /DROP POLICY IF EXISTS workspace_members_insert/);
+assert.match(firstWorkspaceRlsMigration, /private\\.is_current_user_workspace_creator\\(workspace_id\\)/);
+assert.doesNotMatch(firstWorkspaceRlsMigration, /CREATE POLICY workspace_select_created_by_self/);
+assert.match(databaseTypes, /p_workspace_id: string \\| null/);
+
+assert.match(
+  firstWorkspaceRlsMigration,
+  /v_workspace_id := extensions\\.gen_random_uuid\\(\\);[\\s\\S]*INSERT INTO public\\.workspaces \\(id, name, user_id, created_by\\)/
+);
+assert.doesNotMatch(firstWorkspaceRlsMigration, /RETURNING id INTO v_workspace_id/);
 
 console.log("stage16 activation contract: OK");
