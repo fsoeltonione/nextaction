@@ -251,6 +251,15 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.workspace_members WHERE user_id = auth.uid() AND workspace_id = p_workspace_id) THEN
     RAISE EXCEPTION 'workspace not authorized' USING ERRCODE = '42501';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.workspace_capabilities wc
+    WHERE wc.workspace_id = p_workspace_id
+      AND wc.capability = 'reach_customers'
+      AND wc.status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'reach customers capability not selected' USING ERRCODE = '42501';
+  END IF;
   PERFORM set_config('nextaction.workspace_id', p_workspace_id::text, true);
   RETURN QUERY SELECT * FROM public.create_offer_activation(p_title, p_description, p_cta_label, p_destination_url, p_moment_ids);
 END;
