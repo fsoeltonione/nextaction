@@ -141,7 +141,8 @@ function OnboardingContent() {
       setDraft(nextDraft);
       setUrlInput(nextDraft.url);
       savePending(nextDraft.url, nextDraft);
-      router.replace("/onboarding?url=" + encodeURIComponent(nextDraft.url));
+      const nextPath = "/onboarding?url=" + encodeURIComponent(nextDraft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "");
+      router.replace(nextPath);
       setState((current) => current ? { ...current, step: "product_understanding" } : current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Product analysis failed.");
@@ -209,7 +210,11 @@ function OnboardingContent() {
     setSaving(true); setError(null); savePending(draft.url, draft);
     try {
       const response = await fetch("/api/products/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: selectedWorkspaceId, url: draft.url, name: draft.name, description: draft.description, moments: draft.moments.map((moment) => ({ key: moment.key.trim(), label: moment.label.trim(), description: moment.description.trim() })) }) });
-      if (response.status === 401) { router.push("/login?url=" + encodeURIComponent(draft.url)); return; }
+      if (response.status === 401) {
+        const loginPath = "/login?url=" + encodeURIComponent(draft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "");
+        router.push(loginPath);
+        return;
+      }
       if (!response.ok) throw new Error(await readApiError(response, "Unable to confirm the product."));
       clearPending();
       setDraft(null);
