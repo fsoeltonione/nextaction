@@ -296,6 +296,11 @@ workflows:
       - stage16_activation_contract:
           requires:
             - quality
+      - analysis_provider_smoke:
+          context:
+            - nextaction-staging
+          requires:
+            - quality
       - cloudflare_compatibility:
           requires:
             - quality
