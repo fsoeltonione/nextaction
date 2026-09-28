@@ -201,6 +201,16 @@ BEGIN
   END IF;
   IF v_workspace_id IS NULL THEN RAISE EXCEPTION 'workspace not found' USING ERRCODE = 'P0002'; END IF;
 
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.workspace_capabilities wc
+    WHERE wc.workspace_id = v_workspace_id
+      AND wc.capability = 'reach_customers'
+      AND wc.status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'reach customers capability not selected' USING ERRCODE = '42501';
+  END IF;
+
   SELECT count(*), array_agg(m.moment_key ORDER BY m.moment_key) INTO v_moment_count, v_target_keys
   FROM public.moments m JOIN public.products p ON p.id = m.product_id
   WHERE m.id = ANY(p_moment_ids) AND p.workspace_id = v_workspace_id AND m.status = 'active';
