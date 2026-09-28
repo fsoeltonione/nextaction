@@ -7,33 +7,31 @@ export async function GET(request: Request) {
   const requestId = createRequestId();
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = safeInternalRedirect(
-    requestUrl.searchParams.get("next"),
-    "/dashboard",
-  );
+  const safeNext = safeInternalRedirect(requestUrl.searchParams.get("next"), "/dashboard");
+  const safeNextUrl = new URL(safeNext, requestUrl.origin);
+  const pendingUrl = safeNextUrl.searchParams.get("url");
+  const pendingWorkspaceId = safeNextUrl.searchParams.get("workspace_id");
 
-  if (!code) {
+  function authFailure() {
     const errorUrl = new URL("/login", requestUrl.origin);
+    if (pendingUrl) errorUrl.searchParams.set("url", pendingUrl);
+    if (pendingWorkspaceId) errorUrl.searchParams.set("workspace_id", pendingWorkspaceId);
     errorUrl.searchParams.set("error", "auth_failed");
     errorUrl.searchParams.set("request_id", requestId);
     return NextResponse.redirect(errorUrl);
   }
 
+  if (!code) return authFailure();
+
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-
     if (!error) {
-      const redirectUrl = new URL(next, requestUrl.origin);
-      return NextResponse.redirect(redirectUrl);
+      return NextResponse.redirect(new URL(safeNext, requestUrl.origin));
     }
   } catch (error) {
     console.error("Auth callback failed", { requestId, error });
   }
 
-  const errorUrl = new URL("/login", requestUrl.origin);
-  errorUrl.searchParams.set("error", "auth_failed");
-  errorUrl.searchParams.set("request_id", requestId);
-
-  return NextResponse.redirect(errorUrl);
+  return authFailure();
 }

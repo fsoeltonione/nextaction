@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Sparkles, Code2, LogOut, Plus, X, Zap, Target, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -31,31 +31,61 @@ function DashboardContent() {
     moment_ids: [] as string[],
   });
   const [savingOffer, setSavingOffer] = useState(false);
+  const [workspaceOptions, setWorkspaceOptions] = useState<string[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(searchParams.get("workspace_id"));
+  const [workspaceSelectionRequired, setWorkspaceSelectionRequired] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   useEffect(() => {
     async function loadData() {
+      setError(null);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      const { data: membership, error: membershipError } = await supabase
+      const { data: memberships, error: membershipError } = await supabase
         .from('workspace_members')
         .select('workspace_id')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
       if (membershipError) {
+        setError("Unable to load workspace context.");
         setLoading(false);
         return;
       }
 
-      if (!membership) { setLoading(false); return; }
+      const ids = (memberships ?? []).map((membership) => membership.workspace_id);
+      setWorkspaceOptions(ids);
 
-      const currentWorkspaceId = membership.workspace_id;
+      const requestedWorkspaceId = searchParams.get("workspace_id");
+      if (requestedWorkspaceId) {
+        if (!ids.includes(requestedWorkspaceId)) {
+          setError("You are not authorized for the selected workspace.");
+          setWorkspaceSelectionRequired(ids.length > 1);
+          setLoading(false);
+          return;
+        }
+        setSelectedWorkspaceId(requestedWorkspaceId);
+        setWorkspaceSelectionRequired(false);
+      } else if (ids.length === 1) {
+        setSelectedWorkspaceId(ids[0]);
+        setWorkspaceSelectionRequired(false);
+      } else if (ids.length > 1) {
+        setSelectedWorkspaceId(null);
+        setWorkspaceSelectionRequired(true);
+        setLoading(false);
+        return;
+      } else {
+        setSelectedWorkspaceId(null);
+        setWorkspaceSelectionRequired(false);
+        setLoading(false);
+        return;
+      }
+
+      const currentWorkspaceId = requestedWorkspaceId ?? ids[0];
       const [productsResult, offersResult, offerMomentLinksResult] = await Promise.all([
         supabase
           .from('products')
@@ -89,7 +119,7 @@ function DashboardContent() {
       setLoading(false);
     }
     loadData();
-  }, [router, supabase]);
+  }, [router, searchParams, supabase]);
 
   // Gather all moments from all products for the offer targeting
   const allMoments = products.flatMap((product) => product.moments);
@@ -97,21 +127,29 @@ function DashboardContent() {
 
   const handleCreateOffer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedWorkspaceId) {
+      setError("Select a workspace before creating an offer.");
+      return;
+    }
     setSavingOffer(true);
+    setError(null);
     try {
       const res = await fetch('/api/offers/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(offerForm),
+        body: JSON.stringify({ ...offerForm, workspace_id: selectedWorkspaceId }),
       });
       if (res.ok) {
         const { offer } = (await res.json()) as { offer: Offer };
         setOffers(prev => [
-          { ...offer, target_moment_ids: offer.target_moments ?? [] },
+          { ...offer, target_moment_ids: [...offerForm.moment_ids] },
           ...prev,
         ]);
         setShowCreateOffer(false);
         setOfferForm({ title: '', description: '', cta_label: 'Learn More', destination_url: '', moment_ids: [] });
+      } else {
+        const body = await res.json().catch(() => null);
+        setError(body?.error?.message ?? "Unable to create the offer.");
       }
     } finally {
       setSavingOffer(false);
@@ -156,6 +194,35 @@ function DashboardContent() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-8 py-12">
+        {workspaceOptions.length > 1 && (
+          <div className="mb-8 rounded-2xl border border-neutral-800 bg-neutral-900 p-4">
+            <label className="block text-sm font-medium text-neutral-300 mb-2">Workspace</label>
+            <select
+              value={selectedWorkspaceId ?? ""}
+              onChange={(event) => {
+                const id = event.target.value || null;
+                if (!id) {
+                  setSelectedWorkspaceId(null);
+                  setWorkspaceSelectionRequired(true);
+                  return;
+                }
+                router.replace("/dashboard?workspace_id=" + encodeURIComponent(id));
+              }}
+              className="w-full max-w-xl rounded-xl bg-neutral-950 border border-neutral-700 px-4 py-3 text-white"
+            >
+              <option value="">Select a workspace</option>
+              {workspaceOptions.map((id) => <option key={id} value={id}>{id}</option>)}
+            </select>
+          </div>
+        )}
+        {error && <div className="mb-6 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div>}
+        {workspaceSelectionRequired && !selectedWorkspaceId ? (
+          <div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8">
+            <h1 className="text-2xl font-semibold text-white">Select a workspace</h1>
+            <p className="mt-2 text-neutral-400">Choose the workspace you want to manage before continuing.</p>
+          </div>
+        ) : (
+        <>
         {/* Tabs */}
         <div className="flex items-center gap-2 mb-10 border-b border-neutral-800">
           <button
@@ -180,7 +247,7 @@ function DashboardContent() {
                 <h1 className="text-3xl font-bold text-white mb-1">Your Products</h1>
                 <p className="text-neutral-400 text-sm">Install the tracking snippet to start monetizing moments.</p>
               </div>
-              <Link href="/onboarding" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-semibold transition-colors">
+              <Link href={selectedWorkspaceId ? "/onboarding?workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "/onboarding"} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-semibold transition-colors">
                 <Plus className="w-4 h-4" /> Add Product
               </Link>
             </div>
@@ -290,6 +357,8 @@ function DashboardContent() {
               </div>
             )}
           </div>
+        )}
+        </>
         )}
       </main>
 
