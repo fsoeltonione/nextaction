@@ -142,7 +142,7 @@ function DashboardContent() {
       if (res.ok) {
         const { offer } = (await res.json()) as { offer: Offer };
         setOffers(prev => [
-          { ...offer, target_moment_ids: offer.target_moments ?? [] },
+          { ...offer, target_moment_ids: [...offerForm.moment_ids] },
           ...prev,
         ]);
         setShowCreateOffer(false);
