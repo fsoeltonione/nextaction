@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, workspaceScopeMigration, initialWorkspaceContextFix, databaseTypes] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, workspaceScopeMigration, initialWorkspaceContextFix, firstWorkspaceBootstrapRlsMigration, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -22,6 +22,7 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("supabase/migrations/20260928180500_stage_16_private_table_deny_policies.sql"),
   read("supabase/migrations/20260928183000_stage_16_v2_workspace_scope_qualification.sql"),
   read("supabase/migrations/20260928185000_stage_16_v2_initial_workspace_context_fix.sql"),
+  read("supabase/migrations/20260928203000_stage_16_first_workspace_bootstrap_rls.sql"),
   read("src/lib/stage16-database.types.ts"),
 ]);
 
@@ -81,6 +82,9 @@ assert.match(initialWorkspaceMigration, /p_workspace_id UUID/);
 assert.match(initialWorkspaceMigration, /p_workspace_id IS NULL/);
 assert.match(initialWorkspaceMigration, /v_membership_count > 0/);
 assert.match(initialWorkspaceMigration, /confirm_product_activation\(/);
+assert.match(firstWorkspaceBootstrapRlsMigration, /workspace_select_member/);
+assert.match(firstWorkspaceBootstrapRlsMigration, /workspaces\.created_by = \(select auth\.uid\(\)\)/i);
+assert.match(firstWorkspaceBootstrapRlsMigration, /DROP POLICY IF EXISTS workspace_select_member/);
 assert.match(privilegeMigration, /REVOKE ALL ON FUNCTION public\.confirm_product_activation_v2/);
 assert.match(privilegeMigration, /FROM PUBLIC, anon/);
 assert.match(privilegeMigration, /GRANT EXECUTE ON FUNCTION public\.confirm_product_activation_v2[\s\S]*?TO authenticated/);
