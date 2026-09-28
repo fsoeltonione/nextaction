@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, workspaceScopeMigration, initialWorkspaceContextFix, firstWorkspaceRlsMigration, databaseTypes] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, workspaceScopeMigration, initialWorkspaceContextFix, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -23,6 +23,7 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("supabase/migrations/20260928183000_stage_16_v2_workspace_scope_qualification.sql"),
   read("supabase/migrations/20260928185000_stage_16_v2_initial_workspace_context_fix.sql"),
   read("supabase/migrations/20260928193000_stage_16_first_workspace_rls_bootstrap.sql"),
+  read("supabase/migrations/20260928194500_stage_16_first_workspace_insert_returning_rls.sql"),
   read("src/lib/stage16-database.types.ts"),
 ]);
 
@@ -109,9 +110,9 @@ assert.doesNotMatch(firstWorkspaceRlsMigration, /CREATE POLICY workspace_select_
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
 assert.match(
-  firstWorkspaceRlsMigration,
+  firstWorkspaceReturningRlsMigration,
   /v_workspace_id := extensions\.gen_random_uuid\(\);[\s\S]*INSERT INTO public\.workspaces \(id, name, user_id, created_by\)/
 );
-assert.doesNotMatch(firstWorkspaceRlsMigration, /RETURNING id INTO v_workspace_id/);
+assert.doesNotMatch(firstWorkspaceReturningRlsMigration, /RETURNING id INTO v_workspace_id/);
 
 console.log("stage16 activation contract: OK");
