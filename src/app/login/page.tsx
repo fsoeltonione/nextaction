@@ -47,7 +47,7 @@ function LoginContent() {
       "next",
       pendingUrl
         ? "/onboarding?url=" + encodeURIComponent(pendingUrl)
-        : "/onboarding",
+        : "/dashboard",
     );
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
