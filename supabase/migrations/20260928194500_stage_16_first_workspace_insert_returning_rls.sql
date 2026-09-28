@@ -26,6 +26,10 @@ DECLARE
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501'; END IF;
 
+  -- Serialize first-workspace bootstrap per user. This prevents two concurrent
+  -- confirmations from both observing zero memberships and creating two workspaces.
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text, 0));
+
   IF p_canonical_url IS NULL OR length(trim(p_canonical_url)) > 2048
      OR p_canonical_url !~* '^https?://[^/?#]+(?:/[^?#]*)?$' OR p_canonical_url ~ '[?#]' THEN
     RAISE EXCEPTION 'invalid canonical product URL' USING ERRCODE = '22023';
