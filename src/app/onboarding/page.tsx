@@ -75,6 +75,7 @@ function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialQueryUrl = searchParams.get("url") ?? "";
+  const initialWorkspaceId = searchParams.get("workspace_id");
   const restored = useMemo(() => restorePending(), []);
   const [urlInput, setUrlInput] = useState(initialQueryUrl || restored.url);
   const [draft, setDraft] = useState<ProductDraft | null>(restored.draft);
@@ -153,9 +154,9 @@ function OnboardingContent() {
     let active = true;
     // This effect synchronizes initial client state with the authenticated server state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadState().catch((err) => { if (active) setError(err instanceof Error ? err.message : "Unable to load activation state."); }).finally(() => { if (active) setLoading(false); });
+    void loadState(initialWorkspaceId).catch((err) => { if (active) setError(err instanceof Error ? err.message : "Unable to load activation state."); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [loadState]);
+  }, [initialWorkspaceId, loadState]);
 
   useEffect(() => {
     if (!urlInput || draft || analysisRunning || autoAnalysisUrlRef.current === urlInput) return;
