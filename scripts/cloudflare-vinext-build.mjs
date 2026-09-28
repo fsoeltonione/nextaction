@@ -10,6 +10,7 @@ const packages = [
   "react-server-dom-webpack@19.2.8",
   "@cloudflare/vite-plugin@1.54.11",
   "wrangler@4.139.0",
+  "typescript-eslint@8.70.1",
 ];
 
 function run(command, args, env = process.env) {
