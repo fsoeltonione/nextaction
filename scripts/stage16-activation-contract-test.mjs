@@ -126,8 +126,9 @@ assert.match(atomicIntegrationCredentialMigration, /SECURITY DEFINER/);
 assert.match(atomicIntegrationCredentialMigration, /private\.integration_secrets/);
 assert.match(atomicIntegrationCredentialMigration, /pg_advisory_xact_lock/);
 assert.match(atomicIntegrationCredentialMigration, /FOR UPDATE/);
-assert.match(atomicIntegrationCredentialMigration, /REVOKE ALL ON FUNCTION public\.provision_integration_credential_v2/);
-assert.match(atomicIntegrationCredentialMigration, /FROM PUBLIC, anon, authenticated/);
+assert.match(atomicIntegrationCredentialMigration, /REVOKE ALL ON FUNCTION public\.provision_integration_credential_v2[\s\S]*FROM PUBLIC/);
+assert.match(atomicIntegrationCredentialMigration, /REVOKE ALL ON FUNCTION public\.provision_integration_credential_v2[\s\S]*FROM anon/);
+assert.match(atomicIntegrationCredentialMigration, /REVOKE ALL ON FUNCTION public\.provision_integration_credential_v2[\s\S]*FROM authenticated/);
 assert.match(atomicIntegrationCredentialMigration, /GRANT EXECUTE ON FUNCTION public\.provision_integration_credential_v2[\s\S]*TO service_role/);
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
