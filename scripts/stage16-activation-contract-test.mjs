@@ -57,7 +57,7 @@ assert.match(state, /workspaces\.length === 1/);
 assert.match(state, /requestedWorkspaceId/);
 assert.match(confirm, /confirm_product_activation_v2/);
 assert.match(confirm, /workspaceId \|\| null/);
-assert.match(confirm, /workspace selection required/);
+assert.match(confirm, /workspace_selection_required/);
 assert.match(capabilities, /set_workspace_capabilities_v2/);
 assert.match(integrationCreate, /workspace_id/);
 assert.match(integrationVerify, /workspace_id/);
