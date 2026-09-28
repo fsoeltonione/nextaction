@@ -60,6 +60,8 @@ assert.match(migration, /confirm_product_activation_v2/);
 assert.match(migration, /set_workspace_capabilities_v2/);
 assert.match(migration, /create_offer_activation_v2/);
 assert.match(migration, /reach customers capability not selected/);
+assert.match(migration, /workspace_capabilities wc/);
+assert.match(dashboard, /target_moment_ids: \[\.\.\.offerForm\.moment_ids\]/);
 assert.match(initialWorkspaceMigration, /p_workspace_id UUID/);
 assert.match(initialWorkspaceMigration, /p_workspace_id IS NULL/);
 assert.match(initialWorkspaceMigration, /v_membership_count > 0/);
