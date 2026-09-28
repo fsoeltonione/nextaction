@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration] = await Promise.all([
+const [home, onboarding, callback, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, databaseTypes] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -13,6 +13,8 @@ const [home, onboarding, callback, state, confirm, capabilities, integrationCrea
   read("src/app/api/integrations/verify/route.ts"),
   read("src/app/api/offers/create/route.ts"),
   read("supabase/migrations/20260928053000_stage_16_activation_workspace_context.sql"),
+  read("supabase/migrations/20260928061500_stage_16_initial_workspace_creation.sql"),
+  read("src/lib/stage16-database.types.ts"),
 ]);
 
 assert.match(home, /\/onboarding\?url=/);
@@ -29,7 +31,8 @@ assert.match(state, /workspace_selection_required/);
 assert.match(state, /workspaces\.length === 1/);
 assert.match(state, /requestedWorkspaceId/);
 assert.match(confirm, /confirm_product_activation_v2/);
-assert.match(confirm, /workspace_id/);
+assert.match(confirm, /workspaceId \|\| null/);
+assert.match(confirm, /workspace selection required/);
 assert.match(capabilities, /set_workspace_capabilities_v2/);
 assert.match(integrationCreate, /workspace_id/);
 assert.match(integrationVerify, /workspace_id/);
@@ -38,5 +41,10 @@ assert.match(migration, /workspace selection required/);
 assert.match(migration, /confirm_product_activation_v2/);
 assert.match(migration, /set_workspace_capabilities_v2/);
 assert.match(migration, /create_offer_activation_v2/);
+assert.match(initialWorkspaceMigration, /p_workspace_id UUID/);
+assert.match(initialWorkspaceMigration, /p_workspace_id IS NULL/);
+assert.match(initialWorkspaceMigration, /v_membership_count > 0/);
+assert.match(initialWorkspaceMigration, /confirm_product_activation\(/);
+assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
 console.log("stage16 activation contract: OK");
