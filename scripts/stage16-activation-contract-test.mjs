@@ -37,7 +37,9 @@ assert.match(onboarding, /const \[hostname, setHostname\] = useState\(\(\) =>/);
 assert.match(onboarding, /const \[isValidUrl, setIsValidUrl\] = useState\(\(\) =>/);
 assert.match(onboarding, /function handleUrlChange\(value: string\)/);
 assert.match(onboarding, /normalizeProductUrl\(value\)/);
-assert.match(onboarding, /s2\.googleusercontent\.com\/s2\/favicons\?domain=/);
+assert.match(onboarding, /s2\.googleusercontent\.com\/s2\/favicons\?domain=/);assert.match(onboarding, /pointer-events-none absolute left-4/);
+assert.match(onboarding, /w-full rounded-2xl border bg-neutral-900 py-4 pl-12 pr-4/);
+
 assert.match(onboarding, /Enter a public HTTP or HTTPS SaaS URL\./);
 assert.match(onboarding, /disabled=\{!isValidUrl \|\| analysisRunning\}/);
 
