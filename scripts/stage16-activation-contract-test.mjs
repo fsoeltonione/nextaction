@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck, analysisRoute, analysisGrounding] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -28,6 +28,8 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("src/lib/stage16-database.types.ts"),
   read("scripts/cloudflare-vinext-build.mjs"),
   read("scripts/cloudflare-vinext-check.mjs"),
+  read("src/app/api/analyze/route.ts"),
+  read("src/lib/runtime/analysis-grounding.ts"),
 ]);
 
 assert.match(home, /\/onboarding\?url=/);
@@ -67,7 +69,12 @@ assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.png/);
 assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.svg/);
 assert.match(onboarding, /s2\.googleusercontent\.com\/s2\/favicons\?domain=/);
 assert.match(onboarding, /onError=\{\(\) => setFaviconAttempt/);
-assert.match(c, /analysis-grounding/);
+assert.match(analysisRoute, /validateGroundedSaaSAnalysis/);
+assert.match(analysisRoute, /product_not_understood/);
+assert.match(analysisGrounding, /product_type/);
+assert.match(analysisGrounding, /name_evidence/);
+assert.match(analysisGrounding, /evidence/);
+assert.match(analysisGrounding, /corpus\.includes/);
 
 assert.match(dashboard, /\/onboarding\?workspace_id=/);
 assert.match(dashboard, /\/onboarding\?workspace_id=.*&mode=add_product/);
