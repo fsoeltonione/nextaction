@@ -32,7 +32,15 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
 
 assert.match(home, /\/onboarding\?url=/);
 assert.doesNotMatch(home, /signInWithOAuth|router\.push\(["']\/login\?url=/);
-assert.match(onboarding, /\/api\/analyze/);
+assert.match(onboarding, /\/api\/analyze/);assert.match(onboarding, /import \{ normalizeProductUrl \} from "@\/lib\/url";/);
+assert.match(onboarding, /const \[hostname, setHostname\] = useState\(\(\) =>/);
+assert.match(onboarding, /const \[isValidUrl, setIsValidUrl\] = useState\(\(\) =>/);
+assert.match(onboarding, /function handleUrlChange\(value: string\)/);
+assert.match(onboarding, /normalizeProductUrl\(value\)/);
+assert.match(onboarding, /s2\.googleusercontent\.com\/s2\/favicons\?domain=/);
+assert.match(onboarding, /Enter a public HTTP or HTTPS SaaS URL\./);
+assert.match(onboarding, /disabled=\{!isValidUrl \|\| analysisRunning\}/);
+
 assert.match(onboarding, /response\.status === 401/);
 assert.match(onboarding, /sessionStorage/);
 assert.match(onboarding, /workspace_id/);
