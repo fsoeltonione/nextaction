@@ -1,5 +1,3 @@
-import { isRecord } from "./analysis-output.ts";
-
 export type AnalysisGroundingFailureReason =
   | "invalid_product_type"
   | "unsupported_product_analysis"
@@ -26,6 +24,10 @@ export class AnalysisGroundingError extends Error {
     this.code = code;
     this.index = index;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 const PRODUCT_TYPES = new Set(["saas", "not_saas", "unknown"]);
