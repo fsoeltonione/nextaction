@@ -21,6 +21,7 @@ const valid = {
   url: "https://carrd.com",
   name: "Carrd",
   description: "A site builder for creating one-page websites.",
+  product_evidence: "Create one-page websites with Carrd.",
   moments: [
     {
       key: "site_created",
@@ -32,7 +33,7 @@ const valid = {
       id: "publish-site",
       label: "Site Published",
       description: "A site is published to a live URL.",
-      evidence: "Publish your site",
+      evidence: "Publish your site to the web",
     },
   ],
 };
