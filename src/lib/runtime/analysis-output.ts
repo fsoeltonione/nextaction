@@ -29,7 +29,11 @@ export type AnalysisOutputFailureReason =
   | "name_missing"
   | "name_too_long"
   | "description_missing"
-  | "description_too_long";
+  | "description_too_long"
+  | "insufficient_evidence"
+  | "ungrounded_moment"
+  | "ungrounded_name"
+  | "ungrounded_description";
 
 export class AnalysisOutputValidationError extends Error {
   readonly reason: AnalysisOutputFailureReason;
@@ -53,6 +57,29 @@ const MOMENTS_KEYS = ["moments", "key_moments", "commercial_moments"];
 const MOMENT_KEY_KEYS = ["key", "id", "moment_key", "slug"];
 const MOMENT_LABEL_KEYS = ["label", "name", "title", "moment"];
 const MOMENT_DESCRIPTION_KEYS = ["description", "summary", "details"];
+
+const GROUNDING_STOP_WORDS = new Set([
+  "about", "after", "also", "with", "your", "this", "that", "from", "into",
+  "than", "then", "they", "their", "there", "where", "when", "what", "which",
+  "have", "has", "had", "will", "would", "could", "should", "using", "user",
+  "users", "page", "site", "product", "service", "application", "system",
+  "online", "public", "private", "more", "most", "some", "such", "only",
+  "very", "here", "over", "under", "between", "through", "these", "those",
+  "next", "action", "key", "moment", "commercial", "relevant",
+]);
+
+function groundingTokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 3 && !GROUNDING_STOP_WORDS.has(token));
+}
+
+function hasGroundingOverlap(candidate: string, evidenceText: string): boolean {
+  const evidence = new Set(groundingTokens(evidenceText));
+  return groundingTokens(candidate).some((token) => evidence.has(token));
+}
 
 function firstString(
   record: Record<string, unknown>,
@@ -163,18 +190,20 @@ function normalizeRoot(value: unknown): Record<string, unknown> {
   return value;
 }
 
-function derivedDescription(moments: AnalysisMoment[]): string {
-  const labels = moments.slice(0, 3).map((moment) => moment.label);
-  if (labels.length === 0) return "";
-
-  return `A SaaS product with key moments including ${labels.join(", ")}.`;
-}
-
 export function parseAnalysisOutput(
   value: unknown,
   fallback?: { name?: string; description?: string },
+  evidenceText = "",
 ): AnalysisResult {
   const root = normalizeRoot(value);
+
+  if (root.insufficient_evidence === true) {
+    throw new AnalysisOutputValidationError(
+      "insufficient_evidence",
+      "The public product page did not provide enough evidence for a reliable Product Understanding.",
+    );
+  }
+
   const rawMoments = normalizeRawMoments(root);
 
   if (rawMoments.length < 1) {
@@ -255,6 +284,17 @@ export function parseAnalysisOutput(
       );
     }
 
+    if (evidenceText && !hasGroundingOverlap(
+      [normalizedLabel, description ?? ""].join(" "),
+      evidenceText,
+    )) {
+      throw new AnalysisOutputValidationError(
+        "ungrounded_moment",
+        "A Moment was not grounded in the supplied product evidence.",
+        index,
+      );
+    }
+
     moments.push({
       key,
       label: normalizedLabel,
@@ -274,6 +314,13 @@ export function parseAnalysisOutput(
   const fallbackName = fallback?.name?.trim() ?? "";
   const name = (providerName || fallbackName).slice(0, 160);
 
+  if (evidenceText && providerName && !hasGroundingOverlap(providerName, evidenceText)) {
+    throw new AnalysisOutputValidationError(
+      "ungrounded_name",
+      "The provider product name was not grounded in the supplied product evidence.",
+    );
+  }
+
   if (!name) {
     throw new AnalysisOutputValidationError(
       "name_missing",
@@ -290,8 +337,19 @@ export function parseAnalysisOutput(
 
   const providerDescription = firstString(root, DESCRIPTION_KEYS);
   const fallbackDescription = fallback?.description?.trim() ?? "";
-  const generatedDescription =
-    providerDescription || fallbackDescription || derivedDescription(moments);
+
+  if (
+    evidenceText &&
+    providerDescription &&
+    !hasGroundingOverlap(providerDescription, evidenceText)
+  ) {
+    throw new AnalysisOutputValidationError(
+      "ungrounded_description",
+      "The provider product description was not grounded in the supplied product evidence.",
+    );
+  }
+
+  const generatedDescription = providerDescription || fallbackDescription;
   const description = generatedDescription.slice(0, 600);
 
   if (!description) {
