@@ -45,6 +45,9 @@ assert.match(onboarding, /w-full rounded-2xl border bg-neutral-900 py-4 pl-12 pr
 assert.match(onboarding, /Enter a public HTTP or HTTPS SaaS URL\./);
 assert.match(onboarding, /disabled=\{!isValidUrl \|\| analysisRunning\}/);
 assert.match(onboarding, /faviconCandidateIndex/);
+assert.match(onboarding, /faviconUnavailable/);
+assert.match(onboarding, /setFaviconUnavailable\(true\)/);
+
 assert.match(onboarding, /https:\/\/www\.google\.com\/s2\/favicons\?domain_url=/);
 assert.match(onboarding, /\/favicon\.ico/);
 assert.match(onboarding, /\/favicon\.png/);
