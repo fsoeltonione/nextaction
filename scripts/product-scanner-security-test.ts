@@ -69,6 +69,35 @@ test("DNS resolver classifies no-record and transient failures", async () => {
   );
 });
 
+test("scanner retries a transient non-public DNS answer before fetch", async () => {
+  let resolveCalls = 0;
+  let fetchCalls = 0;
+
+  const transientResolver = async () => {
+    resolveCalls += 1;
+    return resolveCalls === 1 ? ["10.0.0.1"] : ["93.184.216.34"];
+  };
+
+  const result = await scanProductUrl(
+    "https://example.com",
+    async () => {
+      fetchCalls += 1;
+      return new Response(
+        '<html><title>Example</title><body>OK</body></html>',
+        {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        },
+      );
+    },
+    transientResolver,
+  );
+
+  assert.equal(result.title, "Example");
+  assert.equal(resolveCalls, 3);
+  assert.equal(fetchCalls, 1);
+});
+
 test("scanner rejects non-public DNS answers before fetch", async () => {
   let fetchCalled = false;
 
