@@ -26,14 +26,61 @@ const valid = {
       key: "site_created",
       label: "Site Created",
       description: "A new site has been created.",
+      evidence: "Create one-page websites",
     },
     {
       id: "publish-site",
       label: "Site Published",
       description: "A site is published to a live URL.",
+      evidence: "Publish your site",
     },
   ],
 };
+
+test("accepts Moments with evidence grounded in a supplied source snapshot", () => {
+  const result = parseAnalysisOutput(valid, undefined, {
+    evidenceText: "Use Carrd to Create one-page websites. Publish your site when ready.",
+  });
+  assert.equal(result.moments.length, 2);
+});
+
+test("rejects a Moment whose evidence is missing when grounding is required", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput(
+        {
+          name: "Carrd",
+          description: "Site builder",
+          moments: [{ key: "site_created", label: "Site Created" }],
+        },
+        undefined,
+        { evidenceText: "Create one-page websites." },
+      ),
+    "moment_evidence_missing",
+  );
+});
+
+test("rejects a Moment whose evidence is not present in the source snapshot", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput(
+        {
+          name: "Carrd",
+          description: "Site builder",
+          moments: [
+            {
+              key: "site_created",
+              label: "Site Created",
+              evidence: "Invoice automation for teams",
+            },
+          ],
+        },
+        undefined,
+        { evidenceText: "Create one-page websites." },
+      ),
+    "moment_evidence_not_found",
+  );
+});
 
 test("normalizes Moment ids into runtime-safe snake_case keys", () => {
   const result = parseAnalysisOutput(valid);
