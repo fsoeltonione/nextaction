@@ -222,7 +222,7 @@ test("rejects ungrounded Moments when evidence is supplied", () => {
           ],
         },
         undefined,
-        "Example site builder for creating websites.",
+        "Example website builder for creating websites.",
       ),
     "ungrounded_moment",
   );
@@ -237,8 +237,8 @@ test("rejects an ungrounded provider description when evidence is supplied", () 
           description: "An airline ticket marketplace with reward miles.",
           moments: [
             {
-              label: "Site Created",
-              description: "A new site is created.",
+              label: "Website Created",
+              description: "A new website is created.",
             },
           ],
         },
