@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck, productScanner, analysisOutput] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -28,6 +28,8 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("src/lib/stage16-database.types.ts"),
   read("scripts/cloudflare-vinext-build.mjs"),
   read("scripts/cloudflare-vinext-check.mjs"),
+  read("src/lib/product-scanner.ts"),
+  read("src/lib/runtime/analysis-output.ts"),
 ]);
 
 assert.match(home, /\/onboarding\?url=/);
@@ -42,6 +44,19 @@ assert.match(onboarding, /w-full rounded-2xl border bg-neutral-900 py-4 pl-12 pr
 
 assert.match(onboarding, /Enter a public HTTP or HTTPS SaaS URL\./);
 assert.match(onboarding, /disabled=\{!isValidUrl \|\| analysisRunning\}/);
+assert.match(onboarding, /faviconCandidateIndex/);
+assert.match(onboarding, /https:\/\/www\.google\.com\/s2\/favicons\?domain_url=/);
+assert.match(onboarding, /\/favicon\.ico/);
+assert.match(onboarding, /\/favicon\.png/);
+assert.match(productScanner, /faviconUrl/);
+assert.match(productScanner, /<link[^>]+rel=/);
+assert.match(analysisOutput, /insufficient_evidence/);
+assert.match(analysisOutput, /ungrounded_moment/);
+assert.match(analysisOutput, /ungrounded_name/);
+assert.match(analysisOutput, /ungrounded_description/);
+assert.match(analysisOutput, /evidenceText/);
+assert.match(onboarding, /favicon_url/);
+
 
 assert.match(onboarding, /response\.status === 401/);
 assert.match(onboarding, /sessionStorage/);
