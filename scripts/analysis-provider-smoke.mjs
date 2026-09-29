@@ -1,6 +1,7 @@
 import { parseAnalysisProviderResponse } from "../src/lib/runtime/analysis-provider-response.ts";
 import { parseAnalysisOutput } from "../src/lib/runtime/analysis-output.ts";
 import { parseAnalysisProviderContent } from "../src/lib/runtime/analysis-provider-content.ts";
+import { validateGroundedSaaSAnalysis } from "../src/lib/runtime/analysis-grounding.ts";
 
 const apiKey = process.env.ANALYSIS_API_KEY?.trim();
 const baseUrl = process.env.ANALYSIS_BASE_URL?.trim();
@@ -225,12 +226,23 @@ try {
   }
 
   try {
+    validateGroundedSaaSAnalysis(
+      parsedContent,
+      [
+        "Page title: Synthetic SaaS",
+        "Meta description: A small fictional SaaS used for a contract test.",
+        "Synthetic SaaS helps teams create and send invoices.",
+        "Users can start a free trial and track payment status.",
+        "Product name: Synthetic SaaS",
+      ].join("\n"),
+    );
+
     const analysis = parseAnalysisOutput(parsedContent, {
       name: "Synthetic SaaS",
       description: "Synthetic product used for provider contract validation.",
     });
 
-    if (analysis.moments.length < 1 || analysis.moments.length > 10) {
+    if (analysis.moments.length < 3 || analysis.moments.length > 8) {
       throw new Error("unexpected Moment count");
     }
   } catch (error) {
