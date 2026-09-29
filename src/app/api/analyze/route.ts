@@ -285,6 +285,44 @@ export async function POST(request: Request) {
       );
     }
 
+    try {
+      validateGroundedSaaSAnalysis(
+        parsedOutput,
+        [
+          "Page title: " + scan.title,
+          "Meta description: " + scan.description,
+          "Final URL after validated redirects: " + scan.finalUrl,
+          scan.text,
+        ].join("\n"),
+      );
+    } catch (error) {
+      if (error instanceof AnalysisGroundingError) {
+        if (error.code === "unsupported_product_analysis") {
+          throw new HttpError(
+            422,
+            "product_not_understood",
+            error.message,
+          );
+        }
+
+        console.error("Analysis provider grounding contract failed", {
+          requestId,
+          validation_reason: error.code,
+        });
+        throw new HttpError(
+          502,
+          "invalid_provider_analysis",
+          "Analysis provider returned an invalid grounded analysis result.",
+        );
+      }
+
+      throw new HttpError(
+        502,
+        "invalid_provider_analysis",
+        "Analysis provider returned an invalid grounded analysis result.",
+      );
+    }
+
     let analysis: AnalysisResult;
     try {
       analysis = parseAnalysisOutput(parsedOutput, {
