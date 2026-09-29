@@ -5,7 +5,7 @@ import { isBlockedHostname, normalizeProductUrl } from "./url.ts";
 export const PRODUCT_SCANNER_LIMITS = Object.freeze({
   maxRedirects: 3,
   timeoutMs: 8_000,
-  maxResponseBytes: 256 * 1024,
+  maxResponseBytes: 1024 * 1024,
   maxTextChars: 16_000,
   maxUrlLength: 2_048,
 });
@@ -23,6 +23,7 @@ export type ProductScanResult = {
   title: string;
   description: string;
   text: string;
+  faviconUrl: string | null;
 };
 
 export class ProductScannerError extends Error {
@@ -236,8 +237,29 @@ async function readLimitedBody(
   return new TextDecoder().decode(merged);
 }
 
-function extractHtmlSignals(html: string) {
+function extractHtmlSignals(html: string, baseUrl: string) {
   const bounded = html.slice(0, PRODUCT_SCANNER_LIMITS.maxTextChars * 3);
+
+  const faviconHref =
+    bounded.match(
+      /<link[^>]+rel=["'][^"']*(?:icon|shortcut icon)[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i,
+    )?.[1] ??
+    bounded.match(
+      /<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*(?:icon|shortcut icon)[^"']*["'][^>]*>/i,
+    )?.[1] ??
+    null;
+
+  let faviconUrl: string | null = null;
+  if (faviconHref) {
+    try {
+      const candidate = new URL(faviconHref, baseUrl);
+      if ((candidate.protocol === "https:" || candidate.protocol === "http:") && !isIpAddress(candidate.hostname) && !isBlockedHostname(candidate.hostname)) {
+        faviconUrl = candidate.toString();
+      }
+    } catch {
+      faviconUrl = null;
+    }
+  }
 
   const title = (
     bounded.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ""
@@ -269,7 +291,7 @@ function extractHtmlSignals(html: string) {
     .trim()
     .slice(0, PRODUCT_SCANNER_LIMITS.maxTextChars);
 
-  return { title, description, text };
+  return { title, description, text, faviconUrl };
 }
 
 function isHttpsDowngrade(from: URL, to: URL): boolean {
@@ -429,7 +451,7 @@ export async function scanProductUrl(
         response,
         PRODUCT_SCANNER_LIMITS.maxResponseBytes,
       );
-      const signals = extractHtmlSignals(body);
+      const signals = extractHtmlSignals(body, currentValue);
 
       return {
         finalUrl: currentValue,
