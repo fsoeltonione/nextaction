@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, analyzeRoute, productScanner, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -11,6 +11,8 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("src/app/globals.css"),
   read(".circleci/config.yml"),
   read("src/app/api/onboarding/state/route.ts"),
+  read("src/app/api/analyze/route.ts"),
+  read("src/lib/product-scanner.ts"),
   read("src/app/api/products/confirm/route.ts"),
   read("src/app/api/workspaces/capabilities/route.ts"),
   read("src/app/api/integrations/create/route.ts"),
@@ -46,6 +48,11 @@ assert.match(onboarding, /w-full rounded-2xl border bg-neutral-900 py-4 pl-12 pr
 
 assert.match(onboarding, /Enter a public HTTP or HTTPS SaaS URL\./);
 assert.match(onboarding, /disabled=\{!isValidUrl \|\| analysisRunning\}/);
+assert.match(analyzeRoute, /insufficient_product_evidence/);
+assert.match(analyzeRoute, /product_evidence/);
+assert.match(analyzeRoute, /Every Moment MUST contain evidence/);
+assert.match(analyzeRoute, /evidenceText/);
+
 assert.match(onboarding, /faviconSource/);
 assert.match(onboarding, /https:\/\/\" \+ hostname \+ "\/favicon\.ico"/);
 assert.match(onboarding, /setFaviconSource\("google"\)/);
@@ -180,6 +187,7 @@ assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.conf
 assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.set_workspace_capabilities\(/);
 assert.match(readOnlyControlPlaneMigration, /REVOKE ALL ON FUNCTION public\.create_offer_activation\(/);
 assert.match(cloudflareBuild, /typescript-eslint@8\.70\.1/);
+assert.match(productScanner, /maxResponseBytes: 1024 \* 1024/);
 assert.match(cloudflareCheck, /typescript-eslint@8\.70\.1/);
 assert.match(databaseTypes, /p_workspace_id: string \| null/);
 
