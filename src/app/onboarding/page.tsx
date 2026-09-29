@@ -168,10 +168,6 @@ function OnboardingContent() {
   }, [draft, isAddProductMode, router, selectedWorkspaceId]);
 
   useEffect(() => {
-    setFaviconSource("google");
-  }, [hostname]);
-
-  useEffect(() => {
     let active = true;
     // This effect synchronizes initial client state with the authenticated server state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -198,6 +194,7 @@ function OnboardingContent() {
 
   function handleUrlChange(value: string) {
     setUrlInput(value);
+    setFaviconSource("google");
     try {
       const normalized = normalizeProductUrl(value);
       setHostname(normalized.hostname);
