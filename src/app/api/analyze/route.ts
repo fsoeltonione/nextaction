@@ -211,7 +211,8 @@ export async function POST(request: Request) {
                 "You are the NextAction product analyst.",
                 "Return exactly one JSON object. Do not return Markdown, code fences, prose, arrays, or analysis wrappers.",
                 "If the page does not clearly provide enough evidence of a SaaS product and at least 3 distinct commercially relevant Moments, return exactly: {\"status\":\"insufficient_evidence\",\"reason\":\"...\"}.",
-                "For a valid analysis, the JSON object must contain: name (string), description (string), moments (array).",
+                "For a valid analysis, the JSON object must contain: name (string), description (string), product_evidence (string), moments (array).",
+                "product_evidence MUST be a short exact phrase copied verbatim from the supplied page snapshot that directly supports the product identity/description.",
                 "moments must contain 3 to 8 commercially relevant Moment objects.",
                 "Every Moment MUST contain evidence (string): a short exact phrase copied verbatim from the supplied page snapshot that directly supports that Moment.",
                 "Every Moment label and description must be conservative and directly grounded in the supplied snapshot; never invent features, workflows, pricing, customers, integrations, or capabilities that are not evidenced.",
@@ -365,6 +366,14 @@ export async function POST(request: Request) {
         errorMessage,
       );
     }
+    if (normalizedAnalysis.moments.length < 3 || normalizedAnalysis.moments.length > 8) {
+      throw new HttpError(
+        502,
+        "invalid_provider_analysis",
+        "Analysis provider did not return the required number of grounded Moments.",
+      );
+    }
+
     const normalizedAnalysis = {
       ...analysis,
       url: normalized.value,
