@@ -4,6 +4,10 @@ import {
   parseAnalysisOutput,
   AnalysisOutputValidationError,
 } from "../src/lib/runtime/analysis-output.ts";
+import {
+  AnalysisGroundingError,
+  validateGroundedSaaSAnalysis,
+} from "../src/lib/runtime/analysis-grounding.ts";
 
 function assertValidationFailure(
   fn: () => unknown,
@@ -198,3 +202,70 @@ test("derives a compact description when the provider omits one", () => {
   assert.match(result.description, /Payment Received/);
 });
 
+
+const groundingSnapshot = [
+  "Page title: Acme Invoice",
+  "Meta description: Create and send professional invoices online.",
+  "Create your invoice in minutes.",
+  "Send invoices to customers and track payment status.",
+  "Start your free trial today.",
+].join("\n");
+
+const groundedAnalysis = {
+  product_type: "saas",
+  name: "Acme Invoice",
+  name_evidence: "Page title: Acme Invoice",
+  description: "Create and send professional invoices online.",
+  moments: [
+    {
+      key: "invoice_created",
+      label: "Invoice Created",
+      evidence: "Create your invoice in minutes.",
+    },
+    {
+      key: "invoice_sent",
+      label: "Invoice Sent",
+      evidence: "Send invoices to customers and track payment status.",
+    },
+    {
+      key: "trial_started",
+      label: "Trial Started",
+      evidence: "Start your free trial today.",
+    },
+  ],
+};
+
+test("accepts grounded SaaS analysis", () => {
+  assert.doesNotThrow(() =>
+    validateGroundedSaaSAnalysis(groundedAnalysis, groundingSnapshot),
+  );
+});
+
+test("rejects invented Moment evidence", () => {
+  const invalid = structuredClone(groundedAnalysis);
+  invalid.moments[1].evidence = "Connect your bank account automatically.";
+
+  assert.throws(
+    () => validateGroundedSaaSAnalysis(invalid, groundingSnapshot),
+    (error) =>
+      error instanceof AnalysisGroundingError &&
+      error.code === "moment_evidence_not_grounded",
+  );
+});
+
+test("rejects unsupported non-SaaS classification", () => {
+  const notSaaS = {
+    product_type: "not_saas",
+    name: "SIM TNI",
+    name_evidence: "Acme Invoice",
+    description: "Restricted application.",
+    moments: [],
+  };
+
+  assert.throws(
+    () => validateGroundedSaaSAnalysis(notSaaS, groundingSnapshot),
+    (error) =>
+      error instanceof AnalysisGroundingError &&
+      error.code === "unsupported_product_analysis",
+  );
+});
