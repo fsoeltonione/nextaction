@@ -91,6 +91,7 @@ function OnboardingContent() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoAnalysisUrlRef = useRef<string | null>(null);
+  const initialAutoAnalysisUrlRef = useRef(initialQueryUrl || restored.url);
   const loadStateRequestRef = useRef(0);
 
   const applyState = useCallback((nextState: ActivationState) => {
@@ -164,6 +165,9 @@ function OnboardingContent() {
 
   useEffect(() => {
     if (loading || !urlInput || draft || analysisRunning || autoAnalysisUrlRef.current === urlInput) return;
+    // Only auto-analyze a URL that was seeded when this onboarding view mounted.
+    // Manual typing from the URL field must wait for the explicit Analyze action.
+    if (urlInput !== initialAutoAnalysisUrlRef.current) return;
     if (state?.product?.canonical_url === urlInput) return;
 
     autoAnalysisUrlRef.current = urlInput;
