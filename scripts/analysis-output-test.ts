@@ -21,7 +21,7 @@ const valid = {
   url: "https://carrd.com",
   name: "Carrd",
   description: "A site builder for creating one-page websites.",
-  product_evidence: "Create one-page websites with Carrd.",
+  product_evidence: "Create one-page websites",
   moments: [
     {
       key: "site_created",
