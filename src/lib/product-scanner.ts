@@ -192,14 +192,11 @@ async function readLimitedBody(
 ): Promise<{ text: string; truncated: boolean }> {
   if (!response.body) {
     const text = await response.text();
-    if (new TextEncoder().encode(text).byteLength > maxBytes) {
-      throw new ProductScannerError(
-        "response_too_large",
-        "Product response is too large.",
-        413,
-      );
-    }
-    return text;
+    const encoded = new TextEncoder().encode(text);
+    return {
+      text: new TextDecoder().decode(encoded.slice(0, maxBytes)),
+      truncated: encoded.byteLength > maxBytes,
+    };
   }
 
   const reader = response.body.getReader();
@@ -212,17 +209,23 @@ async function readLimitedBody(
       const result = await reader.read();
       if (result.done) break;
 
-      totalBytes += result.value.byteLength;
-      if (totalBytes > maxBytes) {
+      const remaining = maxBytes - totalBytes;
+      if (remaining <= 0) {
+        truncated = true;
         await reader.cancel();
-        throw new ProductScannerError(
-          "response_too_large",
-          "Product response is too large.",
-          413,
-        );
+        break;
+      }
+
+      if (result.value.byteLength > remaining) {
+        chunks.push(result.value.slice(0, remaining));
+        totalBytes += remaining;
+        truncated = true;
+        await reader.cancel();
+        break;
       }
 
       chunks.push(result.value);
+      totalBytes += result.value.byteLength;
     }
   } finally {
     reader.releaseLock();
@@ -424,19 +427,6 @@ export async function scanProductUrl(
           "unsupported_content_type",
           "Product response is not an HTML document.",
           415,
-        );
-      }
-
-      const contentLength = Number(response.headers.get("content-length"));
-      if (
-        Number.isFinite(contentLength) &&
-        contentLength > PRODUCT_SCANNER_LIMITS.maxResponseBytes
-      ) {
-        await response.body?.cancel();
-        throw new ProductScannerError(
-          "response_too_large",
-          "Product response is too large.",
-          413,
         );
       }
 
