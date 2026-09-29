@@ -6,6 +6,7 @@ export type AnalysisMoment = {
   key: string;
   label: string;
   description?: string;
+  evidence?: string;
 };
 
 export type AnalysisResult = {
@@ -53,6 +54,7 @@ const MOMENTS_KEYS = ["moments", "key_moments", "commercial_moments"];
 const MOMENT_KEY_KEYS = ["key", "id", "moment_key", "slug"];
 const MOMENT_LABEL_KEYS = ["label", "name", "title", "moment"];
 const MOMENT_DESCRIPTION_KEYS = ["description", "summary", "details"];
+const MOMENT_EVIDENCE_KEYS = ["evidence", "source", "grounding"];
 
 function firstString(
   record: Record<string, unknown>,
@@ -246,6 +248,12 @@ export function parseAnalysisOutput(
       );
     }
 
+    const rawEvidence = firstString(record, MOMENT_EVIDENCE_KEYS);
+    const evidence =
+      rawEvidence.length > 0
+        ? rawEvidence.slice(0, 320)
+        : undefined;
+
     const key = normalizeMomentKey(rawKey, normalizedLabel);
     if (!key) {
       throw new AnalysisOutputValidationError(
@@ -259,6 +267,7 @@ export function parseAnalysisOutput(
       key,
       label: normalizedLabel,
       ...(description ? { description } : {}),
+      ...(evidence ? { evidence } : {}),
     });
   }
 
