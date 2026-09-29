@@ -64,6 +64,9 @@ assert.match(onboarding, /if \(nextState\.step !== "product_understanding"\) ret
 assert.doesNotMatch(onboarding, /setState\(\(current\) => current \? \{ \.\.\.current, step: "product_understanding"/);
 assert.match(onboarding, /disabled=\{analysisRunning\}/);
 assert.match(onboarding, /selectedWorkspaceId \? "&workspace_id="/);assert.match(onboarding, /const \[faviconAttempt, setFaviconAttempt\] = useState\(0\)/);
+assert.match(onboarding, /https:\/\/" \+ hostname \+ "\/favicon\.ico/);
+assert.match(onboarding, /https:\/\/" \+ hostname \+ "\/favicon\.png/);
+assert.match(onboarding, /https:\/\/" \+ hostname \+ "\/favicon\.svg/);
 assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.ico/);
 assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.png/);
 assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.svg/);
@@ -75,6 +78,9 @@ assert.match(analysisGrounding, /product_type/);
 assert.match(analysisGrounding, /name_evidence/);
 assert.match(analysisGrounding, /evidence/);
 assert.match(analysisGrounding, /corpus\.includes/);
+assert.match(analysisRoute, /validateGroundedSaaSAnalysis/);
+assert.match(analysisRoute, /product_not_understood/);
+assert.match(analysisRoute, /name_evidence/);
 
 assert.match(dashboard, /\/onboarding\?workspace_id=/);
 assert.match(dashboard, /\/onboarding\?workspace_id=.*&mode=add_product/);
