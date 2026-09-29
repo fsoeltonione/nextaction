@@ -268,7 +268,7 @@ function extractHtmlSignals(html: string) {
     .slice(0, 500);
 
   const structuralText = [...bounded.matchAll(
-    /<(?:h1|h2|h3|h4|p|li|button|label|a|main)[^>]*>([\s\S]*?)<\/(?:h1|h2|h3|h4|p|li|button|label|a|main)>/gi,
+    /<(?:h1|h2|h3|h4|p|li|button|label|a)[^>]*>([\s\S]*?)<\/(?:h1|h2|h3|h4|p|li|button|label|a)>/gi,
   )]
     .map((match) => match[1] ?? "")
     .join(" ")
