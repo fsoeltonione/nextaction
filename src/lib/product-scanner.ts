@@ -205,6 +205,7 @@ async function readLimitedBody(
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
+  let truncated = false;
 
   try {
     while (true) {
@@ -236,7 +237,7 @@ async function readLimitedBody(
 
   return {
     text: new TextDecoder().decode(merged),
-    truncated: totalBytes >= maxBytes,
+    truncated,
   };
 }
 
