@@ -122,6 +122,23 @@ test("scanner rejects non-public DNS answers before fetch", async () => {
   assert.equal(fetchCalled, false);
 });
 
+test("scanner extracts a declared favicon as an absolute URL", async () => {
+  const result = await scanProductUrl(
+    "https://example.com",
+    async () =>
+      new Response(
+        '<html><head><title>Example</title><link rel="icon" href="/assets/favicon.png"></head><body>Example site</body></html>',
+        {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        },
+      ),
+    publicAddresses,
+  );
+
+  assert.equal(result.faviconUrl, "https://example.com/assets/favicon.png");
+});
+
 test("scanner uses manual redirects and does not forward caller credentials", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
 
