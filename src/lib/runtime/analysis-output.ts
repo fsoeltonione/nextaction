@@ -28,6 +28,10 @@ export type AnalysisOutputFailureReason =
   | "moment_evidence_too_short"
   | "moment_evidence_too_long"
   | "moment_evidence_not_found"
+  | "product_evidence_missing"
+  | "product_evidence_too_short"
+  | "product_evidence_too_long"
+  | "product_evidence_not_found"
   | "moment_key_empty"
   | "duplicate_moment_key"
   | "name_missing"
@@ -58,6 +62,7 @@ const MOMENT_KEY_KEYS = ["key", "id", "moment_key", "slug"];
 const MOMENT_LABEL_KEYS = ["label", "name", "title", "moment"];
 const MOMENT_DESCRIPTION_KEYS = ["description", "summary", "details"];
 const MOMENT_EVIDENCE_KEYS = ["evidence", "source_excerpt", "supporting_text"];
+const PRODUCT_EVIDENCE_KEYS = ["product_evidence", "summary_evidence"];
 
 function firstString(
   record: Record<string, unknown>,
@@ -312,6 +317,34 @@ export function parseAnalysisOutput(
       "duplicate_moment_key",
       "Analysis provider output contained duplicate Moment keys.",
     );
+  }
+
+  const productEvidence = firstString(root, PRODUCT_EVIDENCE_KEYS);
+  if (context?.evidenceText !== undefined) {
+    if (!productEvidence) {
+      throw new AnalysisOutputValidationError(
+        "product_evidence_missing",
+        "The analysis did not contain source evidence for the product summary.",
+      );
+    }
+    if (productEvidence.length < 20) {
+      throw new AnalysisOutputValidationError(
+        "product_evidence_too_short",
+        "Product source evidence was too short.",
+      );
+    }
+    if (productEvidence.length > 300) {
+      throw new AnalysisOutputValidationError(
+        "product_evidence_too_long",
+        "Product source evidence was too long.",
+      );
+    }
+    if (!normalizeEvidence(context.evidenceText).includes(normalizeEvidence(productEvidence))) {
+      throw new AnalysisOutputValidationError(
+        "product_evidence_not_found",
+        "Product source evidence was not found in the validated page snapshot.",
+      );
+    }
   }
 
   const providerName = firstString(root, NAME_KEYS);
