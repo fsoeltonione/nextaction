@@ -231,7 +231,9 @@ try {
       [
         "Product name: Synthetic SaaS",
         "Product description: A small fictional SaaS used for a contract test.",
-        "The product lets teams create invoices and send invoices to customers.",
+        "The product lets teams create invoices.",
+        "Teams can send invoices to customers.",
+        "Customers can pay invoices.",
       ].join("\n"),
     );
 
