@@ -23,6 +23,7 @@ export type ProductScanResult = {
   title: string;
   description: string;
   text: string;
+  truncated: boolean;
 };
 
 export class ProductScannerError extends Error {
@@ -188,7 +189,7 @@ async function resolvePublicAddressesWithRetry(
 async function readLimitedBody(
   response: Response,
   maxBytes: number,
-): Promise<string> {
+): Promise<{ text: string; truncated: boolean }> {
   if (!response.body) {
     const text = await response.text();
     if (new TextEncoder().encode(text).byteLength > maxBytes) {
@@ -233,11 +234,14 @@ async function readLimitedBody(
     offset += chunk.byteLength;
   }
 
-  return new TextDecoder().decode(merged);
+  return {
+    text: new TextDecoder().decode(merged),
+    truncated: totalBytes >= maxBytes,
+  };
 }
 
 function extractHtmlSignals(html: string) {
-  const bounded = html.slice(0, PRODUCT_SCANNER_LIMITS.maxTextChars * 3);
+  const bounded = html.slice(0, PRODUCT_SCANNER_LIMITS.maxResponseBytes);
 
   const title = (
     bounded.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ""
@@ -259,14 +263,24 @@ function extractHtmlSignals(html: string) {
     .trim()
     .slice(0, 500);
 
-  const text = bounded
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
+  const structuralText = [...bounded.matchAll(
+    /<(?:h1|h2|h3|h4|p|li|button|label|a|main)[^>]*>([\s\S]*?)<\/(?:h1|h2|h3|h4|p|li|button|label|a|main)>/gi,
+  )]
+    .map((match) => match[1] ?? "")
+    .join(" ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
-    .trim()
+    .trim();
+
+  const text = (structuralText ||
+    bounded
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim())
     .slice(0, PRODUCT_SCANNER_LIMITS.maxTextChars);
 
   return { title, description, text };
@@ -425,17 +439,18 @@ export async function scanProductUrl(
         );
       }
 
-      const body = await readLimitedBody(
+      const boundedBody = await readLimitedBody(
         response,
         PRODUCT_SCANNER_LIMITS.maxResponseBytes,
       );
-      const signals = extractHtmlSignals(body);
+      const signals = extractHtmlSignals(boundedBody.text);
 
       return {
         finalUrl: currentValue,
         redirects,
         contentType,
         resolvedAddresses: firstResolvedAddresses ?? resolvedBefore,
+        truncated: boundedBody.truncated,
         ...signals,
       };
     } catch (error) {
