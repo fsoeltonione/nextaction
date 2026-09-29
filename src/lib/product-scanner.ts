@@ -5,8 +5,8 @@ import { isBlockedHostname, normalizeProductUrl } from "./url.ts";
 export const PRODUCT_SCANNER_LIMITS = Object.freeze({
   maxRedirects: 3,
   timeoutMs: 8_000,
-  maxResponseBytes: 256 * 1024,
-  maxTextChars: 16_000,
+  maxResponseBytes: 1024 * 1024,
+  maxTextChars: 24_000,
   maxUrlLength: 2_048,
 });
 
