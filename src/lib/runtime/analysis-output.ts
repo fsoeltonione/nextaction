@@ -24,6 +24,10 @@ export type AnalysisOutputFailureReason =
   | "moment_label_missing"
   | "moment_label_too_long"
   | "moment_description_too_long"
+  | "moment_evidence_missing"
+  | "moment_evidence_too_short"
+  | "moment_evidence_too_long"
+  | "moment_evidence_not_found"
   | "moment_key_empty"
   | "duplicate_moment_key"
   | "name_missing"
@@ -53,6 +57,7 @@ const MOMENTS_KEYS = ["moments", "key_moments", "commercial_moments"];
 const MOMENT_KEY_KEYS = ["key", "id", "moment_key", "slug"];
 const MOMENT_LABEL_KEYS = ["label", "name", "title", "moment"];
 const MOMENT_DESCRIPTION_KEYS = ["description", "summary", "details"];
+const MOMENT_EVIDENCE_KEYS = ["evidence", "source_excerpt", "supporting_text"];
 
 function firstString(
   record: Record<string, unknown>,
@@ -65,6 +70,10 @@ function firstString(
     }
   }
   return "";
+}
+
+function normalizeEvidence(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function prettyLabelFromKey(key: string): string {
@@ -173,6 +182,7 @@ function derivedDescription(moments: AnalysisMoment[]): string {
 export function parseAnalysisOutput(
   value: unknown,
   fallback?: { name?: string; description?: string },
+  context?: { evidenceText?: string },
 ): AnalysisResult {
   const root = normalizeRoot(value);
   const rawMoments = normalizeRawMoments(root);
@@ -244,6 +254,40 @@ export function parseAnalysisOutput(
         "A Moment description was too long.",
         index,
       );
+    }
+
+    const evidence = firstString(record, MOMENT_EVIDENCE_KEYS);
+    if (context?.evidenceText !== undefined) {
+      if (!evidence) {
+        throw new AnalysisOutputValidationError(
+          "moment_evidence_missing",
+          "A Moment did not contain source evidence.",
+          index,
+        );
+      }
+      if (evidence.length < 20) {
+        throw new AnalysisOutputValidationError(
+          "moment_evidence_too_short",
+          "A Moment source evidence was too short.",
+          index,
+        );
+      }
+      if (evidence.length > 240) {
+        throw new AnalysisOutputValidationError(
+          "moment_evidence_too_long",
+          "A Moment source evidence was too long.",
+          index,
+        );
+      }
+
+      const source = normalizeEvidence(context.evidenceText);
+      if (!source.includes(normalizeEvidence(evidence))) {
+        throw new AnalysisOutputValidationError(
+          "moment_evidence_not_found",
+          "A Moment source evidence was not found in the validated page snapshot.",
+          index,
+        );
+      }
     }
 
     const key = normalizeMomentKey(rawKey, normalizedLabel);
