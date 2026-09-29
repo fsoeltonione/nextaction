@@ -4,6 +4,11 @@ import {
   parseAnalysisOutput,
   AnalysisOutputValidationError,
 } from "../src/lib/runtime/analysis-output.ts";
+import {
+  AnalysisGroundingError,
+  getAnalysisProductType,
+  validateGroundedSaaSAnalysis,
+} from "../src/lib/runtime/analysis-grounding.ts";
 
 function assertValidationFailure(
   fn: () => unknown,
@@ -16,6 +21,106 @@ function assertValidationFailure(
       error.reason === reason,
   );
 }
+
+test("classifies provider output as SaaS only when explicitly declared", () => {
+  assert.equal(
+    getAnalysisProductType({
+      product_type: "saas",
+      name: "Carrd",
+      moments: [],
+    }),
+    "saas",
+  );
+});
+
+test("rejects a non-SaaS page before Moment parsing", () => {
+  assert.throws(
+    () =>
+      validateGroundedSaaSAnalysis(
+        {
+          product_type: "not_saas",
+          name: "Kompas.com",
+          description: "News portal",
+          moments: [],
+        },
+        "Kompas.com news portal",
+      ),
+    (error) =>
+      error instanceof AnalysisGroundingError &&
+      error.code === "unsupported_product_analysis",
+  );
+});
+
+test("rejects SaaS Moments that cannot be found in the scanned page", () => {
+  assert.throws(
+    () =>
+      validateGroundedSaaSAnalysis(
+        {
+          product_type: "saas",
+          name: "Synthetic SaaS",
+          name_evidence: "Synthetic SaaS",
+          description: "Invoice management.",
+          moments: [
+            {
+              key: "invoice_created",
+              label: "Invoice Created",
+              evidence: "Teams can create invoices.",
+            },
+            {
+              key: "invoice_sent",
+              label: "Invoice Sent",
+              evidence: "This text is not on the page.",
+            },
+            {
+              key: "invoice_paid",
+              label: "Invoice Paid",
+              evidence: "Customers can pay invoices.",
+            },
+          ],
+        },
+        "Synthetic SaaS. Teams can create invoices. Customers can pay invoices.",
+      ),
+    (error) =>
+      error instanceof AnalysisGroundingError &&
+      error.code === "unsupported_product_analysis",
+  );
+});
+
+test("accepts SaaS Moments when name and Moment evidence are present verbatim", () => {
+  assert.doesNotThrow(() =>
+    validateGroundedSaaSAnalysis(
+      {
+        product_type: "saas",
+        name: "Synthetic SaaS",
+        name_evidence: "Synthetic SaaS",
+        description: "Invoice management.",
+        moments: [
+          {
+            key: "invoice_created",
+            label: "Invoice Created",
+            evidence: "Teams can create invoices.",
+          },
+          {
+            key: "invoice_sent",
+            label: "Invoice Sent",
+            evidence: "Teams can send invoices to customers.",
+          },
+          {
+            key: "invoice_paid",
+            label: "Invoice Paid",
+            evidence: "Customers can pay invoices.",
+          },
+        ],
+      },
+      [
+        "Synthetic SaaS.",
+        "Teams can create invoices.",
+        "Teams can send invoices to customers.",
+        "Customers can pay invoices.",
+      ].join(" "),
+    ),
+  );
+});
 
 const valid = {
   url: "https://carrd.com",
