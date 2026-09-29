@@ -61,6 +61,39 @@ test("rejects a Moment whose evidence is missing when grounding is required", ()
   );
 });
 
+test("rejects a product summary whose evidence is missing when grounding is required", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput(
+        {
+          name: "Carrd",
+          description: "Site builder",
+          moments: [{ key: "site_created", label: "Site Created", evidence: "Create one-page websites." }],
+        },
+        undefined,
+        { evidenceText: "Create one-page websites." },
+      ),
+    "product_evidence_missing",
+  );
+});
+
+test("rejects a product summary whose evidence is not present in the source snapshot", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput(
+        {
+          name: "Carrd",
+          description: "Site builder",
+          product_evidence: "Invoice automation for teams",
+          moments: [{ key: "site_created", label: "Site Created", evidence: "Create one-page websites." }],
+        },
+        undefined,
+        { evidenceText: "Create one-page websites." },
+      ),
+    "product_evidence_not_found",
+  );
+});
+
 test("rejects a Moment whose evidence is not present in the source snapshot", () => {
   assertValidationFailure(
     () =>
