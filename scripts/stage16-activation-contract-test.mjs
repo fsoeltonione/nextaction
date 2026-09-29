@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, circleci, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck, analyze, scanner, analysisOutput, analysisGrounding] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -28,11 +28,30 @@ const [home, onboarding, callback, login, dashboard, globals, circleci, state, c
   read("src/lib/stage16-database.types.ts"),
   read("scripts/cloudflare-vinext-build.mjs"),
   read("scripts/cloudflare-vinext-check.mjs"),
+  read("src/app/api/analyze/route.ts"),
+  read("src/lib/product-scanner.ts"),
+  read("src/lib/runtime/analysis-output.ts"),
+  read("src/lib/runtime/analysis-grounding.ts"),
 ]);
 
 assert.match(home, /\/onboarding\?url=/);
 assert.doesNotMatch(home, /signInWithOAuth|router\.push\(["']\/login\?url=/);
-assert.match(onboarding, /\/api\/analyze/);assert.match(onboarding, /import \{ normalizeProductUrl \} from "@\/lib\/url";/);
+assert.match(onboarding, /\/api\/analyze/);assert.match(onboarding, /faviconCandidates/);
+assert.match(onboarding, /https:\/\/www\.google\.com\/s2\/favicons\?domain=/);
+assert.match(onboarding, /onError=\{\(\) => setFaviconAttempt/);
+assert.match(analyze, /product_type/);
+assert.match(analyze, /name_evidence/);
+assert.match(analyze, /evidence copied exactly from the supplied page snapshot/);
+assert.match(analyze, /validateGroundedSaaSAnalysis/);
+assert.match(analyze, /product_not_understood/);
+assert.match(scanner, /truncated: boolean/);
+assert.match(scanner, /readLimitedBody/);
+assert.match(scanner, /structuralText/);
+assert.match(analysisOutput, /evidence\?: string/);
+assert.match(analysisOutput, /MOMENT_EVIDENCE_KEYS/);
+assert.match(analysisGrounding, /unsupported_product_analysis/);
+assert.match(analysisGrounding, /moment_evidence_not_grounded/);
+assert.match(onboarding, /import \{ normalizeProductUrl \} from "@\/lib\/url";/);
 assert.match(onboarding, /const \[hostname, setHostname\] = useState\(\(\) =>/);
 assert.match(onboarding, /const \[isValidUrl, setIsValidUrl\] = useState\(\(\) =>/);
 assert.match(onboarding, /function handleUrlChange\(value: string\)/);
