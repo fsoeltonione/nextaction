@@ -61,7 +61,14 @@ assert.match(onboarding, /const nextState = await loadState\(selectedWorkspaceId
 assert.match(onboarding, /if \(nextState\.step !== "product_understanding"\) return null/);
 assert.doesNotMatch(onboarding, /setState\(\(current\) => current \? \{ \.\.\.current, step: "product_understanding"/);
 assert.match(onboarding, /disabled=\{analysisRunning\}/);
-assert.match(onboarding, /selectedWorkspaceId \? "&workspace_id="/);
+assert.match(onboarding, /selectedWorkspaceId \? "&workspace_id="/);assert.match(onboarding, /const \[faviconAttempt, setFaviconAttempt\] = useState\(0\)/);
+assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.ico/);
+assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.png/);
+assert.match(onboarding, /https:\/\/" + hostname + "\/favicon\.svg/);
+assert.match(onboarding, /s2\.googleusercontent\.com\/s2\/favicons\?domain=/);
+assert.match(onboarding, /onError=\{\(\) => setFaviconAttempt/);
+assert.match(c, /analysis-grounding/);
+
 assert.match(dashboard, /\/onboarding\?workspace_id=/);
 assert.match(dashboard, /\/onboarding\?workspace_id=.*&mode=add_product/);
 assert.match(dashboard, /\/onboarding\?mode=add_product/);
