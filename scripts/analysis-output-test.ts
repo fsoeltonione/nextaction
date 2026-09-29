@@ -26,14 +26,22 @@ const valid = {
       key: "site_created",
       label: "Site Created",
       description: "A new site has been created.",
+      evidence: "A new site has been created.",
     },
     {
       id: "publish-site",
       label: "Site Published",
       description: "A site is published to a live URL.",
+      evidence: "A site is published to a live URL.",
     },
   ],
 };
+
+test("preserves provider evidence on normalized Moments", () => {
+  const result = parseAnalysisOutput(valid);
+  assert.equal(result.moments[0].evidence, "A new site has been created.");
+  assert.equal(result.moments[1].evidence, "A site is published to a live URL.");
+});
 
 test("normalizes Moment ids into runtime-safe snake_case keys", () => {
   const result = parseAnalysisOutput(valid);
