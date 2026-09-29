@@ -1,5 +1,6 @@
 import { parseAnalysisProviderResponse } from "../src/lib/runtime/analysis-provider-response.ts";
 import { parseAnalysisOutput } from "../src/lib/runtime/analysis-output.ts";
+import { validateGroundedSaaSAnalysis } from "../src/lib/runtime/analysis-grounding.ts";
 import { parseAnalysisProviderContent } from "../src/lib/runtime/analysis-provider-content.ts";
 
 const apiKey = process.env.ANALYSIS_API_KEY?.trim();
@@ -126,9 +127,11 @@ try {
           role: "system",
           content: [
             "Return exactly one JSON object for a SaaS product.",
-            "The object must contain name, description, and moments.",
+            "The object must contain product_type, name, description, name_evidence, and moments.",
+            "product_type must be exactly saas for this contract fixture.",
             "moments must be an array of 2 or more objects.",
-            "Each Moment must have a label string and may have a key and description.",
+            "Each Moment must have a label string, evidence string, and may have a key and description.",
+            "evidence and name_evidence must be copied exactly from the supplied fixture text.",
             "Return no Markdown or prose.",
           ].join("\n"),
         },
@@ -137,7 +140,8 @@ try {
           content: [
             "Product name: Synthetic SaaS",
             "Product description: A small fictional SaaS used for a contract test.",
-            "Generate two commercially relevant Moments.",
+            "The product lets teams create invoices and send invoices to customers.",
+            "Generate two commercially relevant Moments and ground each one in exact evidence from this fixture text.",
           ].join("\n"),
         },
       ],
@@ -220,6 +224,15 @@ try {
   }
 
   try {
+    validateGroundedSaaSAnalysis(
+      parsedContent,
+      [
+        "Product name: Synthetic SaaS",
+        "Product description: A small fictional SaaS used for a contract test.",
+        "The product lets teams create invoices and send invoices to customers.",
+      ].join("\n"),
+    );
+
     const analysis = parseAnalysisOutput(parsedContent, {
       name: "Synthetic SaaS",
       description: "Synthetic product used for provider contract validation.",
