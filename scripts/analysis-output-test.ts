@@ -177,16 +177,75 @@ test("accepts string Moments and derives human labels from keys", () => {
   assert.equal(result.moments[1].label, "Invoice Created");
 });
 
-test("derives a compact description when the provider omits one", () => {
-  const result = parseAnalysisOutput({
-    name: "Example",
-    moments: [
-      { label: "Invoice Created" },
-      { label: "Payment Received" },
-    ],
-  });
+test("uses scanner metadata only when the provider omits top-level description", () => {
+  const result = parseAnalysisOutput(
+    {
+      name: "Example",
+      moments: [
+        { label: "Invoice Created" },
+      ],
+    },
+    {
+      name: "Example",
+      description: "A payment platform for invoices.",
+    },
+  );
 
-  assert.match(result.description, /Invoice Created/);
-  assert.match(result.description, /Payment Received/);
+  assert.equal(result.description, "A payment platform for invoices.");
+});
+
+test("rejects an explicit insufficient-evidence response", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput({
+        insufficient_evidence: true,
+        name: "",
+        description: "",
+        moments: [],
+      }),
+    "insufficient_evidence",
+  );
+});
+
+test("rejects ungrounded Moments when evidence is supplied", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput(
+        {
+          name: "Example",
+          description: "A site builder for websites.",
+          moments: [
+            {
+              label: "Cryptocurrency Exchange",
+              description: "Buy and sell digital assets.",
+            },
+          ],
+        },
+        undefined,
+        "Example site builder for creating websites.",
+      ),
+    "ungrounded_moment",
+  );
+});
+
+test("rejects an ungrounded provider description when evidence is supplied", () => {
+  assertValidationFailure(
+    () =>
+      parseAnalysisOutput(
+        {
+          name: "Example",
+          description: "An airline ticket marketplace with reward miles.",
+          moments: [
+            {
+              label: "Site Created",
+              description: "A new site is created.",
+            },
+          ],
+        },
+        undefined,
+        "Example site builder for creating websites.",
+      ),
+    "ungrounded_description",
+  );
 });
 
