@@ -12,6 +12,7 @@ function LoginContent() {
 
   const pendingUrl = searchParams.get("url");
   const pendingWorkspaceId = searchParams.get("workspace_id");
+  const pendingMode = searchParams.get("mode");
   const authError = searchParams.get("error");
 
   const [loading, setLoading] = useState(false);
@@ -26,7 +27,7 @@ function LoginContent() {
 
       if (data.session) {
         const target = pendingUrl
-          ? "/onboarding?url=" + encodeURIComponent(pendingUrl) + (pendingWorkspaceId ? "&workspace_id=" + encodeURIComponent(pendingWorkspaceId) : "")
+          ? "/onboarding?url=" + encodeURIComponent(pendingUrl) + (pendingWorkspaceId ? "&workspace_id=" + encodeURIComponent(pendingWorkspaceId) : "") + (pendingMode === "add_product" ? "&mode=add_product" : "")
           : "/dashboard";
         router.replace(target);
       } else {
@@ -37,7 +38,7 @@ function LoginContent() {
     return () => {
       active = false;
     };
-  }, [pendingUrl, pendingWorkspaceId, router, supabase]);
+  }, [pendingMode, pendingUrl, pendingWorkspaceId, router, supabase]);
 
   async function handleGoogleLogin() {
     setLoading(true);
@@ -47,7 +48,7 @@ function LoginContent() {
     redirectTo.searchParams.set(
       "next",
       pendingUrl
-        ? "/onboarding?url=" + encodeURIComponent(pendingUrl) + (pendingWorkspaceId ? "&workspace_id=" + encodeURIComponent(pendingWorkspaceId) : "")
+        ? "/onboarding?url=" + encodeURIComponent(pendingUrl) + (pendingWorkspaceId ? "&workspace_id=" + encodeURIComponent(pendingWorkspaceId) : "") + (pendingMode === "add_product" ? "&mode=add_product" : "")
         : "/dashboard",
     );
 

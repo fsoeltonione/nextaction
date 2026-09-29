@@ -76,9 +76,12 @@ function OnboardingContent() {
   const searchParams = useSearchParams();
   const initialQueryUrl = searchParams.get("url") ?? "";
   const initialWorkspaceId = searchParams.get("workspace_id");
+  const isAddProductMode = searchParams.get("mode") === "add_product";
   const restored = useMemo(() => restorePending(), []);
-  const [urlInput, setUrlInput] = useState(initialQueryUrl || restored.url);
-  const [draft, setDraft] = useState<ProductDraft | null>(restored.draft);
+  const initialFlowUrl = isAddProductMode ? initialQueryUrl : initialQueryUrl || restored.url;
+  const initialFlowDraft = isAddProductMode ? null : restored.draft;
+  const [urlInput, setUrlInput] = useState(initialFlowUrl);
+  const [draft, setDraft] = useState<ProductDraft | null>(initialFlowDraft);
   const [state, setState] = useState<ActivationState | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOption[]>([]);
@@ -91,7 +94,7 @@ function OnboardingContent() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoAnalysisUrlRef = useRef<string | null>(null);
-  const initialAutoAnalysisUrlRef = useRef(initialQueryUrl || restored.url);
+  const initialAutoAnalysisUrlRef = useRef(initialFlowUrl);
   const loadStateRequestRef = useRef(0);
 
   const applyState = useCallback((nextState: ActivationState) => {
@@ -100,6 +103,7 @@ function OnboardingContent() {
     setSelectedWorkspaceId(nextState.workspace?.id ?? null);
     setCapabilitySelection(nextState.capabilities ?? []);
     setDraft((currentDraft) => {
+      if (isAddProductMode) return currentDraft;
       if (currentDraft && (!nextState.product || currentDraft.url !== nextState.product.canonical_url)) {
         return currentDraft;
       }
@@ -117,7 +121,7 @@ function OnboardingContent() {
       };
     });
     setOfferForm((current) => ({ ...current, moment_ids: current.moment_ids.filter((id) => nextState.product?.moments.some((moment) => moment.id === id)) }));
-  }, []);
+  }, [isAddProductMode]);
 
   const loadState = useCallback(async (workspaceId?: string | null): Promise<ActivationState | null> => {
     const requestSequence = ++loadStateRequestRef.current;
@@ -146,14 +150,14 @@ function OnboardingContent() {
       setDraft(nextDraft);
       setUrlInput(nextDraft.url);
       savePending(nextDraft.url, nextDraft);
-      const nextPath = "/onboarding?url=" + encodeURIComponent(nextDraft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "");
+      const nextPath = "/onboarding?url=" + encodeURIComponent(nextDraft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "") + (isAddProductMode ? "&mode=add_product" : "");
       router.replace(nextPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Product analysis failed.");
       setDraft(null);
       savePending(targetUrl, null);
     } finally { setAnalysisRunning(false); }
-  }, [draft, router, selectedWorkspaceId]);
+  }, [draft, isAddProductMode, router, selectedWorkspaceId]);
 
   useEffect(() => {
     let active = true;
@@ -225,12 +229,18 @@ function OnboardingContent() {
     try {
       const response = await fetch("/api/products/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: selectedWorkspaceId, url: draft.url, name: draft.name, description: draft.description, moments: draft.moments.map((moment) => ({ key: moment.key.trim(), label: moment.label.trim(), description: moment.description.trim() })) }) });
       if (response.status === 401) {
-        const loginPath = "/login?url=" + encodeURIComponent(draft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "");
+        const loginPath = "/login?url=" + encodeURIComponent(draft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "") + (isAddProductMode ? "&mode=add_product" : "");
         router.push(loginPath);
         return;
       }
       if (!response.ok) throw new Error(await readApiError(response, "Unable to confirm the product."));
       autoAnalysisUrlRef.current = draft.url;
+      if (isAddProductMode) {
+        clearPending();
+        setDraft(null);
+        router.replace("/dashboard?workspace_id=" + encodeURIComponent(selectedWorkspaceId ?? ""));
+        return;
+      }
       const nextState = await loadState(selectedWorkspaceId);
       if (!nextState) throw new Error("Unable to load activation state after confirming the product.");
       clearPending();
@@ -292,7 +302,7 @@ function OnboardingContent() {
 
   const hasPendingProposal =
     draft != null && (!state?.product || draft.url !== state.product.canonical_url);
-  const currentStep = hasPendingProposal ? "product_understanding" : state?.step ?? "url";
+  const currentStep = hasPendingProposal ? "product_understanding" : isAddProductMode ? "url" : state?.step ?? "url";
   const moments = state?.product?.moments ?? [];
 
   return (
