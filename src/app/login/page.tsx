@@ -38,7 +38,7 @@ function LoginContent() {
     return () => {
       active = false;
     };
-  }, [pendingUrl, pendingWorkspaceId, router, supabase]);
+  }, [pendingMode, pendingUrl, pendingWorkspaceId, router, supabase]);
 
   async function handleGoogleLogin() {
     setLoading(true);
