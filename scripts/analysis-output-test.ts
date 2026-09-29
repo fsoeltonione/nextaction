@@ -33,7 +33,7 @@ const valid = {
       id: "publish-site",
       label: "Site Published",
       description: "A site is published to a live URL.",
-      evidence: "Publish your site to the web",
+      evidence: "Publish your site when ready",
     },
   ],
 };
