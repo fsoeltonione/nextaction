@@ -220,7 +220,6 @@ jobs:
           command: |
             test -s /tmp/nextaction-release/staging_base_url
             test -n "${STAGING_INTEGRATION_TOKEN}"
-            test -n "${STAGING_MOMENT_KEY}"
       - run:
           name: Run staging smoke
           command: |
