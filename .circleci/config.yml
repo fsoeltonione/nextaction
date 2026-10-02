@@ -143,6 +143,19 @@ jobs:
           name: Validate OpenAgentic provider
           command: npm run analysis:provider-smoke
 
+  release_source_guard:
+    docker:
+      - image: cimg/node:24.21.0
+    environment:
+      NEXTACTION_RELEASE_BRANCH: << pipeline.git.branch >>
+    steps:
+      - checkout
+      - run:
+          name: Enforce release source branch
+          command: |
+            test -n "${NEXTACTION_RELEASE_BRANCH}"
+            test "${NEXTACTION_RELEASE_BRANCH}" = "master"
+
   deploy_staging:
     docker:
       - image: cimg/node:24.21.0
@@ -338,8 +351,12 @@ workflows:
       - analysis_provider_smoke:
           context:
             - nextaction-staging
+          filters:
+            branches:
+              only: master
           requires:
             - quality
+            - release_source_guard
             - cloudflare_build
             - analysis_provider_contract
             - analysis_output_contract
@@ -348,8 +365,12 @@ workflows:
           context:
             - nextaction-cloudflare
             - nextaction-staging
+          filters:
+            branches:
+              only: master
           requires:
             - quality
+            - release_source_guard
             - cloudflare_compatibility
             - cloudflare_build
             - analysis_provider_smoke
@@ -357,26 +378,46 @@ workflows:
       - staging_smoke:
           context:
             - nextaction-staging
+          filters:
+            branches:
+              only: master
           requires:
             - deploy_staging
+            - release_source_guard
       - hold_production:
           type: approval
+          filters:
+            branches:
+              only: master
           requires:
             - staging_smoke
+            - release_source_guard
       - deploy_production:
           context:
             - nextaction-cloudflare
             - nextaction-production
+          filters:
+            branches:
+              only: master
           requires:
             - hold_production
+            - release_source_guard
       - cloudflare_production_audit:
           context:
             - nextaction-cloudflare
+          filters:
+            branches:
+              only: master
           requires:
             - deploy_production
+            - release_source_guard
       - production_smoke:
           context:
             - nextaction-production
+          filters:
+            branches:
+              only: master
           requires:
             - deploy_production
             - cloudflare_production_audit
+            - release_source_guard
