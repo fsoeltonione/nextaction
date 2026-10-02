@@ -163,29 +163,31 @@ function sleep(ms: number): Promise<void> {
 async function resolvePublicAddressesWithRetry(
   hostname: string,
   resolveAddresses: ResolveAddresses,
-  attempt = 0,
 ): Promise<string[]> {
-  const addresses = await resolveAddresses(hostname);
+  for (let attempt = 0; attempt <= NON_PUBLIC_DNS_RETRIES; attempt += 1) {
+    const addresses = await resolveAddresses(hostname);
 
-  try {
-    validatePublicAddresses(addresses, "non_public_address");
-    return addresses;
-  } catch (error) {
-    if (
-      !(error instanceof ProductScannerError) ||
-      error.code !== "non_public_address" ||
-      attempt >= NON_PUBLIC_DNS_RETRIES
-    ) {
-      throw error;
+    try {
+      validatePublicAddresses(addresses, "non_public_address");
+      return addresses;
+    } catch (error) {
+      if (
+        !(error instanceof ProductScannerError) ||
+        error.code !== "non_public_address" ||
+        attempt === NON_PUBLIC_DNS_RETRIES
+      ) {
+        throw error;
+      }
+
+      await sleep(NON_PUBLIC_DNS_RETRY_DELAY_MS);
     }
-
-    await sleep(NON_PUBLIC_DNS_RETRY_DELAY_MS);
-    return resolvePublicAddressesWithRetry(
-      hostname,
-      resolveAddresses,
-      attempt + 1,
-    );
   }
+
+  throw new ProductScannerError(
+    "non_public_address",
+    "Product host resolves to a non-public network address.",
+    400,
+  );
 }
 
 async function readLimitedBody(
