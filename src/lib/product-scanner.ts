@@ -12,6 +12,8 @@ export const PRODUCT_SCANNER_LIMITS = Object.freeze({
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const NO_DATA_DNS_CODES = new Set(["ENODATA", "ENOTFOUND"]);
+const NON_PUBLIC_DNS_RETRIES = 2;
+const NON_PUBLIC_DNS_RETRY_DELAY_MS = 75;
 
 export type ProductScanResult = {
   finalUrl: string;
@@ -149,6 +151,40 @@ function validatePublicAddresses(
         400,
       );
     }
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => resolve(), ms);
+  });
+}
+
+async function resolvePublicAddressesWithRetry(
+  hostname: string,
+  resolveAddresses: ResolveAddresses,
+  attempt = 0,
+): Promise<string[]> {
+  const addresses = await resolveAddresses(hostname);
+
+  try {
+    validatePublicAddresses(addresses, "non_public_address");
+    return addresses;
+  } catch (error) {
+    if (
+      !(error instanceof ProductScannerError) ||
+      error.code !== "non_public_address" ||
+      attempt >= NON_PUBLIC_DNS_RETRIES
+    ) {
+      throw error;
+    }
+
+    await sleep(NON_PUBLIC_DNS_RETRY_DELAY_MS);
+    return resolvePublicAddressesWithRetry(
+      hostname,
+      resolveAddresses,
+      attempt + 1,
+    );
   }
 }
 
