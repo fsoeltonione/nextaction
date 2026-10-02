@@ -107,64 +107,115 @@ function diagnosticPayload({ response, elapsedMs, responseText, responseTruncate
   };
 }
 
-const controller = new AbortController();
 const timeoutMs = 25_000;
-const timeout = setTimeout(() => controller.abort(), timeoutMs);
-const startedAt = Date.now();
+const MAX_ATTEMPTS = 3;
+const TRANSIENT_STATUS_CODES = new Set([429, 502, 503, 504]);
+const MAX_RETRY_DELAY_MS = 5_000;
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), ms);
+  });
+}
+
+function retryDelayMs(response, attempt) {
+  const retryAfter = response.headers.get("retry-after");
+  const retryAfterSeconds = Number(retryAfter);
+
+  if (
+    Number.isFinite(retryAfterSeconds) &&
+    retryAfterSeconds >= 0 &&
+    retryAfterSeconds <= 60
+  ) {
+    return Math.min(retryAfterSeconds * 1000, MAX_RETRY_DELAY_MS);
+  }
+
+  return Math.min(1000 * 2 ** (attempt - 1), MAX_RETRY_DELAY_MS);
+}
 
 try {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: [
-            "Return exactly one JSON object for a SaaS product.",
-            "The object must contain name, description, and moments.",
-            "moments must be an array of 2 or more objects.",
-            "Each Moment must have a label string and may have a key and description.",
-            "Return no Markdown or prose.",
-          ].join("\n"),
-        },
-        {
-          role: "user",
-          content: [
-            "Product name: Synthetic SaaS",
-            "Product description: A small fictional SaaS used for a contract test.",
-            "Generate two commercially relevant Moments.",
-          ].join("\n"),
-        },
-      ],
-      temperature: 0,
-      max_tokens: 512,
-      stream: false,
-    }),
-    signal: controller.signal,
-  });
+  let response = null;
+  let elapsedMs = 0;
 
-  const elapsedMs = Date.now() - startedAt;
-  const body = await readBoundedText(
-    response,
-    MAX_RESPONSE_BODY_BYTES,
-  );
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const startedAt = Date.now();
 
-  if (!response.ok) {
-    console.error(
-      "Analysis provider preflight failed:",
-      diagnosticPayload({
-        response,
-        elapsedMs,
-        responseText: body.text,
-        responseTruncated: body.truncated,
-      }),
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: "system",
+              content: [
+                "Return exactly one JSON object for a SaaS product.",
+                "The object must contain name, description, and moments.",
+                "moments must be an array of 2 or more objects.",
+                "Each Moment must have a label string and may have a key and description.",
+                "Return no Markdown or prose.",
+              ].join("\n"),
+            },
+            {
+              role: "user",
+              content: [
+                "Product name: Synthetic SaaS",
+                "Product description: A small fictional SaaS used for a contract test.",
+                "Generate two commercially relevant Moments.",
+              ].join("\n"),
+            },
+          ],
+          temperature: 0,
+          max_tokens: 512,
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    elapsedMs = Date.now() - startedAt;
+
+    if (response.ok) {
+      break;
+    }
+
+    const body = await readBoundedText(
+      response,
+      MAX_RESPONSE_BODY_BYTES,
     );
-    process.exit(1);
+
+    if (
+      !TRANSIENT_STATUS_CODES.has(response.status) ||
+      attempt === MAX_ATTEMPTS
+    ) {
+      console.error(
+        "Analysis provider preflight failed:",
+        diagnosticPayload({
+          response,
+          elapsedMs,
+          responseText: body.text,
+          responseTruncated: body.truncated,
+        }),
+      );
+      process.exit(1);
+    }
+
+    console.warn(
+      `Analysis provider preflight got transient HTTP ${response.status}; retrying (${attempt}/${MAX_ATTEMPTS - 1}).`,
+    );
+    await sleep(retryDelayMs(response, attempt));
+  }
+
+  if (!response || !response.ok) {
+    throw new Error("Analysis provider preflight failed without a final response.");
   }
 
   let payload;
