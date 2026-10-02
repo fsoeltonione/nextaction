@@ -152,7 +152,7 @@ jobs:
           name: Install
           command: npm ci
       - run:
-          name: Validate OpenAgentic provider
+          name: Validate configured analysis provider
           command: npm run analysis:provider-smoke
 
   release_source_guard:
