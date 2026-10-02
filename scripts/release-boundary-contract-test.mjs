@@ -54,9 +54,30 @@ for (const job of [
 
 assert.match(
   deploy,
-  /target === "production"[\s\S]*?process\.env\.CIRCLECI === "true"[\s\S]*?process\.env\.NEXTACTION_RELEASE_BRANCH !== "master"/,
+  /target === "production"[\s\S]*?process\.env\.CIRCLECI === "true"[\s\S]*?releaseBranch !== "master"/,
 );
 assert.match(deploy, /Production Cloudflare deployment is permitted from master only\./);
+// The guard must not depend solely on NEXTACTION_RELEASE_BRANCH: a deploy job
+// that forgot to set it read `undefined` and refused a master deploy. The
+// built-in CIRCLE_BRANCH is the fallback so a missing explicit variable cannot
+// be mistaken for a non-master release.
+assert.match(deploy, /process\.env\.NEXTACTION_RELEASE_BRANCH \|\| process\.env\.CIRCLE_BRANCH/);
+
+// Every job that runs the deploy script must also receive the release branch,
+// either as an explicit environment entry or (for staging) not at all is not
+// acceptable for production.
+for (const job of ["deploy_staging", "deploy_production"]) {
+  const start = circleci.search(new RegExp("\\n  " + job + ":\\n"));
+  assert.notEqual(start, -1, `${job} must exist`);
+  const rest = circleci.slice(start + 1);
+  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n    docker:/);
+  const block = nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
+  assert.match(
+    block,
+    /NEXTACTION_RELEASE_BRANCH: << pipeline\.git\.branch >>/,
+    `${job} must receive NEXTACTION_RELEASE_BRANCH`,
+  );
+}
 
 // Env/file presence checks in the release path must be loud: a bare
 // `test -n "${VAR}"` exits 1 with no output ("Exited with code exit status 1")

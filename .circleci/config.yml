@@ -174,6 +174,8 @@ jobs:
   deploy_staging:
     docker:
       - image: cimg/node:24.21.0
+    environment:
+      NEXTACTION_RELEASE_BRANCH: << pipeline.git.branch >>
     steps:
       - checkout
       - run:
@@ -233,6 +235,8 @@ jobs:
   deploy_production:
     docker:
       - image: cimg/node:24.21.0
+    environment:
+      NEXTACTION_RELEASE_BRANCH: << pipeline.git.branch >>
     steps:
       - checkout
       - run:

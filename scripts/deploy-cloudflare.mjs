@@ -11,15 +11,20 @@ if (!target || !targets.has(target)) {
   process.exit(2);
 }
 
-if (
-  target === "production" &&
-  process.env.CIRCLECI === "true" &&
-  process.env.NEXTACTION_RELEASE_BRANCH !== "master"
-) {
-  console.error(
-    "Production Cloudflare deployment is permitted from master only.",
-  );
-  process.exit(2);
+if (target === "production" && process.env.CIRCLECI === "true") {
+  // NEXTACTION_RELEASE_BRANCH is set explicitly by the deploy jobs from
+  // << pipeline.git.branch >>. CIRCLE_BRANCH is CircleCI's built-in branch
+  // variable and is always present, so it is used as a fallback: a job that
+  // forgot to set the explicit variable must not be mistaken for a non-master
+  // release.
+  const releaseBranch =
+    process.env.NEXTACTION_RELEASE_BRANCH || process.env.CIRCLE_BRANCH;
+  if (releaseBranch !== "master") {
+    console.error(
+      "Production Cloudflare deployment is permitted from master only.",
+    );
+    process.exit(2);
+  }
 }
 
 const required = [
