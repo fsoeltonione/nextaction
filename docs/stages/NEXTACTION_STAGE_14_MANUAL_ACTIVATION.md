@@ -68,8 +68,11 @@ STAGING_NEXT_PUBLIC_SUPABASE_URL=https://njjybpswxalxjhqjlvqa.supabase.co
 STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<staging publishable key>
 STAGING_SUPABASE_SECRET_KEY=<staging secret key>
 STAGING_INTEGRATION_TOKEN=<token produced by STAGE14_SEED.sql>
-STAGING_MOMENT_KEY=stage14_smoke_moment
 ~~~
+
+The Stage 14 smoke Moment key is the immutable constant `stage14_smoke_moment`
+defined in `scripts/staging-smoke.mjs`; it is intentionally **not** a CircleCI
+context variable, so the smoke can never drift from the seeded fixture.
 
 The release workflow captures the actual `workers.dev` URL after the staging deployment and passes it to the staging smoke job. `STAGING_BASE_URL` does not need to be configured manually.
 
