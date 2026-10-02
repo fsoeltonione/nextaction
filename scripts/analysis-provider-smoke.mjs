@@ -135,12 +135,13 @@ function retryDelayMs(response, attempt) {
 
 try {
   let response = null;
+  let responseBody = null;
   let elapsedMs = 0;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    const startedAt = Date.now();
+    const attemptStartedAt = Date.now();
 
     try {
       response = await fetch(endpoint, {
@@ -181,9 +182,13 @@ try {
       clearTimeout(timeout);
     }
 
-    elapsedMs = Date.now() - startedAt;
+    elapsedMs = Date.now() - attemptStartedAt;
 
     if (response.ok) {
+      responseBody = await readBoundedText(
+        response,
+        MAX_RESPONSE_BODY_BYTES,
+      );
       break;
     }
 
@@ -197,7 +202,7 @@ try {
       attempt === MAX_ATTEMPTS
     ) {
       console.error(
-        "Analysis provider preflight failed:",
+        "Configured analysis provider preflight failed:",
         diagnosticPayload({
           response,
           elapsedMs,
@@ -209,26 +214,26 @@ try {
     }
 
     console.warn(
-      `Analysis provider preflight got transient HTTP ${response.status}; retrying (${attempt}/${MAX_ATTEMPTS - 1}).`,
+      `Configured analysis provider preflight got transient HTTP ${response.status}; retrying (${attempt}/${MAX_ATTEMPTS - 1}).`,
     );
     await sleep(retryDelayMs(response, attempt));
   }
 
-  if (!response || !response.ok) {
-    throw new Error("Analysis provider preflight failed without a final response.");
+  if (!response || !response.ok || !responseBody) {
+    throw new Error("Configured analysis provider preflight failed without a final response.");
   }
 
   let payload;
   try {
-    payload = parseAnalysisProviderResponse(body.text);
+    payload = parseAnalysisProviderResponse(responseBody.text);
   } catch {
     console.error(
-      "Analysis provider preflight returned a non-JSON response:",
+      "Configured analysis provider preflight returned a non-JSON response:",
       diagnosticPayload({
         response,
         elapsedMs,
-        responseText: body.text,
-        responseTruncated: body.truncated,
+        responseText: responseBody.text,
+        responseTruncated: responseBody.truncated,
       }),
     );
     process.exit(1);
@@ -239,12 +244,12 @@ try {
 
   if (typeof content !== "string" || content.trim().length === 0) {
     console.error(
-      "Analysis provider preflight returned no assistant content:",
+      "Configured analysis provider preflight returned no assistant content:",
       diagnosticPayload({
         response,
         elapsedMs,
-        responseText: body.text,
-        responseTruncated: body.truncated,
+        responseText: responseBody.text,
+        responseTruncated: responseBody.truncated,
       }),
     );
     process.exit(1);
@@ -255,13 +260,13 @@ try {
     parsedContent = parseAnalysisProviderContent(content);
   } catch (error) {
     console.error(
-      "Analysis provider preflight assistant content was not JSON:",
+      "Configured analysis provider preflight assistant content was not JSON:",
       {
         ...diagnosticPayload({
           response,
           elapsedMs,
-          responseText: body.text,
-          responseTruncated: body.truncated,
+          responseText: responseBody.text,
+          responseTruncated: responseBody.truncated,
         }),
         validation_reason:
           error instanceof Error ? error.message : "unknown",
@@ -281,13 +286,13 @@ try {
     }
   } catch (error) {
     console.error(
-      "Analysis provider preflight assistant content failed the analysis output contract:",
+      "Configured analysis provider preflight assistant content failed the analysis output contract:",
       {
         ...diagnosticPayload({
           response,
           elapsedMs,
-          responseText: body.text,
-          responseTruncated: body.truncated,
+          responseText: responseBody.text,
+          responseTruncated: responseBody.truncated,
         }),
         validation_reason:
           error instanceof Error ? error.message : "unknown",
@@ -297,20 +302,17 @@ try {
   }
 
   console.log(
-    `Analysis provider preflight + analysis output contract: OK (${elapsedMs}ms, model=${model})`,
+    `Configured analysis provider preflight + analysis output contract: OK (${elapsedMs}ms, model=${model})`,
   );
 } catch (error) {
-  const elapsedMs = Date.now() - startedAt;
   if (error instanceof DOMException && error.name === "AbortError") {
     console.error(
-      `Analysis provider preflight timed out after ${elapsedMs}ms.`,
+      `Configured analysis provider preflight timed out after ${elapsedMs}ms.`,
     );
   } else {
     console.error(
-      `Analysis provider preflight request failed after ${elapsedMs}ms.`,
+      `Configured analysis provider preflight request failed after ${elapsedMs}ms.`,
     );
   }
   process.exit(1);
-} finally {
-  clearTimeout(timeout);
 }
