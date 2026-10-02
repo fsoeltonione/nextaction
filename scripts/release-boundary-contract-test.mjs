@@ -1,1 +1,40 @@
-import assert from "node:assert/strict";\nimport { readFile } from "node:fs/promises";\n\nconst [circleci, deploy] = await Promise.all([\n  readFile(".circleci/config.yml", "utf8"),\n  readFile("scripts/deploy-cloudflare.mjs", "utf8"),\n]);\n\nassert.match(circleci, /release_source_guard:/);\nassert.match(circleci, /NEXTACTION_RELEASE_BRANCH: << pipeline\.git\.branch >>/);\nassert.match(circleci, /test "\$\{NEXTACTION_RELEASE_BRANCH\}" = "master"/);\n\nfor (const job of [\n  "analysis_provider_smoke",\n  "deploy_staging",\n  "staging_smoke",\n  "hold_production",\n  "deploy_production",\n  "cloudflare_production_audit",\n  "production_smoke",\n]) {\n  const start = circleci.indexOf("      - " + job + ":");\n  assert.notEqual(start, -1, `${job} must exist in release-gate`);\n  const end = circleci.indexOf("\n      - ", start + 9);\n  const block = circleci.slice(start, end === -1 ? circleci.length : end);\n  assert.match(block, /filters:\n\s+branches:\n\s+only: master/);\n  assert.match(block, /requires:[\s\S]*release_source_guard/);\n}\n\nassert.match(\n  deploy,\n  /target === "production"[\s\S]*?process\.env\.CIRCLECI === "true"[\s\S]*?process\.env\.NEXTACTION_RELEASE_BRANCH !== "master"/,\n);\nassert.match(deploy, /Production Cloudflare deployment is permitted from master only\./);\n\nconsole.log("release boundary contract: OK");\n
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const [circleci, deploy] = await Promise.all([
+  readFile(".circleci/config.yml", "utf8"),
+  readFile("scripts/deploy-cloudflare.mjs", "utf8"),
+]);
+
+assert.match(circleci, /release_source_guard:/);
+assert.match(circleci, /NEXTACTION_RELEASE_BRANCH: << pipeline\.git\.branch >>/);
+assert.match(circleci, /test "\$\{NEXTACTION_RELEASE_BRANCH\}" = "master"/);
+
+const releaseWorkflowStart = circleci.indexOf("  release-gate:");
+assert.notEqual(releaseWorkflowStart, -1, "release-gate workflow must exist");
+const releaseWorkflow = circleci.slice(releaseWorkflowStart);
+
+for (const job of [
+  "analysis_provider_smoke",
+  "deploy_staging",
+  "staging_smoke",
+  "hold_production",
+  "deploy_production",
+  "cloudflare_production_audit",
+  "production_smoke",
+]) {
+  const start = releaseWorkflow.indexOf("      - " + job + ":");
+  assert.notEqual(start, -1, `${job} must exist in release-gate`);
+  const end = releaseWorkflow.indexOf("\n      - ", start + 9);
+  const block = releaseWorkflow.slice(start, end === -1 ? releaseWorkflow.length : end);
+  assert.match(block, /filters:\n\s+branches:\n\s+only: master/);
+  assert.match(block, /requires:[\s\S]*release_source_guard/);
+}
+
+assert.match(
+  deploy,
+  /target === "production"[\s\S]*?process\.env\.CIRCLECI === "true"[\s\S]*?process\.env\.NEXTACTION_RELEASE_BRANCH !== "master"/,
+);
+assert.match(deploy, /Production Cloudflare deployment is permitted from master only\./);
+
+console.log("release boundary contract: OK");
