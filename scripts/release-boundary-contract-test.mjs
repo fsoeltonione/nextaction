@@ -14,6 +14,24 @@ const releaseWorkflowStart = circleci.indexOf("  release-gate:");
 assert.notEqual(releaseWorkflowStart, -1, "release-gate workflow must exist");
 const releaseWorkflow = circleci.slice(releaseWorkflowStart);
 
+// release_source_guard must be present as an actual job in the release-gate
+// workflow's jobs list, not just referenced from other jobs' requires: lists.
+// A requires: entry in CircleCI must name a job that exists in the same
+// workflow's jobs: block, otherwise the pipeline fails config validation
+// with "requires 'X', which is the name of 0 other jobs in workflow ...".
+const guardJobStart = releaseWorkflow.indexOf("      - release_source_guard:");
+assert.notEqual(
+  guardJobStart,
+  -1,
+  "release_source_guard must be listed as a job in the release-gate workflow",
+);
+const guardJobEnd = releaseWorkflow.indexOf("\n      - ", guardJobStart + 9);
+const guardJobBlock = releaseWorkflow.slice(
+  guardJobStart,
+  guardJobEnd === -1 ? releaseWorkflow.length : guardJobEnd,
+);
+assert.match(guardJobBlock, /filters:\n\s+branches:\n\s+only: master/);
+
 for (const job of [
   "analysis_provider_smoke",
   "deploy_staging",

@@ -341,6 +341,10 @@ workflows:
     when: << pipeline.parameters.run_release_gate >>
     jobs:
       - quality
+      - release_source_guard:
+          filters:
+            branches:
+              only: master
       - product_scanner_security:
           requires:
             - quality
