@@ -1,6 +1,9 @@
 const baseUrl = process.env.STAGING_BASE_URL;
 const integrationToken = process.env.STAGING_INTEGRATION_TOKEN;
-const momentKey = process.env.STAGING_MOMENT_KEY ?? "stage14_smoke_moment";
+
+// Stage 14 is a fixed release-gate fixture. Its Moment key is part of the
+// fixture contract and must not be supplied by mutable CI configuration.
+const STAGE14_SMOKE_MOMENT_KEY = "stage14_smoke_moment";
 const expectedEnvironment =
   process.env.EXPECTED_ENVIRONMENT ?? "staging";
 const defaultAnalyzeSmokeUrl = "https://carrd.com";
@@ -124,6 +127,9 @@ if (
 }
 
 console.log("Event idempotency smoke: OK");
+console.log(
+  `Stage 14 Moment contract: ${STAGE14_SMOKE_MOMENT_KEY}`,
+);
 
 const offer = await request("/v1/offer", {
   method: "POST",
@@ -132,7 +138,7 @@ const offer = await request("/v1/offer", {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    moment_key: momentKey,
+    moment_key: STAGE14_SMOKE_MOMENT_KEY,
     context: {
       source: "stage14-smoke",
     },
