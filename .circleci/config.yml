@@ -165,8 +165,11 @@ jobs:
       - run:
           name: Enforce release source branch
           command: |
-            test -n "${NEXTACTION_RELEASE_BRANCH}"
-            test "${NEXTACTION_RELEASE_BRANCH}" = "master"
+            bash scripts/require-env.sh NEXTACTION_RELEASE_BRANCH
+            if [ "${NEXTACTION_RELEASE_BRANCH}" != "master" ]; then
+              echo "Release gate may only run from master, got: ${NEXTACTION_RELEASE_BRANCH}" >&2
+              exit 1
+            fi
 
   deploy_staging:
     docker:
@@ -179,14 +182,15 @@ jobs:
       - run:
           name: Validate staging secrets
           command: |
-            test -n "${CLOUDFLARE_API_TOKEN}"
-            test -n "${CLOUDFLARE_ACCOUNT_ID}"
-            test -n "${STAGING_NEXT_PUBLIC_SUPABASE_URL}"
-            test -n "${STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
-            test -n "${STAGING_SUPABASE_SECRET_KEY}"
-            test -n "${ANALYSIS_API_KEY}"
-            test -n "${ANALYSIS_BASE_URL}"
-            test -n "${ANALYSIS_MODEL}"
+            bash scripts/require-env.sh \
+              CLOUDFLARE_API_TOKEN \
+              CLOUDFLARE_ACCOUNT_ID \
+              STAGING_NEXT_PUBLIC_SUPABASE_URL \
+              STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+              STAGING_SUPABASE_SECRET_KEY \
+              ANALYSIS_API_KEY \
+              ANALYSIS_BASE_URL \
+              ANALYSIS_MODEL
       - run:
           name: Deploy staging
           command: |
@@ -199,7 +203,7 @@ jobs:
             grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-staging.ndjson \
               | tail -1 \
               > /tmp/nextaction-release/staging_base_url
-            test -s /tmp/nextaction-release/staging_base_url
+            bash scripts/require-file.sh /tmp/nextaction-release/staging_base_url
       - persist_to_workspace:
           root: /tmp/nextaction-release
           paths:
@@ -218,8 +222,8 @@ jobs:
       - run:
           name: Validate staging smoke inputs
           command: |
-            test -s /tmp/nextaction-release/staging_base_url
-            test -n "${STAGING_INTEGRATION_TOKEN}"
+            bash scripts/require-file.sh /tmp/nextaction-release/staging_base_url
+            bash scripts/require-env.sh STAGING_INTEGRATION_TOKEN
       - run:
           name: Run staging smoke
           command: |
@@ -237,14 +241,15 @@ jobs:
       - run:
           name: Validate production secrets
           command: |
-            test -n "${CLOUDFLARE_API_TOKEN}"
-            test -n "${CLOUDFLARE_ACCOUNT_ID}"
-            test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"
-            test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}"
-            test -n "${PRODUCTION_SUPABASE_SECRET_KEY}"
-            test -n "${ANALYSIS_API_KEY}"
-            test -n "${ANALYSIS_BASE_URL}"
-            test -n "${ANALYSIS_MODEL}"
+            bash scripts/require-env.sh \
+              CLOUDFLARE_API_TOKEN \
+              CLOUDFLARE_ACCOUNT_ID \
+              PRODUCTION_NEXT_PUBLIC_SUPABASE_URL \
+              PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+              PRODUCTION_SUPABASE_SECRET_KEY \
+              ANALYSIS_API_KEY \
+              ANALYSIS_BASE_URL \
+              ANALYSIS_MODEL
       - run:
           name: Deploy production
           command: |
@@ -257,7 +262,7 @@ jobs:
             grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-production.ndjson \
               | tail -1 \
               > /tmp/nextaction-release/production_base_url
-            test -s /tmp/nextaction-release/production_base_url
+            bash scripts/require-file.sh /tmp/nextaction-release/production_base_url
       - persist_to_workspace:
           root: /tmp/nextaction-release
           paths:
@@ -272,8 +277,7 @@ jobs:
       - run:
           name: Validate Cloudflare audit inputs
           command: |
-            test -n "${CLOUDFLARE_API_TOKEN}"
-            test -n "${CLOUDFLARE_ACCOUNT_ID}"
+            bash scripts/require-env.sh CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
       - run:
           name: Audit active production Worker
           command: |
@@ -292,9 +296,10 @@ jobs:
       - run:
           name: Validate production smoke inputs
           command: |
-            test -s /tmp/nextaction-release/production_base_url
-            test -n "${PRODUCTION_NEXT_PUBLIC_SUPABASE_URL}"
-            test -n "${PRODUCTION_SUPABASE_SECRET_KEY}"
+            bash scripts/require-file.sh /tmp/nextaction-release/production_base_url
+            bash scripts/require-env.sh \
+              PRODUCTION_NEXT_PUBLIC_SUPABASE_URL \
+              PRODUCTION_SUPABASE_SECRET_KEY
       - run:
           name: Run production runtime smoke
           command: |

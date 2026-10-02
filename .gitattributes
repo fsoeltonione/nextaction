@@ -1,0 +1,13 @@
+# Shell scripts run on Linux (CircleCI, Cloudflare). Force LF so a Windows
+# checkout with autocrlf can never introduce CRLF that breaks `bash script.sh`
+# with "env: 'bash\r': No such file or directory".
+*.sh text eol=lf
+
+# Keep the CircleCI config and Node sources LF as well.
+.circleci/config.yml text eol=lf
+*.mjs text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.sql text eol=lf
