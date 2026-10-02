@@ -40,6 +40,18 @@ jobs:
           name: Build
           command: npm run build
 
+  release_boundary_contract:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Verify release boundary contract
+          command: npm run test:release-boundary
+
   product_scanner_security:
     docker:
       - image: cimg/node:24.21.0
@@ -294,9 +306,13 @@ workflows:
   quality-gate:
     jobs:
       - quality
+      - release_boundary_contract:
+          requires:
+            - quality
       - product_scanner_security:
           requires:
             - quality
+            - release_boundary_contract
       - analysis_provider_contract:
           requires:
             - quality
