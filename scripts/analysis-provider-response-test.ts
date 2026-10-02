@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseAnalysisProviderResponse } from "../src/lib/runtime/analysis-provider-response.ts";
 
-const providerResponse =
+const providerResponseWithDoneTrailer =
   JSON.stringify({
     id: "19ab4ba2e8324bbe8d1a161b20cc0f11",
     object: "chat.completion",
     created: 1790532084,
-    model: "cb-deepseek-v4.1-flash",
+    model: "test-model",
     choices: [
       {
         index: 0,
@@ -37,8 +37,8 @@ test("parses a normal JSON provider response", () => {
   assert.deepEqual(value, { ok: true });
 });
 
-test("parses OpenAgentic JSON followed by the exact DONE trailer", () => {
-  const value = parseAnalysisProviderResponse(providerResponse);
+test("parses a JSON provider response followed by the exact DONE trailer", () => {
+  const value = parseAnalysisProviderResponse(providerResponseWithDoneTrailer);
   assert.equal(typeof value, "object");
   const payload = value as {
     choices?: Array<{

@@ -172,9 +172,7 @@ async function resolvePublicAddressesWithRetry(
         throw error;
       }
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, NON_PUBLIC_DNS_RETRY_DELAY_MS),
-      );
+      await sleep(NON_PUBLIC_DNS_RETRY_DELAY_MS);
     }
   }
 
@@ -183,6 +181,12 @@ async function resolvePublicAddressesWithRetry(
     "Product host resolves to a non-public network address.",
     400,
   );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => resolve(), ms);
+  });
 }
 
 async function readLimitedBody(

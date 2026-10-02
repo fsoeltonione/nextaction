@@ -11,6 +11,17 @@ if (!target || !targets.has(target)) {
   process.exit(2);
 }
 
+if (
+  target === "production" &&
+  process.env.CIRCLECI === "true" &&
+  process.env.NEXTACTION_RELEASE_BRANCH !== "master"
+) {
+  console.error(
+    "Production Cloudflare deployment is permitted from master only.",
+  );
+  process.exit(2);
+}
+
 const required = [
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_ACCOUNT_ID",

@@ -209,7 +209,7 @@ export async function POST(request: Request) {
             },
           ],
           temperature: 0,
-          max_tokens: 1600,
+          max_completion_tokens: 1600,
           stream: false,
         }),
         signal: controller.signal,

@@ -59,14 +59,15 @@ ANALYSIS_BASE_URL
 ANALYSIS_MODEL
 ```
 
-Required smoke variables:
+Required staging smoke variable:
 
 ```text
 STAGING_INTEGRATION_TOKEN
-STAGING_MOMENT_KEY
 ```
 
-Staging smoke also exercises `POST /api/analyze` through the deployed Worker. NextAction currently uses OpenAgentic.id as its analysis provider. The staging and production deployment contexts must provide `ANALYSIS_API_KEY`, `ANALYSIS_BASE_URL`, and `ANALYSIS_MODEL`. The API key is stored as a Worker secret; the base URL and model are injected as Worker variables. The smoke uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
+The Stage 14 smoke uses the fixed fixture Moment key `stage14_smoke_moment`; it is intentionally not configurable through CircleCI context variables.
+
+Staging smoke also exercises `POST /api/analyze` through the deployed Worker. NextAction uses a provider-neutral analysis configuration contract. The current provider is Groq. Supply the Groq API key through `ANALYSIS_API_KEY`, use `https://api.groq.com/openai/v1` for `ANALYSIS_BASE_URL`, and set `ANALYSIS_MODEL` to a currently supported Groq chat model. The API key is stored as a Worker secret; the base URL and model are injected as Worker variables. The smoke uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
 
 Never commit Supabase secrets, Cloudflare API tokens, or `.env` files.
 

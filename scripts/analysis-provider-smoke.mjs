@@ -107,77 +107,133 @@ function diagnosticPayload({ response, elapsedMs, responseText, responseTruncate
   };
 }
 
-const controller = new AbortController();
 const timeoutMs = 25_000;
-const timeout = setTimeout(() => controller.abort(), timeoutMs);
-const startedAt = Date.now();
+const MAX_ATTEMPTS = 3;
+const TRANSIENT_STATUS_CODES = new Set([429, 502, 503, 504]);
+const MAX_RETRY_DELAY_MS = 5_000;
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), ms);
+  });
+}
+
+function retryDelayMs(response, attempt) {
+  const retryAfter = response.headers.get("retry-after");
+  const retryAfterSeconds = Number(retryAfter);
+
+  if (
+    Number.isFinite(retryAfterSeconds) &&
+    retryAfterSeconds >= 0 &&
+    retryAfterSeconds <= 60
+  ) {
+    return Math.min(retryAfterSeconds * 1000, MAX_RETRY_DELAY_MS);
+  }
+
+  return Math.min(1000 * 2 ** (attempt - 1), MAX_RETRY_DELAY_MS);
+}
 
 try {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: [
-            "Return exactly one JSON object for a SaaS product.",
-            "The object must contain name, description, and moments.",
-            "moments must be an array of 2 or more objects.",
-            "Each Moment must have a label string and may have a key and description.",
-            "Return no Markdown or prose.",
-          ].join("\n"),
-        },
-        {
-          role: "user",
-          content: [
-            "Product name: Synthetic SaaS",
-            "Product description: A small fictional SaaS used for a contract test.",
-            "Generate two commercially relevant Moments.",
-          ].join("\n"),
-        },
-      ],
-      temperature: 0,
-      max_tokens: 512,
-      stream: false,
-    }),
-    signal: controller.signal,
-  });
+  let response = null;
+  let responseBody = null;
+  let elapsedMs = 0;
 
-  const elapsedMs = Date.now() - startedAt;
-  const body = await readBoundedText(
-    response,
-    MAX_RESPONSE_BODY_BYTES,
-  );
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const attemptStartedAt = Date.now();
 
-  if (!response.ok) {
-    console.error(
-      "Analysis provider preflight failed:",
-      diagnosticPayload({
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: "system",
+              content: [
+                "Return exactly one JSON object for a SaaS product.",
+                "The object must contain name, description, and moments.",
+                "moments must be an array of 2 or more objects.",
+                "Each Moment must have a label string and may have a key and description.",
+                "Return no Markdown or prose.",
+              ].join("\n"),
+            },
+            {
+              role: "user",
+              content: [
+                "Product name: Synthetic SaaS",
+                "Product description: A small fictional SaaS used for a contract test.",
+                "Generate two commercially relevant Moments.",
+              ].join("\n"),
+            },
+          ],
+          temperature: 0,
+          max_completion_tokens: 512,
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    elapsedMs = Date.now() - attemptStartedAt;
+
+    if (response.ok) {
+      responseBody = await readBoundedText(
         response,
-        elapsedMs,
-        responseText: body.text,
-        responseTruncated: body.truncated,
-      }),
+        MAX_RESPONSE_BODY_BYTES,
+      );
+      break;
+    }
+
+    const body = await readBoundedText(
+      response,
+      MAX_RESPONSE_BODY_BYTES,
     );
-    process.exit(1);
+
+    if (
+      !TRANSIENT_STATUS_CODES.has(response.status) ||
+      attempt === MAX_ATTEMPTS
+    ) {
+      console.error(
+        "Configured analysis provider preflight failed:",
+        diagnosticPayload({
+          response,
+          elapsedMs,
+          responseText: body.text,
+          responseTruncated: body.truncated,
+        }),
+      );
+      process.exit(1);
+    }
+
+    console.warn(
+      `Configured analysis provider preflight got transient HTTP ${response.status}; retrying (${attempt}/${MAX_ATTEMPTS - 1}).`,
+    );
+    await sleep(retryDelayMs(response, attempt));
+  }
+
+  if (!response || !response.ok || !responseBody) {
+    throw new Error("Configured analysis provider preflight failed without a final response.");
   }
 
   let payload;
   try {
-    payload = parseAnalysisProviderResponse(body.text);
+    payload = parseAnalysisProviderResponse(responseBody.text);
   } catch {
     console.error(
-      "Analysis provider preflight returned a non-JSON response:",
+      "Configured analysis provider preflight returned a non-JSON response:",
       diagnosticPayload({
         response,
         elapsedMs,
-        responseText: body.text,
-        responseTruncated: body.truncated,
+        responseText: responseBody.text,
+        responseTruncated: responseBody.truncated,
       }),
     );
     process.exit(1);
@@ -188,12 +244,12 @@ try {
 
   if (typeof content !== "string" || content.trim().length === 0) {
     console.error(
-      "Analysis provider preflight returned no assistant content:",
+      "Configured analysis provider preflight returned no assistant content:",
       diagnosticPayload({
         response,
         elapsedMs,
-        responseText: body.text,
-        responseTruncated: body.truncated,
+        responseText: responseBody.text,
+        responseTruncated: responseBody.truncated,
       }),
     );
     process.exit(1);
@@ -204,13 +260,13 @@ try {
     parsedContent = parseAnalysisProviderContent(content);
   } catch (error) {
     console.error(
-      "Analysis provider preflight assistant content was not JSON:",
+      "Configured analysis provider preflight assistant content was not JSON:",
       {
         ...diagnosticPayload({
           response,
           elapsedMs,
-          responseText: body.text,
-          responseTruncated: body.truncated,
+          responseText: responseBody.text,
+          responseTruncated: responseBody.truncated,
         }),
         validation_reason:
           error instanceof Error ? error.message : "unknown",
@@ -230,13 +286,13 @@ try {
     }
   } catch (error) {
     console.error(
-      "Analysis provider preflight assistant content failed the analysis output contract:",
+      "Configured analysis provider preflight assistant content failed the analysis output contract:",
       {
         ...diagnosticPayload({
           response,
           elapsedMs,
-          responseText: body.text,
-          responseTruncated: body.truncated,
+          responseText: responseBody.text,
+          responseTruncated: responseBody.truncated,
         }),
         validation_reason:
           error instanceof Error ? error.message : "unknown",
@@ -246,20 +302,17 @@ try {
   }
 
   console.log(
-    `Analysis provider preflight + analysis output contract: OK (${elapsedMs}ms, model=${model})`,
+    `Configured analysis provider preflight + analysis output contract: OK (${elapsedMs}ms, model=${model})`,
   );
 } catch (error) {
-  const elapsedMs = Date.now() - startedAt;
   if (error instanceof DOMException && error.name === "AbortError") {
     console.error(
-      `Analysis provider preflight timed out after ${elapsedMs}ms.`,
+      `Configured analysis provider preflight timed out after ${elapsedMs}ms.`,
     );
   } else {
     console.error(
-      `Analysis provider preflight request failed after ${elapsedMs}ms.`,
+      `Configured analysis provider preflight request failed after ${elapsedMs}ms.`,
     );
   }
   process.exit(1);
-} finally {
-  clearTimeout(timeout);
 }

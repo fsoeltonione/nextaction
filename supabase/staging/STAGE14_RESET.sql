@@ -37,32 +37,38 @@ OR publisher_workspace_id IN (
   WHERE name IN ('Stage 14 Publisher', 'Stage 14 Advertiser')
 );
 
+-- Decisions may be no_fill and therefore have no offer_id. Teardown follows
+-- the Stage 14 integration boundary rather than only the smoke Offer.
 DELETE FROM private.qualified_clicks
 WHERE click_id IN (
   SELECT c.id
   FROM private.clicks c
   JOIN private.deliveries d ON d.id = c.delivery_id
-  WHERE d.offer_id IN (
-    SELECT id FROM public.offers WHERE title = 'Stage 14 Smoke Offer'
+  WHERE d.integration_id IN (
+    SELECT id FROM public.integrations
+    WHERE name = 'stage14-smoke-integration'
   )
 );
 
 DELETE FROM private.clicks
 WHERE delivery_id IN (
   SELECT id FROM private.deliveries
-  WHERE offer_id IN (
-    SELECT id FROM public.offers WHERE title = 'Stage 14 Smoke Offer'
+  WHERE integration_id IN (
+    SELECT id FROM public.integrations
+    WHERE name = 'stage14-smoke-integration'
   )
 );
 
 DELETE FROM private.deliveries
-WHERE offer_id IN (
-  SELECT id FROM public.offers WHERE title = 'Stage 14 Smoke Offer'
+WHERE integration_id IN (
+  SELECT id FROM public.integrations
+  WHERE name = 'stage14-smoke-integration'
 );
 
 DELETE FROM private.decisions
-WHERE offer_id IN (
-  SELECT id FROM public.offers WHERE title = 'Stage 14 Smoke Offer'
+WHERE integration_id IN (
+  SELECT id FROM public.integrations
+  WHERE name = 'stage14-smoke-integration'
 );
 
 DELETE FROM private.moment_occurrences

@@ -144,7 +144,7 @@ The tests do not depend on the public network.
 
 The staging smoke now exercises `POST /api/analyze` through the deployed Worker in addition to the existing runtime chain.
 
-NextAction currently uses OpenAgentic.id as its analysis provider. The staging and production deployment contexts must provide `ANALYSIS_API_KEY`, `ANALYSIS_BASE_URL`, and `ANALYSIS_MODEL`. The deployment script stores the API key as a Worker secret and injects the base URL and model as Worker variables. Release deployment validation fails before deployment when these values are absent.
+NextAction uses a provider-neutral analysis configuration contract. The current deployment uses Groq through the OpenAI-compatible Chat Completions API. The staging and production deployment contexts must provide `ANALYSIS_API_KEY`, `ANALYSIS_BASE_URL`, and `ANALYSIS_MODEL`; the Groq base URL is `https://api.groq.com/openai/v1`. The deployment script stores the API key as a Worker secret and injects the base URL and model as Worker variables. Release deployment validation fails before deployment when these values are absent.
 
 The analyze smoke validates:
 
