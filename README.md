@@ -66,7 +66,7 @@ STAGING_INTEGRATION_TOKEN
 STAGING_MOMENT_KEY
 ```
 
-Staging smoke also exercises `POST /api/analyze` through the deployed Worker. NextAction currently uses OpenAgentic.id as its analysis provider. The staging and production deployment contexts must provide `ANALYSIS_API_KEY`, `ANALYSIS_BASE_URL`, and `ANALYSIS_MODEL`. The API key is stored as a Worker secret; the base URL and model are injected as Worker variables. The smoke uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
+Staging smoke also exercises `POST /api/analyze` through the deployed Worker. NextAction uses a provider-neutral analysis configuration contract. The current provider can be Groq by supplying Groq credentials/configuration through `ANALYSIS_API_KEY`, `ANALYSIS_BASE_URL`, and `ANALYSIS_MODEL`. The API key is stored as a Worker secret; the base URL and model are injected as Worker variables. The smoke uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
 
 Never commit Supabase secrets, Cloudflare API tokens, or `.env` files.
 
