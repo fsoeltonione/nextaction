@@ -197,8 +197,11 @@ STAGING_SUPABASE_SECRET_KEY
 
 ~~~text
 STAGING_INTEGRATION_TOKEN
-STAGING_MOMENT_KEY
 ~~~
+
+The Stage 14 smoke Moment key is the immutable constant `stage14_smoke_moment`
+defined in `scripts/staging-smoke.mjs`; it is intentionally **not** a context
+variable, so the smoke can never drift from the seeded fixture.
 
 
 ### Production
