@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [circleci, deploy] = await Promise.all([
+const [circleci, deploy, requireEnv, requireFile] = await Promise.all([
   readFile(".circleci/config.yml", "utf8"),
   readFile("scripts/deploy-cloudflare.mjs", "utf8"),
+  readFile("scripts/require-env.sh", "utf8"),
+  readFile("scripts/require-file.sh", "utf8"),
 ]);
 
 assert.match(circleci, /release_source_guard:/);
 assert.match(circleci, /NEXTACTION_RELEASE_BRANCH: << pipeline\.git\.branch >>/);
-assert.match(circleci, /test "\$\{NEXTACTION_RELEASE_BRANCH\}" = "master"/);
+assert.match(circleci, /require-env\.sh NEXTACTION_RELEASE_BRANCH/);
+assert.match(circleci, /Release gate may only run from master/);
 
 const releaseWorkflowStart = circleci.indexOf("  release-gate:");
 assert.notEqual(releaseWorkflowStart, -1, "release-gate workflow must exist");
@@ -54,5 +57,39 @@ assert.match(
   /target === "production"[\s\S]*?process\.env\.CIRCLECI === "true"[\s\S]*?process\.env\.NEXTACTION_RELEASE_BRANCH !== "master"/,
 );
 assert.match(deploy, /Production Cloudflare deployment is permitted from master only\./);
+
+// Env/file presence checks in the release path must be loud: a bare
+// `test -n "${VAR}"` exits 1 with no output ("Exited with code exit status 1")
+// and hides which context variable was missing. Every release job that
+// validates context inputs must use the reporting helpers instead.
+assert.doesNotMatch(
+  circleci,
+  /test -n "\$\{[A-Z0-9_]+\}"/,
+  "release config must not use silent `test -n` env checks",
+);
+assert.doesNotMatch(
+  circleci,
+  /test -s \/tmp\/nextaction-release/,
+  "release config must not use silent `test -s` file checks",
+);
+for (const job of [
+  "deploy_staging",
+  "staging_smoke",
+  "deploy_production",
+  "cloudflare_production_audit",
+  "production_smoke",
+]) {
+  const startMatch = new RegExp("\\n  " + job + ":\\n");
+  const start = circleci.search(startMatch);
+  assert.notEqual(start, -1, `${job} must exist`);
+  // A job definition starts at 2-space indentation with `name:` then `docker:`.
+  const rest = circleci.slice(start + 1);
+  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n    docker:/);
+  const block =
+    nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
+  assert.match(block, /require-(env|file)\.sh/, `${job} must use loud validation`);
+}
+assert.match(requireEnv, /Missing required environment variables:/);
+assert.match(requireFile, /Missing or empty required file\(s\):/);
 
 console.log("release boundary contract: OK");
