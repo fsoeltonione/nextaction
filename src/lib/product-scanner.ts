@@ -12,8 +12,6 @@ export const PRODUCT_SCANNER_LIMITS = Object.freeze({
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const NO_DATA_DNS_CODES = new Set(["ENODATA", "ENOTFOUND"]);
-const NON_PUBLIC_DNS_RETRIES = 2;
-const NON_PUBLIC_DNS_RETRY_DELAY_MS = 75;
 
 export type ProductScanResult = {
   finalUrl: string;
@@ -154,37 +152,6 @@ function validatePublicAddresses(
   }
 }
 
-async function resolvePublicAddressesWithRetry(
-  hostname: string,
-  resolveAddresses: ResolveAddresses,
-): Promise<string[]> {
-  for (let attempt = 0; attempt <= NON_PUBLIC_DNS_RETRIES; attempt += 1) {
-    const addresses = await resolveAddresses(hostname);
-    try {
-      validatePublicAddresses(addresses, "non_public_address");
-      return addresses;
-    } catch (error) {
-      if (
-        !(error instanceof ProductScannerError) ||
-        error.code !== "non_public_address" ||
-        attempt === NON_PUBLIC_DNS_RETRIES
-      ) {
-        throw error;
-      }
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, NON_PUBLIC_DNS_RETRY_DELAY_MS),
-      );
-    }
-  }
-
-  throw new ProductScannerError(
-    "non_public_address",
-    "Product host resolves to a non-public network address.",
-    400,
-  );
-}
-
 async function readLimitedBody(
   response: Response,
   maxBytes: number,
@@ -302,10 +269,8 @@ export async function scanProductUrl(
     }
     visited.add(currentValue);
 
-    const resolvedBefore = await resolvePublicAddressesWithRetry(
-      current.hostname,
-      resolveAddresses,
-    );
+    const resolvedBefore = await resolveAddresses(current.hostname);
+    validatePublicAddresses(resolvedBefore, "non_public_address");
     if (firstResolvedAddresses === null) {
       firstResolvedAddresses = resolvedBefore;
     }
