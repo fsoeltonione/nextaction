@@ -4,7 +4,7 @@ BEGIN;
 -- H1: immutable-ish monitoring snapshots. The table is private, RLS-protected,
 -- and never exposed to anon/authenticated. Rows are monitoring history only.
 CREATE TABLE IF NOT EXISTS private.runtime_integrity_snapshots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT extensions.gen_random_uuid(),
   checked_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   status TEXT NOT NULL CHECK (status IN ('ok', 'warning', 'critical')),
   anomaly_count INTEGER NOT NULL CHECK (anomaly_count >= 0),
@@ -153,7 +153,7 @@ BEGIN
      OR available_units < 0;
 
   v_anomaly_count :=
-      v_queue_count
+      CASE WHEN v_queue_oldest_age_seconds > 60 THEN 1 ELSE 0 END
     + v_stale_event_count
     + v_financial_mismatch_count
     + v_settlement_split_mismatch_count
@@ -306,10 +306,7 @@ END;
 $guards$;
 
 -- Supabase Cron must be changed through cron functions, not cron.job writes.
-SELECT cron.unschedule(jobid)
-FROM cron.job
-WHERE jobname = 'nextaction-runtime-integrity-audit';
-
+-- Scheduling an existing job name replaces that job definition.
 SELECT cron.schedule(
   'nextaction-runtime-integrity-audit',
   '*/5 * * * *',
