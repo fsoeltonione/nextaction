@@ -146,6 +146,15 @@ export async function GET(
         );
       }
 
+      if (error.code === "P0001") {
+        return failure(
+          requestId,
+          503,
+          "settlement_unavailable",
+          "Click settlement is temporarily unavailable.",
+        );
+      }
+
       console.error("Runtime click processing failed", {
         requestId,
         code: error.code,
