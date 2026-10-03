@@ -143,7 +143,8 @@ try {
   if (
     migrations?.h2_1_runtime_failure_containment !== true ||
     migrations?.h2_2_recovery_operations !== true ||
-    migrations?.h2_2_runtime_ops_hardening !== true
+    migrations?.h2_2_runtime_ops_hardening !== true ||
+    migrations?.h2_3_release_reliability_proof !== true
   ) {
     throw new Error(
       `Production migration proof failed: ${JSON.stringify(migrations)}`,
