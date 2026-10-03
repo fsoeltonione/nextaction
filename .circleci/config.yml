@@ -143,6 +143,18 @@ jobs:
           name: Run Stage 16 activation contract checks
           command: npm run test:stage16-activation
 
+  runtime_hardening_contract:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run H0/H1 runtime hardening contract
+          command: npm run test:runtime-hardening
+
   analysis_provider_smoke:
     docker:
       - image: cimg/node:24.21.0
@@ -333,10 +345,15 @@ workflows:
       - stage16_activation_contract:
           requires:
             - quality
+      - runtime_hardening_contract:
+          requires:
+            - quality
       - cloudflare_compatibility:
           requires:
             - quality
             - product_scanner_security
+            - runtime_hardening_contract
+            - runtime_hardening_contract
             - analysis_provider_contract
             - analysis_output_contract
             - analysis_provider_content_contract
@@ -374,6 +391,9 @@ workflows:
           requires:
             - quality
       - stage16_activation_contract:
+          requires:
+            - quality
+      - runtime_hardening_contract:
           requires:
             - quality
       - analysis_provider_smoke:
