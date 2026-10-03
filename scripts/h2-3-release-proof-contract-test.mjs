@@ -98,8 +98,7 @@ for (const job of [
 ]) {
   assert.match(
     releaseJobs,
-    new RegExp("^  " + job + ":",
-    ),
+    new RegExp("^  " + job + ":", "m"),
     `${job} must exist in GitHub release workflow`,
   );
 }
