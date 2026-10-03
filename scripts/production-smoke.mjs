@@ -129,6 +129,25 @@ try {
 
   console.log("Production health check: OK");
 
+  const readiness = await appRequest("/api/health/ready");
+  if (readiness.status !== 200) {
+    throw new Error(`Production runtime readiness check failed: HTTP ${readiness.status}`);
+  }
+
+  const readinessBody = await readiness.json();
+  if (
+    readinessBody?.status !== "ready" ||
+    readinessBody?.queue?.exists !== true ||
+    readinessBody?.worker?.function_exists !== true ||
+    readinessBody?.worker?.schedule_active !== true ||
+    readinessBody?.worker?.recent_success !== true ||
+    readinessBody?.operations?.schedule_active !== true
+  ) {
+    throw new Error(`Production runtime readiness returned an unexpected state: ${JSON.stringify(readinessBody)}`);
+  }
+
+  console.log("Production runtime readiness check: OK");
+
   const analyze = await appRequest("/api/analyze", {
     method: "POST",
     headers: {
