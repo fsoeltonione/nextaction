@@ -66,12 +66,10 @@ export async function GET(request: Request) {
     }
 
     const adminClient = createAdminClient();
-    const { data: account, error } = await adminClient
-      .schema("private")
-      .from("advertiser_credit_accounts")
-      .select("available_units")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
+    const { data: account, error } = await adminClient.rpc(
+      "runtime_get_workspace_balance",
+      { p_workspace_id: workspaceId },
+    );
 
     if (error) {
       console.error("Balance fetch failed", {
@@ -86,7 +84,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const availableUnits = account?.available_units ?? 0;
+    const row = Array.isArray(account) ? account[0] : account;
+    const availableUnits = Number(row?.result_available_units ?? 0);
     const response = jsonSuccess(
       {
         balance: `$${availableUnits.toFixed(2)}`,

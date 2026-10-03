@@ -198,8 +198,7 @@ try {
   if (
     !fixture ||
     typeof fixture.result_integration_id !== "string" ||
-    typeof fixture.result_moment_key !== "string" ||
-    typeof fixture.result_expected_available_units_after_settlement !== "number"
+    typeof fixture.result_moment_key !== "string"
   ) {
     throw new Error("Production smoke fixture provisioning failed.");
   }
@@ -322,8 +321,12 @@ try {
     settlement.currency !== "USD" ||
     settlement.financial_debit_cents !== 100 ||
     settlement.financial_credit_cents !== 100 ||
-    settlement.credit_available_units !==
-      fixture.result_expected_available_units_after_settlement
+    settlement.credit_consumption_entry_count !== 1 ||
+    settlement.decision_count !== 1 ||
+    settlement.delivery_count !== 1 ||
+    settlement.click_count !== 1 ||
+    settlement.qualified_click_count !== 1 ||
+    settlement.credit_available_units < 0
   ) {
     throw new Error("Production economic settlement invariants failed.");
   }
@@ -364,6 +367,7 @@ try {
     publisher_share_cents: settlement.publisher_share_cents,
     platform_share_cents: settlement.platform_share_cents,
     credit_available_units: settlement.credit_available_units,
+    credit_consumption_entry_count: settlement.credit_consumption_entry_count,
   }, null, 2));
 
   console.log(
