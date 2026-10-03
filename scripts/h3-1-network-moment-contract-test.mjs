@@ -82,6 +82,8 @@ assert.match(catalogRoute, /Authentication is required/);
 assert.match(mappingRoute, /POST\(request: Request\)/);
 assert.match(mappingRoute, /set_moment_network_mapping_v1/);
 assert.match(mappingRoute, /network_moment_key/);
+assert.match(mappingRoute, /network_moment_key_required/);
+assert.match(mappingRoute, /use null to remove a mapping/);
 assert.match(mappingRoute, /42501/);
 assert.match(mappingRoute, /P0002/);
 
