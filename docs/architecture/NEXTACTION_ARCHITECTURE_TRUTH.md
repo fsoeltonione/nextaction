@@ -674,3 +674,25 @@ The scanner uses Cloudflare Workers-compatible node:dns resolution for A and AAA
 The architecture deliberately distinguishes DNS preflight validation from connection-level destination pinning. Standard Worker fetch does not provide a general mechanism to force an arbitrary public hostname to the exact IP returned by a prior DNS query, so the implementation does not claim that guarantee.
 
 Strict IP-pinned egress remains a separate future infrastructure decision if product requirements make that guarantee necessary.
+
+## 32. H3.1 Network Moment architecture amendment
+
+Moment remains product-scoped. A platform-owned Network Moment supplies the semantic identity needed for cross-product matching.
+
+Runtime resolution is server-side:
+
+```text
+integration credential
+  → Product
+  → Product Moment
+  → Network Moment
+  → eligible Offers
+  → Decision
+  → Delivery
+```
+
+Network Moment is taxonomy/configuration data, not a lifecycle stage. No end-user identity layer is introduced.
+
+The network semantic lookup must remain inside the existing `/v1/offer` latency boundary and must not add LLM calls, scanner work, slow queues, or end-user authentication.
+
+Existing product-scoped `offer_moments` relations remain valid during additive migration; new network targeting is introduced through a separate normalized relation.

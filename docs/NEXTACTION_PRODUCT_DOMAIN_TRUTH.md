@@ -231,3 +231,25 @@ Stage 16 also locks current-workspace handling: zero accessible workspaces may c
 The ready state remains server-derived. Client step state is never authoritative.
 
 Stage 16 does not change the locked domain chain, qualification rules, or MVP economics. Final cross-workspace commercial Moment targeting remains a later control-plane concern.
+
+## 19. H3.1 Network Moment Model amendment
+
+**LOCKED DECISION (2026-10-04):** Moment remains the core semantic primitive and remains product-scoped. NextAction adds a platform-owned **Network Moment** as a cross-product semantic category; it is not a new lifecycle stage and does not replace Moment.
+
+The relationship is:
+
+```text
+Product → Product Moment → Network Moment
+```
+
+One Product Moment maps to zero or one active Network Moment. One Network Moment may represent many Product Moments across many publisher Products.
+
+`/v1/offer` continues to accept the publisher's `moment_key`. The server resolves `integration credential → product/workspace → Product Moment → Network Moment → eligible Offers`. Publisher clients never supply internal Network Moment IDs.
+
+Network matching remains contextual and must not introduce user identity tracking, device fingerprinting, or an identity graph.
+
+Targeting moves to a normalized Network Moment relation while the existing `offer_moments` relation remains intact during additive migration. Existing `moment_id` values must never be silently reinterpreted as Network Moment IDs.
+
+H3.1 does not change the locked lifecycle `Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement`, settlement economics, or the low-latency `/v1/offer` boundary.
+
+Implementation of the model requires explicit catalog validation and release-gated migration/backfill.

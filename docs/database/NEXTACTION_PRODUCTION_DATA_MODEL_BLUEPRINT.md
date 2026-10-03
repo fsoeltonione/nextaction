@@ -939,3 +939,36 @@ Stage 9 runtime additions:
 - scheduled PostgreSQL worker for Event processing
 
 These changes preserve the locked chain **Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement** while keeping asynchronous ingestion from blocking a valid Moment decision.
+
+## 36. H3.1 Network Moment data-model amendment
+
+Add a controlled platform taxonomy:
+
+```text
+public.network_moments
+  id uuid primary key
+  key text unique not null
+  label text not null
+  description text
+  status text not null
+  created_at timestamptz not null
+  updated_at timestamptz not null
+```
+
+Extend `public.moments` with nullable `network_moment_id` referencing `public.network_moments(id)`. This keeps Product Moment ownership and lifecycle unchanged while permitting an unmapped review state.
+
+Add normalized advertiser targeting:
+
+```text
+public.offer_network_moments
+  offer_id uuid not null
+  network_moment_id uuid not null
+  created_at timestamptz not null
+  unique (offer_id, network_moment_id)
+```
+
+Existing `public.offer_moments` is retained during migration and is not reinterpreted. Cross-workspace targeting is permitted through Network Moments.
+
+`/v1/offer` must derive Network Moment identity server-side from the publisher Product Moment. No client-supplied internal Network Moment identifier is accepted.
+
+No H3.1 schema change alters settlement, capacity-consumption timing, or financial ledger authority.
