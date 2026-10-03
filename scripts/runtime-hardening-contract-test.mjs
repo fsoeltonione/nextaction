@@ -79,6 +79,56 @@ assert.match(h1Canary, /runtime_integrity_audit\(\)/);
 assert.match(h1Canary, /NOT EXISTS \(\s*SELECT 1[\s\S]*runtime_excluded_workspaces/);
 assert.match(h1Canary, /excluded_workspace_count/);
 
+
+// H2.1: runtime failure containment is bounded, durable, and terminal.
+// The contract deliberately checks both sides of the invariant:
+// retryable failures may retry only within a finite budget, while malformed
+// and permanent failures are durably quarantined instead of looping forever.
+const h2Path = "supabase/migrations/20261004010000_h2_1_runtime_failure_containment.sql";
+let h2;
+try {
+  h2 = await readFile(h2Path, "utf8");
+} catch {
+  throw new Error("H2.1 runtime failure containment migration is missing.");
+}
+
+assert.match(h2, /ADD COLUMN IF NOT EXISTS processing_attempts INTEGER NOT NULL DEFAULT 0/);
+assert.match(h2, /ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ/);
+assert.match(h2, /ADD COLUMN IF NOT EXISTS last_failure_class TEXT/);
+assert.match(h2, /ADD COLUMN IF NOT EXISTS last_failure_code TEXT/);
+assert.match(h2, /ADD COLUMN IF NOT EXISTS last_failure_reason TEXT/);
+assert.match(h2, /ADD COLUMN IF NOT EXISTS last_failed_at TIMESTAMPTZ/);
+
+assert.match(h2, /CREATE TABLE IF NOT EXISTS private\.runtime_dead_letters/);
+assert.match(h2, /runtime_dead_letters_queue_message_uq/);
+assert.match(h2, /ALTER TABLE private\.runtime_dead_letters ENABLE ROW LEVEL SECURITY/);
+assert.match(h2, /REVOKE ALL ON TABLE private\.runtime_dead_letters FROM PUBLIC, anon, authenticated/);
+assert.match(h2, /CREATE POLICY runtime_dead_letters_no_access/);
+assert.match(h2, /GRANT ALL PRIVILEGES ON TABLE private\.runtime_dead_letters TO service_role/);
+
+assert.match(h2, /CREATE OR REPLACE FUNCTION private\.runtime_quarantine_message/);
+assert.match(h2, /pgmq\.archive\(/);
+assert.match(h2, /RETURN NOT EXISTS \(\s*SELECT 1[\s\S]*q_runtime-events/);
+
+assert.match(h2, /CREATE OR REPLACE FUNCTION public\.runtime_worker_tick\(\s*p_quantity INTEGER DEFAULT 20,\s*p_visibility_seconds INTEGER DEFAULT 60\s*\)/);
+assert.match(h2, /v_max_attempts CONSTANT INTEGER := 5/);
+assert.match(h2, /SELECT msg_id, read_ct, enqueued_at, message/);
+assert.match(h2, /GET STACKED DIAGNOSTICS/);
+assert.match(h2, /RETURNED_SQLSTATE/);
+assert.match(h2, /v_failure_class := 'permanent'/);
+assert.match(h2, /v_failure_class := 'retry_exhausted'/);
+assert.match(h2, /v_failure_class := 'retryable'/);
+assert.match(h2, /processing_status = CASE[\s\S]*'failed'[\s\S]*'accepted'/);
+assert.match(h2, /private\.runtime_quarantine_message\(/);
+
+assert.match(h2, /IF NOT v_process_returned[\s\S]*result_processed/);
+assert.match(h2, /result_reason_code/);
+assert.match(h2, /Referenced event does not exist\./);
+
+// H2.1 must keep the worker callable only from the service boundary.
+assert.match(h2, /REVOKE ALL ON FUNCTION public\.runtime_worker_tick\(INTEGER, INTEGER\)[\s\S]*FROM PUBLIC, anon, authenticated/);
+assert.match(h2, /GRANT EXECUTE ON FUNCTION public\.runtime_worker_tick\(INTEGER, INTEGER\)[\s\S]*TO service_role/);
+
 const pkg = JSON.parse(packageJson);
 assert.equal(pkg.scripts["test:runtime-hardening"], "node scripts/runtime-hardening-contract-test.mjs");
 assert.match(circleci, /runtime_hardening_contract:/);
