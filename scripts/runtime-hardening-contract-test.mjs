@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [clickRoute, stage16, stage17, circleci, packageJson] = await Promise.all([
+const [clickRoute, stage16, stage17, runtimeHttp, readyRoute, circleci, packageJson] = await Promise.all([
   readFile("src/app/v1/click/[delivery_token]/route.ts", "utf8"),
   readFile("supabase/migrations/20260928053000_stage_16_activation_workspace_context.sql", "utf8"),
   readFile("supabase/migrations/20261003000000_stage_17_remediation.sql", "utf8"),
+  readFile("src/lib/runtime/http.ts", "utf8"),
+  readFile("src/app/api/health/ready/route.ts", "utf8"),
   readFile(".circleci/config.yml", "utf8"),
   readFile("package.json", "utf8"),
 ]);
@@ -128,6 +130,48 @@ assert.match(h2, /Referenced event does not exist\./);
 // H2.1 must keep the worker callable only from the service boundary.
 assert.match(h2, /REVOKE ALL ON FUNCTION public\.runtime_worker_tick\(INTEGER, INTEGER\)[\s\S]*FROM PUBLIC, anon, authenticated/);
 assert.match(h2, /GRANT EXECUTE ON FUNCTION public\.runtime_worker_tick\(INTEGER, INTEGER\)[\s\S]*TO service_role/);
+
+
+// H2.2: recovery and runtime operations stay bounded and operationally visible.
+const h22Path = "supabase/migrations/20261004020000_h2_2_recovery_operations.sql";
+let h22;
+try {
+  h22 = await readFile(h22Path, "utf8");
+} catch {
+  throw new Error("H2.2 recovery operations migration is missing.");
+}
+
+assert.match(h22, /CREATE OR REPLACE FUNCTION public\.runtime_operations_tick/);
+assert.match(h22, /FOR UPDATE SKIP LOCKED/);
+assert.match(h22, /stale_events_marked_processed/);
+assert.match(h22, /stale_events_requeued/);
+assert.match(h22, /pgmq\.send\(/);
+assert.match(h22, /DELETE FROM private\.rate_limit_buckets/);
+assert.match(h22, /p_rate_limit_retention_seconds INTEGER DEFAULT 7200/);
+assert.match(h22, /nextaction-runtime-operations/);
+assert.match(h22, /'\*\/5 \* \* \* \*'/);
+
+assert.match(h22, /CREATE OR REPLACE FUNCTION public\.runtime_readiness\(\)/);
+assert.match(h22, /runtime-events/);
+assert.match(h22, /nextaction-runtime-worker/);
+assert.match(h22, /job_run_details/);
+assert.match(h22, /status = 'succeeded'/);
+assert.match(h22, /INTERVAL '3 minutes'/);
+assert.match(h22, /nextaction-runtime-operations/);
+assert.match(h22, /GRANT EXECUTE ON FUNCTION public\.runtime_readiness\(\)[\s\S]*TO service_role/);
+
+// H2.2: readiness is a service-side dependency check and never exposes
+// database error details to the caller.
+assert.match(readyRoute, /runtime_readiness/);
+assert.match(readyRoute, /status: "not_ready"/);
+assert.match(readyRoute, /status === "ready" \? 200 : 503/);
+assert.match(readyRoute, /X-Request-Id/);
+assert.match(readyRoute, /Cache-Control/);
+
+// H2.2: Cloudflare is the explicit IP trust boundary; forwarded chains are ignored.
+assert.match(runtimeHttp, /CF-Connecting-IP is the Cloudflare-provided client IP header/);
+assert.match(runtimeHttp, /return cloudflareIp \|\| "unknown"/);
+assert.doesNotMatch(runtimeHttp, /x-forwarded-for/);
 
 const pkg = JSON.parse(packageJson);
 assert.equal(pkg.scripts["test:runtime-hardening"], "node scripts/runtime-hardening-contract-test.mjs");
