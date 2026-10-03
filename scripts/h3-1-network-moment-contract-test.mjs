@@ -52,6 +52,7 @@ assert.match(migration, /CREATE OR REPLACE FUNCTION public\.create_network_offer
 assert.match(migration, /p_network_moment_keys TEXT\[\]/);
 assert.match(migration, /reach_customers/);
 assert.match(migration, /network_moments.*status = 'active'/s);
+assert.match(migration, /RAISE EXCEPTION 'one or more target network moments are not available' USING ERRCODE = '22023'/);
 
 assert.match(migration, /H3\.1 runtime resolution: Network Moment first, legacy fallback second/);
 assert.match(migration, /FROM public\.offer_network_moments/);
