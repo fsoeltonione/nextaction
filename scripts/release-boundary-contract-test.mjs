@@ -70,8 +70,16 @@ function jobBlock(workflow, job) {
 }
 
 const guard = jobBlock(releaseWorkflow, "release_source_guard");
-assert.match(guard, /if:/);
-assert.match(guard, /github\.ref_name === 'master'|github\.ref_name == 'master'|github\.ref_name != 'master'/);
+assert.match(
+  guard,
+  /GITHUB_REF_NAME|NEXTACTION_RELEASE_BRANCH/,
+  "release source guard must inspect the selected GitHub branch",
+);
+assert.match(
+  guard,
+  /Release gate may only run from master/,
+  "release source guard must reject non-master releases",
+);
 
 const h31 = jobBlock(releaseWorkflow, "h3_1_network_moment_contract");
 assert.match(h31, /needs:[\s\S]*quality/);
