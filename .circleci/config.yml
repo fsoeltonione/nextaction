@@ -155,6 +155,19 @@ jobs:
           name: Run H0/H1 runtime hardening contract
           command: npm run test:runtime-hardening
 
+  h2_3_release_proof_contract:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run H2.3 release proof contract
+          command: npm run test:h2-3-release-proof
+
+
   analysis_provider_smoke:
     docker:
       - image: cimg/node:24.21.0
@@ -226,6 +239,8 @@ jobs:
   staging_smoke:
     docker:
       - image: cimg/node:24.21.0
+    environment:
+      STAGING_EXPECTED_RELEASE_SHA: << pipeline.git.revision >>
     steps:
       - checkout
       - attach_workspace:
@@ -302,6 +317,8 @@ jobs:
   production_smoke:
     docker:
       - image: cimg/node:24.21.0
+    environment:
+      PRODUCTION_EXPECTED_RELEASE_SHA: << pipeline.git.revision >>
     steps:
       - checkout
       - attach_workspace:
@@ -321,6 +338,31 @@ jobs:
           command: |
             export PRODUCTION_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
             npm run production:smoke
+
+  production_release_proof:
+    docker:
+      - image: cimg/node:24.21.0
+    environment:
+      PRODUCTION_EXPECTED_RELEASE_SHA: << pipeline.git.revision >>
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/nextaction-release
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Validate production release proof inputs
+          command: |
+            bash scripts/require-file.sh /tmp/nextaction-release/production_base_url
+            bash scripts/require-env.sh \
+              PRODUCTION_NEXT_PUBLIC_SUPABASE_URL \
+              PRODUCTION_SUPABASE_SECRET_KEY
+      - run:
+          name: Run production release proof
+          command: |
+            export PRODUCTION_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
+            npm run production:release-proof
 
 workflows:
   quality-gate:
@@ -346,6 +388,9 @@ workflows:
           requires:
             - quality
       - runtime_hardening_contract:
+          requires:
+            - quality
+      - h2_3_release_proof_contract:
           requires:
             - quality
       - cloudflare_compatibility:
@@ -396,6 +441,9 @@ workflows:
       - runtime_hardening_contract:
           requires:
             - quality
+      - h2_3_release_proof_contract:
+          requires:
+            - quality
       - analysis_provider_smoke:
           context:
             - nextaction-staging
@@ -424,6 +472,7 @@ workflows:
             - analysis_provider_smoke
             - stage16_activation_contract
             - runtime_hardening_contract
+            - h2_3_release_proof_contract
       - staging_smoke:
           context:
             - nextaction-staging
@@ -468,5 +517,16 @@ workflows:
               only: master
           requires:
             - deploy_production
+            - cloudflare_production_audit
+            - release_source_guard
+
+      - production_release_proof:
+          context:
+            - nextaction-production
+          filters:
+            branches:
+              only: master
+          requires:
+            - production_smoke
             - cloudflare_production_audit
             - release_source_guard

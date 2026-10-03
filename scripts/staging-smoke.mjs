@@ -7,6 +7,7 @@ const STAGE14_SMOKE_MOMENT_KEY = "stage14_smoke_moment";
 const expectedEnvironment =
   process.env.EXPECTED_ENVIRONMENT ?? "staging";
 const defaultAnalyzeSmokeUrl = "https://carrd.com";
+const expectedReleaseSha = process.env.STAGING_EXPECTED_RELEASE_SHA ?? process.env.CIRCLE_SHA1;
 
 if (!baseUrl) {
   console.error("Missing STAGING_BASE_URL.");
@@ -54,6 +55,19 @@ if (
     ),
   );
   process.exit(1);
+}
+
+if (expectedReleaseSha) {
+  if (!/^[0-9a-f]{40}$/i.test(expectedReleaseSha)) {
+    console.error("STAGING_EXPECTED_RELEASE_SHA must be a valid 40-character Git SHA.");
+    process.exit(2);
+  }
+  if (healthBody?.release_sha !== expectedReleaseSha) {
+    console.error("Runtime release SHA does not match the CI source revision.");
+    console.error(JSON.stringify({ expected_release_sha: expectedReleaseSha, actual_release_sha: healthBody?.release_sha }, null, 2));
+    process.exit(1);
+  }
+  console.log(`${expectedEnvironment} release provenance check: OK`);
 }
 
 console.log(`${expectedEnvironment} health check: OK`);

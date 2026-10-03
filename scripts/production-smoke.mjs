@@ -3,6 +3,7 @@ const supabaseUrl = process.env.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecretKey = process.env.PRODUCTION_SUPABASE_SECRET_KEY;
 const analyzeSmokeUrl =
   process.env.PRODUCTION_ANALYZE_SMOKE_URL ?? "https://carrd.com";
+const expectedReleaseSha = process.env.PRODUCTION_EXPECTED_RELEASE_SHA ?? process.env.CIRCLE_SHA1;
 
 const missing = [
   ["PRODUCTION_BASE_URL", baseUrl],
@@ -135,6 +136,16 @@ try {
     throw new Error(
       "Production health check returned an unexpected deployment identity.",
     );
+  }
+
+  if (expectedReleaseSha) {
+    if (!/^[0-9a-f]{40}$/i.test(expectedReleaseSha)) {
+      throw new Error("PRODUCTION_EXPECTED_RELEASE_SHA must be a valid 40-character Git SHA.");
+    }
+    if (healthBody?.release_sha !== expectedReleaseSha) {
+      throw new Error(`Production runtime release SHA mismatch: expected ${expectedReleaseSha}, got ${healthBody?.release_sha}`);
+    }
+    console.log("Production release provenance check: OK");
   }
 
   console.log("Production health check: OK");
