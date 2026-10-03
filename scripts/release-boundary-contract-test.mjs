@@ -54,6 +54,22 @@ const guardJobBlock = releaseWorkflow.slice(
 );
 assert.match(guardJobBlock, /filters:\n\s+branches:\n\s+only: master/);
 
+assert.match(
+  await readFile("scripts/staging-smoke.mjs", "utf8"),
+  /production_smoke_fixture_verify/,
+  "staging smoke must wait for async Event -> Moment processing",
+);
+assert.match(
+  await readFile("scripts/staging-smoke.mjs", "utf8"),
+  /EVENT_PROCESSING_TIMEOUT_MS = 90_000/,
+  "staging smoke must use a bounded Event processing wait",
+);
+assert.match(
+  await readFile("scripts/staging-smoke.mjs", "utf8"),
+  /waitForEventProcessing\(trackBodyJson\.event_id\)/,
+  "staging smoke must wait before requesting an Offer",
+);
+
 for (const job of [
   "analysis_provider_smoke",
   "deploy_staging",
