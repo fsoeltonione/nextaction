@@ -23,7 +23,10 @@
     "test:release-boundary": "node scripts/release-boundary-contract-test.mjs",
     "test:runtime-hardening": "node scripts/runtime-hardening-contract-test.mjs",
     "test:h2-3-release-proof": "node scripts/h2-3-release-proof-contract-test.mjs",
-    "production:release-proof": "node scripts/production-release-proof.mjs"
+    "production:release-proof": "node scripts/production-release-proof.mjs",
+    "test:h3-1-network-moment": "node scripts/h3-1-network-moment-contract-test.mjs",
+    "test:h3-1-runtime-smoke": "node scripts/h3-1-runtime-smoke.mjs",
+    "h3-1:release-proof": "node scripts/h3-1-release-proof.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
