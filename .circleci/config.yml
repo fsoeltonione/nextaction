@@ -526,6 +526,9 @@ workflows:
       - h2_3_release_proof_contract:
           requires:
             - quality
+      - h3_1_network_moment_contract:
+          requires:
+            - quality
       - analysis_provider_smoke:
           context:
             - nextaction-staging
