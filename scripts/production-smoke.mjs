@@ -80,7 +80,17 @@ async function verifyFixture(integrationId, eventId) {
   return Array.isArray(state) ? state[0] : state;
 }
 
-async function waitForEventProcessing(integrationId, eventId, timeoutMs = 30000) {
+// The runtime worker is scheduled once per minute. A 30s smoke timeout can
+// legitimately expire when an Event arrives just after the minute boundary.
+// Keep one full scheduler interval plus margin so the smoke proves the
+// production async path rather than racing the cron cadence.
+const EVENT_PROCESSING_TIMEOUT_MS = 90_000;
+
+async function waitForEventProcessing(
+  integrationId,
+  eventId,
+  timeoutMs = EVENT_PROCESSING_TIMEOUT_MS,
+) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const snapshot = await verifyFixture(integrationId, eventId);
