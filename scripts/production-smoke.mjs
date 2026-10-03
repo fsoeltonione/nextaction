@@ -176,13 +176,6 @@ try {
 
   const crypto = globalThis.crypto;
   const smokeId = crypto.randomUUID().replace(/-/g, "");
-  const deliveryToken = "na_prod_smoke_" + smokeId;
-  const credentialHashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(deliveryToken));
-  const credentialHash = Array.from(new Uint8Array(credentialHashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-  // 1. Provision fixture
-  const crypto = globalThis.crypto;
-  const smokeId = crypto.randomUUID().replace(/-/g, "");
   const deliveryToken = `na_prod_smoke_${smokeId}`;
   const credentialHashBuffer = await crypto.subtle.digest(
     "SHA-256",
