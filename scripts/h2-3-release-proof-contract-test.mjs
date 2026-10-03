@@ -33,9 +33,9 @@ assert.match(deploy, /NEXT_PUBLIC_RELEASE_SHA/);
 assert.match(deploy, /CIRCLE_SHA1/);
 assert.match(deploy, /valid 40-character release SHA/);
 assert.match(staging, /STAGING_EXPECTED_RELEASE_SHA/);
-assert.match(staging, /healthBody?\.release_sha !== expectedReleaseSha/);
+assert.match(staging, /healthBody\?\.release_sha !== expectedReleaseSha/);
 assert.match(production, /PRODUCTION_EXPECTED_RELEASE_SHA/);
-assert.match(production, /healthBody?\.release_sha !== expectedReleaseSha/);
+assert.match(production, /healthBody\?\.release_sha !== expectedReleaseSha/);
 
 // H2.3 database proof must be service-only and include the H2.1/H2.2
 // migrations plus the final runtime lifecycle invariants.
