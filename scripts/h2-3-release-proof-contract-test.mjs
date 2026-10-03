@@ -8,7 +8,7 @@ const [
   production,
   releaseProof,
   migration,
-  circleci,
+  releaseWorkflow,
   packageJson,
 ] = await Promise.all([
   readFile("src/app/api/health/route.ts", "utf8"),
@@ -20,7 +20,7 @@ const [
     "supabase/migrations/20261004030000_h2_3_release_reliability_proof.sql",
     "utf8",
   ),
-  readFile(".circleci/config.yml", "utf8"),
+  readFile(".github/workflows/release.yml", "utf8"),
   readFile("package.json", "utf8"),
 ]);
 
@@ -72,62 +72,91 @@ assert.equal(
   "node scripts/production-release-proof.mjs",
 );
 
-// CircleCI must make the H2.3 contract a prerequisite for staging deployment
-// and run final production proof only after production smoke.
-const qualityStart = circleci.indexOf("  quality-gate:");
-const releaseStart = circleci.indexOf("  release-gate:");
-assert.notEqual(qualityStart, -1);
-assert.notEqual(releaseStart, -1);
-const qualityWorkflow = circleci.slice(qualityStart, releaseStart);
-const releaseWorkflow = circleci.slice(releaseStart);
+// GitHub Actions release workflow must make the H2.3 contract a prerequisite
+// for staging deployment and keep the final production proof behind the live
+// production smoke.
+const releaseWorkflowJobsStart = releaseWorkflow.indexOf("jobs:");
+assert.notEqual(
+  releaseWorkflowJobsStart,
+  -1,
+  "GitHub release workflow jobs section must exist",
+);
+const releaseJobs = releaseWorkflow.slice(releaseWorkflowJobsStart);
 
-assert.match(qualityWorkflow, /h2_3_release_proof_contract:/);
+for (const job of [
+  "h2_3_release_proof_contract",
+  "deploy_staging",
+  "staging_smoke",
+  "h3_1_staging_release_proof",
+  "h3_1_staging_runtime_smoke",
+  "hold_production",
+  "deploy_production",
+  "cloudflare_production_audit",
+  "production_smoke",
+  "h3_1_production_release_proof",
+  "production_release_proof",
+]) {
+  assert.match(
+    releaseJobs,
+    new RegExp("^  " + job + ":", "m"),
+    `${job} must exist in GitHub release workflow`,
+  );
+}
+
+function jobBlock(job) {
+  const start = releaseWorkflow.indexOf("\n  " + job + ":");
+  assert.notEqual(start, -1, `${job} definition must exist`);
+  const rest = releaseWorkflow.slice(start + 1);
+  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n/);
+  return nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
+}
+
 assert.match(
-  releaseWorkflow,
-  /- h2_3_release_proof_contract/,
+  jobBlock("deploy_staging"),
+  /needs:[\s\S]*h2_3_release_proof_contract/,
+  "deploy_staging must require H2.3 proof contract",
 );
 assert.match(
-  releaseWorkflow,
-  /production_release_proof:/,
+  jobBlock("production_release_proof"),
+  /needs:[\s\S]*production_smoke/,
+  "production_release_proof must require production smoke",
 );
 assert.match(
-  releaseWorkflow,
-  /requires:[\s\S]*production_smoke[\s\S]*cloudflare_production_audit/,
+  jobBlock("production_release_proof"),
+  /needs:[\s\S]*h3_1_production_release_proof/,
+  "production_release_proof must require H3.1 production proof",
 );
-
-// Release smoke/proof jobs must bind expected provenance to the pipeline revision.
-// "environment:" lives in the top-level job definition; workflow entries only
-// provide context/filters/requires.
-const workflowDefinitionsEnd = circleci.indexOf("workflows:");
-assert.notEqual(workflowDefinitionsEnd, -1, "CircleCI workflows section must exist");
-const jobDefinitions = circleci.slice(0, workflowDefinitionsEnd);
-
+// Release smoke/proof jobs must bind application provenance to the GitHub
+// workflow commit SHA, rather than relying on CI-provider-specific variables.
 for (const [job, expectedVar] of [
   ["staging_smoke", "STAGING_EXPECTED_RELEASE_SHA"],
   ["production_smoke", "PRODUCTION_EXPECTED_RELEASE_SHA"],
-  ["production_release_proof", "PRODUCTION_EXPECTED_RELEASE_SHA"],
 ]) {
-  const start = jobDefinitions.indexOf("\n  " + job + ":");
-  assert.notEqual(start, -1, `${job} definition must exist`);
-  const rest = jobDefinitions.slice(start + 1);
-  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n    docker:/);
-  const block = nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
+  const block = jobBlock(job);
   assert.match(
     block,
-    new RegExp(`environment:[\\s\\S]*${expectedVar}: << pipeline\\.git\\.revision >>`),
-    `${job} must bind expected release SHA to pipeline revision`,
+    new RegExp(
+      expectedVar +
+        ": \\$\\{\\{\\s*github\\.sha\\s*\\}\\}",
+    ),
+    `${job} must bind expected release SHA to github.sha`,
+  );
+}
+
+const deployStagingBlock = jobBlock("deploy_staging");
+const deployProductionBlock = jobBlock("deploy_production");
+for (const block of [deployStagingBlock, deployProductionBlock]) {
+  assert.match(
+    block,
+    /NEXTACTION_RELEASE_SHA:\s*\$\{\{\s*github\.sha\s*\}\}/,
+    "deploy jobs must pass github.sha to the deployment script",
   );
 }
 
 // The final proof must be production-only and must run after the live smoke.
-const proofStart = releaseWorkflow.indexOf("      - production_release_proof:");
-const proofEnd = releaseWorkflow.indexOf("\n      - ", proofStart + 9);
-const proofBlock = releaseWorkflow.slice(
-  proofStart,
-  proofEnd === -1 ? releaseWorkflow.length : proofEnd,
-);
-assert.match(proofBlock, /context:\n\s+- nextaction-production/);
-assert.match(proofBlock, /filters:\n\s+branches:\n\s+only: master/);
-assert.match(proofBlock, /requires:[\s\S]*production_smoke/);
+const proofBlock = jobBlock("production_release_proof");
+assert.match(proofBlock, /needs:[\s\S]*production_smoke/);
+assert.match(proofBlock, /needs:[\s\S]*h3_1_production_release_proof/);
+assert.match(proofBlock, /production:release-proof/);
 
 console.log("H2.3 release proof contract: OK");

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Loud required-file validation for CircleCI release jobs.
+# Loud required-file validation for release jobs.
 #
-# A `test -s <file>` whose file is missing or empty exits 1 with no output,
-# leaving only "Exited with code exit status 1". This helper names the file.
+# A `test -s <file>` whose file is missing or empty exits 1 with no output.
+# This helper names the missing file instead.
 set -euo pipefail
 
 if [ "$#" -lt 1 ]; then

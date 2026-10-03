@@ -1,0 +1,704 @@
+name: Release Gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Verify runtime
+        run: |
+          node --version
+          npm --version
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  release_boundary_contract:
+    name: Release boundary contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify release boundary contract
+        run: npm run test:release-boundary
+
+  product_scanner_security:
+    name: Product scanner security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+      - release_boundary_contract
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run product scanner security suite
+        run: npm run test:scanner
+
+  analysis_provider_contract:
+    name: Analysis provider contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run analysis provider response contract tests
+        run: npm run test:analysis-provider
+
+  analysis_output_contract:
+    name: Analysis output contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run analysis output contract tests
+        run: npm run test:analysis-output
+
+  analysis_provider_content_contract:
+    name: Analysis provider content contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run analysis provider content contract tests
+        run: npm run test:analysis-provider-content
+
+  stage16_activation_contract:
+    name: Stage 16 activation contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run Stage 16 activation contract checks
+        run: npm run test:stage16-activation
+
+  runtime_hardening_contract:
+    name: Runtime hardening contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run H0/H1 runtime hardening contract
+        run: npm run test:runtime-hardening
+
+  h2_3_release_proof_contract:
+    name: H2.3 release proof contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run H2.3 release proof contract
+        run: npm run test:h2-3-release-proof
+
+  h3_1_network_moment_contract:
+    name: H3.1 Network Moment contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run H3.1 Network Moment contract
+        run: npm run test:h3-1-network-moment
+
+  cloudflare_compatibility:
+    name: Cloudflare compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - quality
+      - product_scanner_security
+      - runtime_hardening_contract
+      - analysis_provider_contract
+      - analysis_output_contract
+      - analysis_provider_content_contract
+      - stage16_activation_contract
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Check Cloudflare compatibility
+        run: npm run cloudflare:check
+
+  cloudflare_build:
+    name: Cloudflare build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - quality
+      - cloudflare_compatibility
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      SUPABASE_SECRET_KEY: ci-placeholder
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build Cloudflare artifact
+        env:
+          CLOUDFLARE_ENV: staging
+        run: npm run cloudflare:build
+
+      - name: Validate Wrangler configuration
+        run: npx --yes wrangler@4.139.0 deploy --dry-run --env staging
+
+  release_source_guard:
+    name: Release source guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NEXTACTION_RELEASE_BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: Verify release source branch
+        run: |
+          if [ "${NEXTACTION_RELEASE_BRANCH}" != "master" ]; then
+            echo "Release gate may only run from master, got: ${NEXTACTION_RELEASE_BRANCH}" >&2
+            exit 1
+          fi
+
+  analysis_provider_smoke:
+    name: Analysis provider smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+      - release_source_guard
+      - cloudflare_build
+      - analysis_provider_contract
+      - analysis_output_contract
+      - analysis_provider_content_contract
+    env:
+      ANALYSIS_API_KEY: ${{ secrets.ANALYSIS_API_KEY }}
+      ANALYSIS_BASE_URL: ${{ secrets.ANALYSIS_BASE_URL }}
+      ANALYSIS_MODEL: ${{ secrets.ANALYSIS_MODEL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate configured analysis provider
+        run: npm run analysis:provider-smoke
+
+  deploy_staging:
+    name: Deploy staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - quality
+      - release_source_guard
+      - cloudflare_compatibility
+      - cloudflare_build
+      - analysis_provider_smoke
+      - stage16_activation_contract
+      - runtime_hardening_contract
+      - h2_3_release_proof_contract
+      - h3_1_network_moment_contract
+    outputs:
+      staging_base_url: ${{ steps.capture_url.outputs.staging_base_url }}
+    env:
+      NEXTACTION_RELEASE_BRANCH: ${{ github.ref_name }}
+      NEXTACTION_RELEASE_SHA: ${{ github.sha }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
+      ANALYSIS_API_KEY: ${{ secrets.ANALYSIS_API_KEY }}
+      ANALYSIS_BASE_URL: ${{ secrets.ANALYSIS_BASE_URL }}
+      ANALYSIS_MODEL: ${{ secrets.ANALYSIS_MODEL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate staging secrets
+        run: |
+          bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY             ANALYSIS_API_KEY             ANALYSIS_BASE_URL             ANALYSIS_MODEL
+
+      - name: Deploy staging
+        run: |
+          mkdir -p /tmp/nextaction-release
+          export WRANGLER_OUTPUT_FILE_PATH="/tmp/nextaction-release/wrangler-staging.ndjson"
+          npm run deploy:cloudflare -- staging
+
+      - name: Capture staging URL
+        id: capture_url
+        run: |
+          mkdir -p /tmp/nextaction-release
+          grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-staging.ndjson             | tail -1             > /tmp/nextaction-release/staging_base_url
+          bash scripts/require-file.sh /tmp/nextaction-release/staging_base_url
+          printf 'staging_base_url=%s
+' "$(cat /tmp/nextaction-release/staging_base_url)" >> "${GITHUB_OUTPUT}"
+
+  staging_smoke:
+    name: Staging smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - deploy_staging
+      - release_source_guard
+    env:
+      STAGING_BASE_URL: ${{ needs.deploy_staging.outputs.staging_base_url }}
+      STAGING_EXPECTED_RELEASE_SHA: ${{ github.sha }}
+      STAGING_INTEGRATION_TOKEN: ${{ secrets.STAGING_INTEGRATION_TOKEN }}
+      STAGING_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+      STAGING_SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate staging smoke inputs
+        run: |
+          bash scripts/require-env.sh             STAGING_BASE_URL             STAGING_INTEGRATION_TOKEN             STAGING_NEXT_PUBLIC_SUPABASE_URL             STAGING_SUPABASE_SECRET_KEY
+
+      - name: Run staging smoke
+        run: npm run staging:smoke
+
+  h3_1_staging_release_proof:
+    name: H3.1 staging release proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - staging_smoke
+      - h3_1_network_moment_contract
+      - release_source_guard
+    env:
+      STAGING_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+      STAGING_SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate H3.1 staging proof inputs
+        run: |
+          bash scripts/require-env.sh             STAGING_NEXT_PUBLIC_SUPABASE_URL             STAGING_SUPABASE_SECRET_KEY
+
+      - name: Run H3.1 staging release proof
+        run: npm run h3-1:release-proof -- staging
+
+  h3_1_staging_runtime_smoke:
+    name: H3.1 staging runtime smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - deploy_staging
+      - h3_1_staging_release_proof
+      - release_source_guard
+    env:
+      STAGING_BASE_URL: ${{ needs.deploy_staging.outputs.staging_base_url }}
+      STAGING_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+      STAGING_SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
+      STAGING_INTEGRATION_TOKEN: ${{ secrets.STAGING_INTEGRATION_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate H3.1 runtime smoke inputs
+        run: |
+          bash scripts/require-env.sh             STAGING_BASE_URL             STAGING_NEXT_PUBLIC_SUPABASE_URL             STAGING_SUPABASE_SECRET_KEY             STAGING_INTEGRATION_TOKEN
+
+      - name: Run H3.1 staging runtime smoke
+        run: npm run test:h3-1-runtime-smoke
+
+  hold_production:
+    name: Hold for production approval
+    runs-on: ubuntu-latest
+    timeout-minutes: 4320
+    needs:
+      - staging_smoke
+      - h3_1_staging_release_proof
+      - h3_1_staging_runtime_smoke
+      - release_source_guard
+    environment: production
+    steps:
+      - name: Confirm staging gates passed
+        run: |
+          echo "Staging smoke, H3.1 release proof, and H3.1 runtime smoke passed."
+          echo "Production deployment is now permitted by the production environment gate."
+
+  deploy_production:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - hold_production
+      - release_source_guard
+    outputs:
+      production_base_url: ${{ steps.capture_url.outputs.production_base_url }}
+    env:
+      NEXTACTION_RELEASE_BRANCH: ${{ github.ref_name }}
+      NEXTACTION_RELEASE_SHA: ${{ github.sha }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.PRODUCTION_SUPABASE_SECRET_KEY }}
+      ANALYSIS_API_KEY: ${{ secrets.ANALYSIS_API_KEY }}
+      ANALYSIS_BASE_URL: ${{ secrets.ANALYSIS_BASE_URL }}
+      ANALYSIS_MODEL: ${{ secrets.ANALYSIS_MODEL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate production secrets
+        run: |
+          bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY             ANALYSIS_API_KEY             ANALYSIS_BASE_URL             ANALYSIS_MODEL
+
+      - name: Deploy production
+        run: |
+          mkdir -p /tmp/nextaction-release
+          export WRANGLER_OUTPUT_FILE_PATH="/tmp/nextaction-release/wrangler-production.ndjson"
+          npm run deploy:cloudflare -- production
+
+      - name: Capture production URL
+        id: capture_url
+        run: |
+          mkdir -p /tmp/nextaction-release
+          grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-production.ndjson             | tail -1             > /tmp/nextaction-release/production_base_url
+          bash scripts/require-file.sh /tmp/nextaction-release/production_base_url
+          printf 'production_base_url=%s
+' "$(cat /tmp/nextaction-release/production_base_url)" >> "${GITHUB_OUTPUT}"
+
+  cloudflare_production_audit:
+    name: Cloudflare production audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - deploy_production
+      - release_source_guard
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ENVIRONMENT: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate Cloudflare audit inputs
+        run: |
+          bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID
+
+      - name: Audit active production Worker
+        run: npm run cloudflare:production-audit
+
+  production_smoke:
+    name: Production smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - deploy_production
+      - cloudflare_production_audit
+      - release_source_guard
+    env:
+      PRODUCTION_BASE_URL: ${{ needs.deploy_production.outputs.production_base_url }}
+      PRODUCTION_EXPECTED_RELEASE_SHA: ${{ github.sha }}
+      PRODUCTION_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_SECRET_KEY: ${{ secrets.PRODUCTION_SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate production smoke inputs
+        run: |
+          bash scripts/require-env.sh             PRODUCTION_BASE_URL             PRODUCTION_EXPECTED_RELEASE_SHA             PRODUCTION_NEXT_PUBLIC_SUPABASE_URL             PRODUCTION_SUPABASE_SECRET_KEY
+
+      - name: Run production runtime smoke
+        run: npm run production:smoke
+
+  h3_1_production_release_proof:
+    name: H3.1 production release proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - production_smoke
+      - cloudflare_production_audit
+      - release_source_guard
+    env:
+      PRODUCTION_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_SECRET_KEY: ${{ secrets.PRODUCTION_SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate H3.1 production proof inputs
+        run: |
+          bash scripts/require-env.sh             PRODUCTION_NEXT_PUBLIC_SUPABASE_URL             PRODUCTION_SUPABASE_SECRET_KEY
+
+      - name: Run H3.1 production release proof
+        run: npm run h3-1:release-proof -- production
+
+  production_release_proof:
+    name: Production release proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - deploy_production
+      - production_smoke
+      - h3_1_production_release_proof
+      - cloudflare_production_audit
+      - release_source_guard
+    env:
+      PRODUCTION_BASE_URL: ${{ needs.deploy_production.outputs.production_base_url }}
+      PRODUCTION_EXPECTED_RELEASE_SHA: ${{ github.sha }}
+      PRODUCTION_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_SECRET_KEY: ${{ secrets.PRODUCTION_SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate production release proof inputs
+        run: |
+          bash scripts/require-env.sh             PRODUCTION_BASE_URL             PRODUCTION_EXPECTED_RELEASE_SHA             PRODUCTION_NEXT_PUBLIC_SUPABASE_URL             PRODUCTION_SUPABASE_SECRET_KEY
+
+      - name: Run production release proof
+        run: npm run production:release-proof
