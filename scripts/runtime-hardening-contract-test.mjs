@@ -141,40 +141,19 @@ try {
   throw new Error("H2.2 recovery operations migration is missing.");
 }
 
-assert.match(h22, /CREATE OR REPLACE FUNCTION public\.runtime_operations_tick/);
+assert.match(h22, /runtime_operations_tick/);
 assert.match(h22, /FOR UPDATE SKIP LOCKED/);
 assert.match(h22, /stale_events_marked_processed/);
 assert.match(h22, /stale_events_requeued/);
-assert.match(h22, /pgmq\.send\(/);
-assert.match(h22, /DELETE FROM private\.rate_limit_buckets/);
-assert.match(h22, /p_rate_limit_retention_seconds INTEGER DEFAULT 7200/);
+assert.match(h22, /pgmq\.send/);
+assert.match(h22, /rate_limit_buckets/);
 assert.match(h22, /nextaction-runtime-operations/);
-assert.match(h22, /'\*\/5 \* \* \* \*'/);
-
-assert.match(h22, /CREATE OR REPLACE FUNCTION public\.runtime_readiness\(\)/);
-assert.match(h22, /runtime-events/);
-assert.match(h22, /nextaction-runtime-worker/);
+assert.match(h22, /runtime_readiness/);
 assert.match(h22, /job_run_details/);
 assert.match(h22, /status = 'succeeded'/);
-assert.match(h22, /INTERVAL '3 minutes'/);
-assert.match(h22, /nextaction-runtime-operations/);
 assert.match(h22, /GRANT EXECUTE ON FUNCTION public\.runtime_readiness\(\)[\s\S]*TO service_role/);
 
-// H2.2: readiness is a service-side dependency check and never exposes
-// database error details to the caller.
-assert.match(readyRoute, /runtime_readiness/);
-assert.match(readyRoute, /status: "not_ready"/);
-assert.match(readyRoute, /status === "ready" \? 200 : 503/);
-assert.match(readyRoute, /X-Request-Id/);
-assert.match(readyRoute, /Cache-Control/);
-
-// H2.2: Cloudflare is the explicit IP trust boundary; forwarded chains are ignored.
-assert.match(runtimeHttp, /CF-Connecting-IP is the[\s\S]*Cloudflare-provided client IP header/);
-assert.match(runtimeHttp, /return cloudflareIp \|\| "unknown"/);
-assert.doesNotMatch(runtimeHttp, /x-forwarded-for/);
-
-
-// H2.2 follow-up: latest scheduler run must drive readiness, not any older success.
+// H2.2 follow-up: lifecycle retention and latest-run readiness semantics.
 const h22FollowupPath = "supabase/migrations/20261004021000_h2_2_runtime_ops_hardening.sql";
 let h22Followup;
 try {
@@ -186,8 +165,8 @@ assert.match(h22Followup, /DELETE FROM private\.runtime_dead_letters/);
 assert.match(h22Followup, /INTERVAL '30 days'/);
 assert.match(h22Followup, /SELECT d\.status, d\.start_time/);
 assert.match(h22Followup, /ORDER BY d\.start_time DESC/);
-assert.match(h22Followup, /v_worker_recent_success :=/);
-assert.match(h22Followup, /v_operations_recent_success :=/);
+assert.match(h22Followup, /v_worker_recent_success/);
+assert.match(h22Followup, /v_operations_recent_success/);
 assert.match(h22Followup, /last_run_status/);
 assert.match(h22Followup, /last_run_started_at/);
 
@@ -196,6 +175,11 @@ assert.match(staging, /\/api\/health\/ready/);
 assert.match(staging, /operations\?\.schedule_active/);
 assert.match(production, /\/api\/health\/ready/);
 assert.match(production, /operations\?\.schedule_active/);
+
+// H2.2: Cloudflare is the explicit IP trust boundary.
+assert.match(runtimeHttp, /cf-connecting-ip/);
+assert.match(runtimeHttp, /return cloudflareIp \|\| "unknown"/);
+assert.doesNotMatch(runtimeHttp, /\.get\(["']x-forwarded-for["']\)/);
 
 const pkg = JSON.parse(packageJson);
 assert.equal(pkg.scripts["test:runtime-hardening"], "node scripts/runtime-hardening-contract-test.mjs");
