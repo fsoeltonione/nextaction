@@ -95,16 +95,27 @@ assert.match(
 );
 
 // Release smoke/proof jobs must bind expected provenance to the pipeline revision.
+// "environment:" lives in the top-level job definition; workflow entries only
+// provide context/filters/requires.
+const workflowDefinitionsEnd = circleci.indexOf("workflows:");
+assert.notEqual(workflowDefinitionsEnd, -1, "CircleCI workflows section must exist");
+const jobDefinitions = circleci.slice(0, workflowDefinitionsEnd);
+
 for (const [job, expectedVar] of [
   ["staging_smoke", "STAGING_EXPECTED_RELEASE_SHA"],
   ["production_smoke", "PRODUCTION_EXPECTED_RELEASE_SHA"],
   ["production_release_proof", "PRODUCTION_EXPECTED_RELEASE_SHA"],
 ]) {
-  const start = releaseWorkflow.indexOf("      - " + job + ":");
-  assert.notEqual(start, -1, `${job} must exist in release-gate`);
-  const end = releaseWorkflow.indexOf("\n      - ", start + 9);
-  const block = releaseWorkflow.slice(start, end === -1 ? releaseWorkflow.length : end);
-  assert.match(block, new RegExp(`environment:[\\s\\S]*${expectedVar}: << pipeline\\.git\\.revision >>`));
+  const start = jobDefinitions.indexOf("\n  " + job + ":");
+  assert.notEqual(start, -1, `${job} definition must exist`);
+  const rest = jobDefinitions.slice(start + 1);
+  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n    docker:/);
+  const block = nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
+  assert.match(
+    block,
+    new RegExp(`environment:[\\s\\S]*${expectedVar}: << pipeline\\.git\\.revision >>`),
+    `${job} must bind expected release SHA to pipeline revision`,
+  );
 }
 
 // The final proof must be production-only and must run after the live smoke.
