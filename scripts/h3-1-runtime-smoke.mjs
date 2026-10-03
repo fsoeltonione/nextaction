@@ -87,18 +87,24 @@ if (advertiserError) throw advertiserError;
 let advertiserWorkspaceId = null;
 for (const row of advertiserRows ?? []) {
   if (row.workspace_id === publisherWorkspaceId) continue;
-  const { data: account, error } = await supabase
-    .from("advertiser_credit_accounts")
-    .select("workspace_id,available_units")
-    .eq("workspace_id", row.workspace_id)
-    .gt("available_units", 0)
-    .maybeSingle();
-  if (!error && account?.workspace_id) {
-    advertiserWorkspaceId = account.workspace_id;
+
+  const { data: balanceRows, error: balanceError } = await supabase.rpc(
+    "runtime_get_workspace_balance",
+    { p_workspace_id: row.workspace_id },
+  );
+
+  if (balanceError) continue;
+
+  const balance = Array.isArray(balanceRows) ? balanceRows[0] : balanceRows;
+  if (Number(balance?.result_available_units ?? 0) > 0) {
+    advertiserWorkspaceId = row.workspace_id;
     break;
   }
 }
-assert.ok(advertiserWorkspaceId, "A cross-workspace advertiser with capacity is required.");
+assert.ok(
+  advertiserWorkspaceId,
+  "A cross-workspace advertiser with capacity is required.",
+);
 
 const offerTitle = "H3.1 Staging Network Smoke Offer";
 const { data: existingOffers, error: offerLookupError } = await supabase
@@ -141,16 +147,37 @@ const { error: linkError } = await supabase
   );
 if (linkError) throw linkError;
 
-const { error: occurrenceError } = await supabase
-  .from("moment_occurrences")
-  .insert({
-    moment_id: publisherMoment.id,
-    event_id: null,
-    integration_id: publisherIntegrationId,
-    occurred_at: new Date().toISOString(),
-    metadata: { source: "h3-1-runtime-smoke", network_key: networkKey },
-  });
-if (occurrenceError) throw occurrenceError;
+const idempotencyKey = `h3-1-runtime-smoke-${crypto.randomUUID()}`;
+const { data: acceptedRows, error: acceptError } = await supabase.rpc(
+  "runtime_accept_event",
+  {
+    p_integration_id: publisherIntegrationId,
+    p_idempotency_key: idempotencyKey,
+    p_event_type: publisherMoment.moment_key,
+    p_occurred_at: new Date().toISOString(),
+    p_payload: {
+      source: "h3-1-runtime-smoke",
+      network_key: networkKey,
+    },
+    p_request_id: crypto.randomUUID(),
+  },
+);
+if (acceptError) throw acceptError;
+
+const accepted = Array.isArray(acceptedRows) ? acceptedRows[0] : acceptedRows;
+assert.ok(accepted?.result_event_id);
+
+const { data: processedRows, error: processError } = await supabase.rpc(
+  "runtime_process_event",
+  { p_event_id: accepted.result_event_id },
+);
+if (processError) throw processError;
+
+const processed = Array.isArray(processedRows)
+  ? processedRows[0]
+  : processedRows;
+assert.equal(processed?.result_processed, true);
+assert.ok(processed?.result_moment_occurrence_id);
 
 const deliveryToken = `na_del_${crypto.randomBytes(32).toString("base64url")}`;
 const deliveryNonce = `na_nonce_${crypto.randomBytes(32).toString("base64url")}`;
