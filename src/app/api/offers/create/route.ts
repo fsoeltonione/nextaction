@@ -19,8 +19,14 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeNetworkMomentKeys(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
+function normalizeNetworkMomentKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    throw new HttpError(
+      400,
+      "invalid_offer_network_moments",
+      "network_moment_keys must be an array.",
+    );
+  }
 
   const keys = value.map(asString);
   if (
@@ -111,9 +117,13 @@ export async function POST(request: Request) {
     const rawTargetKeys = Array.isArray(body.target_moments)
       ? body.target_moments
       : null;
-    const networkMomentKeys = normalizeNetworkMomentKeys(
-      body.network_moment_keys,
+    const hasNetworkMomentKeys = Object.prototype.hasOwnProperty.call(
+      body,
+      "network_moment_keys",
     );
+    const networkMomentKeys = hasNetworkMomentKeys
+      ? normalizeNetworkMomentKeys(body.network_moment_keys)
+      : null;
 
     const legacyTargetingSelected =
       rawMomentIds !== null || rawTargetKeys !== null;
