@@ -59,6 +59,7 @@ export type Database = {
           id: string
           label: string
           moment_key: string
+          network_moment_id: string | null
           product_id: string
           status: string
           updated_at: string
@@ -69,6 +70,7 @@ export type Database = {
           id?: string
           label: string
           moment_key: string
+          network_moment_id?: string | null
           product_id: string
           status?: string
           updated_at?: string
@@ -79,16 +81,87 @@ export type Database = {
           id?: string
           label?: string
           moment_key?: string
+          network_moment_id?: string | null
           product_id?: string
           status?: string
           updated_at?: string
         }
         Relationships: [
           {
+            foreignKeyName: "moments_network_moment_id_fkey"
+            columns: ["network_moment_id"]
+            isOneToOne: false
+            referencedRelation: "network_moments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "moments_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      network_moments: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          label: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          label: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          label?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      offer_network_moments: {
+        Row: {
+          created_at: string
+          network_moment_id: string
+          offer_id: string
+        }
+        Insert: {
+          created_at?: string
+          network_moment_id: string
+          offer_id: string
+        }
+        Update: {
+          created_at?: string
+          network_moment_id?: string
+          offer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_network_moments_network_moment_id_fkey"
+            columns: ["network_moment_id"]
+            isOneToOne: false
+            referencedRelation: "network_moments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_network_moments_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
             referencedColumns: ["id"]
           },
         ]
@@ -458,6 +531,43 @@ export type Database = {
         Returns: {
           result_failed: number
           result_processed: number
+        }[]
+      }
+      set_moment_network_mapping_v1: {
+        Args: {
+          p_moment_id: string
+          p_network_moment_key?: string | null
+        }
+        Returns: {
+          result_moment_id: string
+          result_network_moment_id: string | null
+          result_network_moment_key: string | null
+        }[]
+      }
+      create_network_offer_activation_v1: {
+        Args: {
+          p_workspace_id: string
+          p_title: string
+          p_description: string
+          p_cta_label: string
+          p_destination_url: string
+          p_network_moment_keys: string[]
+        }
+        Returns: {
+          workspace_id: string
+          offer_id: string
+          network_moment_count: number
+        }[]
+      }
+      runtime_h3_1_release_proof: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          ready: boolean
+          schema_ready: boolean
+          access_ready: boolean
+          runtime_ready: boolean
+          invalid_mapping_count: number
+          inactive_target_count: number
         }[]
       }
       set_workspace_capabilities: {
