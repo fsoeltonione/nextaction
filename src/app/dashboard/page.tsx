@@ -35,6 +35,7 @@ function DashboardContent() {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(searchParams.get("workspace_id"));
   const [workspaceSelectionRequired, setWorkspaceSelectionRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -96,11 +97,27 @@ function DashboardContent() {
           .from('offers')
           .select('*')
           .eq('workspace_id', currentWorkspaceId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('offer_moments')
-          .select('offer_id, moment_id'),
+          .order('created_at', { ascending: false })
       ]);
+
+      const momentsResult = await supabase
+        .from('offer_moments')
+        .select('offer_id, moment_id')
+        .in('offer_id', offersResult.data?.map(o => o.id) || []);
+      
+      const offerMomentLinksResult = momentsResult;
+
+      try {
+        const balanceRes = await fetch(`/api/workspaces/balance?workspace_id=${currentWorkspaceId}`);
+        if (balanceRes.ok) {
+          const balanceData = await balanceRes.json();
+          setBalance(balanceData.balance ?? "$0.00");
+        } else {
+          setBalance("$0.00");
+        }
+      } catch (err) {
+        setBalance("$0.00");
+      }
 
       const targetIdsByOffer = new Map<string, string[]>();
       for (const link of offerMomentLinksResult.data || []) {
@@ -302,7 +319,7 @@ function DashboardContent() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-sm">
-                  Balance: <span className="text-emerald-400 font-semibold">$25.00</span>
+                  Balance: <span className="text-emerald-400 font-semibold">{balance === null ? "..." : balance}</span>
                 </div>
                 <button
                   onClick={() => setShowCreateOffer(true)}

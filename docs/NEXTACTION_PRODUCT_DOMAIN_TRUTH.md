@@ -96,6 +96,9 @@ The same Qualified Click must never create duplicate advertiser deductions or pu
 
 Payment-provider integration is deferred for MVP. Initial advertiser capacity may be provisioned manually/mock (for example, $25 capacity = 25 Qualified Clicks) without changing the domain model.
 
+**Important Domain Invariant: Settlement-Time Capacity Consumption**
+Advertiser capacity is intentionally consumed at *Settlement* time, not reserved at *Delivery* time. Offer deliveries are optimistic (made if capacity > 0 at that snapshot). If capacity is exhausted between delivery and click settlement, the click returns `no_capacity` and does not settle. This is a known, expected behavior allowing maximum delivery throughput without expensive locking on the read path.
+
 ## 9. Domain objects
 The production domain must be able to represent at minimum:
 - Workspace

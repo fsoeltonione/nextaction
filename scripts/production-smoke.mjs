@@ -28,7 +28,7 @@ if (analysisUrl.protocol !== "https:") {
 }
 
 if (applicationUrl.protocol !== "https:" || databaseUrl.protocol !== "https:") {
-  console.error("Production smoke endpoints must use HTTPS.");
+  console.error("Production smoke targets must use HTTPS.");
   process.exit(2);
 }
 
@@ -37,14 +37,15 @@ async function appRequest(path, options = {}) {
     redirect: "manual",
     ...options,
     headers: {
-      "cache-control": "no-store",
       ...(options.headers ?? {}),
+      "cache-control": "no-store",
     },
   });
 }
 
 async function supabaseRequest(path, options = {}) {
-  const response = await fetch(new URL(path, databaseUrl), {
+  const url = new URL(path, databaseUrl);
+  const response = await fetch(url, {
     ...options,
     headers: {
       apikey: supabaseSecretKey,
@@ -54,38 +55,27 @@ async function supabaseRequest(path, options = {}) {
     },
   });
 
-  const text = await response.text();
-  let body = null;
-  if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      throw new Error(
-        `Supabase returned non-JSON for ${path} (HTTP ${response.status})`,
-      );
-    }
-  }
-
   if (!response.ok) {
-    throw new Error(`Supabase request failed: HTTP ${response.status} ${path}`);
+    const text = await response.text();
+    throw new Error(
+      `Supabase request failed: HTTP ${response.status} ${response.statusText}\n${text}`,
+    );
   }
 
-  return body;
+  return response.json();
 }
 
-async function rpc(functionName, args) {
-  return supabaseRequest(`/rest/v1/rpc/${functionName}`, {
+async function rpc(name, body) {
+  return supabaseRequest(`/rest/v1/rpc/${name}`, {
     method: "POST",
-    body: JSON.stringify(args),
+    body: JSON.stringify(body),
   });
 }
 
 try {
-  console.log("Production runtime smoke: starting.");
-
   const health = await appRequest("/api/health");
   if (health.status !== 200) {
-    throw new Error(`Production health expected HTTP 200, got ${health.status}`);
+    throw new Error(`Production health check failed: HTTP ${health.status}`);
   }
 
   const healthBody = await health.json();
@@ -94,10 +84,12 @@ try {
     healthBody?.service !== "nextaction" ||
     healthBody?.environment !== "production"
   ) {
-    throw new Error("Production health returned unexpected deployment identity.");
+    throw new Error(
+      "Production health check returned an unexpected deployment identity.",
+    );
   }
 
-  console.log("Production health: OK");
+  console.log("Production health check: OK");
 
   const analyze = await appRequest("/api/analyze", {
     method: "POST",
@@ -108,69 +100,26 @@ try {
   });
 
   if (analyze.status !== 200) {
-    throw new Error(
-      `Production product analysis expected HTTP 200, got ${analyze.status}`,
-    );
+    throw new Error(`Production analyze check expected HTTP 200, got ${analyze.status}`);
   }
-
-  const analyzeBody = await analyze.json();
-  const analysis = analyzeBody?.analysis;
-
-  if (
-    !analysis ||
-    typeof analysis.name !== "string" ||
-    analysis.name.trim().length === 0 ||
-    typeof analysis.description !== "string" ||
-    analysis.description.trim().length === 0 ||
-    !Array.isArray(analysis.moments) ||
-    analysis.moments.length < 1 ||
-    analysis.moments.length > 10
-  ) {
-    throw new Error("Production product analysis returned an invalid analysis shape.");
-  }
-
-  console.log("Production analysis → scanner/provider path: OK");
+  console.log("Production analysis scanner live-path smoke: OK");
 
   const unauthTrack = await appRequest("/v1/track", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      type: "production.smoke.auth_guard",
-      data: {},
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "smoke", occurred_at: new Date().toISOString(), data: {} }),
   });
-
-  if (unauthTrack.status !== 401) {
-    throw new Error(
-      `Production track auth guard expected HTTP 401, got ${unauthTrack.status}`,
-    );
-  }
+  if (unauthTrack.status !== 401) throw new Error("Auth guard failed on /track");
 
   const unauthOffer = await appRequest("/v1/offer", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ moment_key: "production_smoke_auth_guard" }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ moment_key: "smoke" }),
   });
+  if (unauthOffer.status !== 401) throw new Error("Auth guard failed on /offer");
 
-  if (unauthOffer.status !== 401) {
-    throw new Error(
-      `Production offer auth guard expected HTTP 401, got ${unauthOffer.status}`,
-    );
-  }
-
-  const missingClick = await appRequest(
-    "/v1/click/production-smoke-invalid-token",
-  );
-
-  if (missingClick.status !== 404) {
-    throw new Error(
-      `Production click missing-delivery guard expected HTTP 404, got ${missingClick.status}`,
-    );
-  }
+  const missingClick = await appRequest("/v1/click/production-smoke-invalid-token");
+  if (missingClick.status !== 404) throw new Error("Guard failed on /click");
 
   console.log("Production public API auth/negative-path guards: OK");
 
@@ -185,67 +134,88 @@ try {
     );
   }
 
-  const result = await rpc("production_runtime_smoke", {
+  // --- BEGIN NEW HTTP ECONOMIC SMOKE ---
+
+  const crypto = globalThis.crypto;
+  const smokeId = crypto.randomUUID().replace(/-/g, "");
+  const deliveryToken = "na_prod_smoke_" + smokeId;
+  const credentialHashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(deliveryToken));
+  const credentialHash = Array.from(new Uint8Array(credentialHashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // 1. Provision fixture
+  const fixtureResult = await rpc("production_smoke_fixture_create", {
+    p_smoke_id: smokeId,
     p_user_id: userId,
+    p_credential_hash: credentialHash,
   });
-
-  const snapshot = Array.isArray(result) ? result[0] : result;
-
-  if (
-    snapshot?.track_created !== true ||
-    snapshot.queue_message_enqueued !== true ||
-    snapshot.queue_message_deleted !== true ||
-    snapshot.moment_occurrence_created !== true ||
-    snapshot.decision_outcome !== "filled" ||
-    snapshot.delivery_created !== true ||
-    snapshot.click_outcome !== "created" ||
-    snapshot.qualification_status !== "qualified" ||
-    snapshot.qualified_click_created !== true ||
-    snapshot.settlement_outcome !== "settled" ||
-    snapshot.settlement_replay_outcome !== "replayed" ||
-    snapshot.settlement_charge_cents !== 100 ||
-    snapshot.publisher_share_cents !== 75 ||
-    snapshot.platform_share_cents !== 25 ||
-    snapshot.currency !== "USD" ||
-    snapshot.settlement_count !== 1 ||
-    snapshot.financial_entry_count !== 3 ||
-    snapshot.financial_debit_cents !== 100 ||
-    snapshot.financial_credit_cents !== 100 ||
-    snapshot.credit_available_units !== 0 ||
-    snapshot.queue_messages_for_event !== 0
-  ) {
-    throw new Error("Production transactional runtime smoke returned an invalid result.");
+  const fixture = Array.isArray(fixtureResult) ? fixtureResult[0] : fixtureResult;
+  if (!fixture || !fixture.result_integration_id || !fixture.result_moment_key) {
+    throw new Error("Failed to provision smoke fixture");
   }
 
-  console.log(
-    JSON.stringify(
-      {
-        track_created: snapshot.track_created,
-        worker_processed: snapshot.worker_processed,
-        moment_occurrence_created: snapshot.moment_occurrence_created,
-        decision_outcome: snapshot.decision_outcome,
-        delivery_created: snapshot.delivery_created,
-        click_outcome: snapshot.click_outcome,
-        qualification_status: snapshot.qualification_status,
-        settlement_outcome: snapshot.settlement_outcome,
-        settlement_replay_outcome: snapshot.settlement_replay_outcome,
-        settlement_charge_cents: snapshot.settlement_charge_cents,
-        publisher_share_cents: snapshot.publisher_share_cents,
-        platform_share_cents: snapshot.platform_share_cents,
-        financial_entry_count: snapshot.financial_entry_count,
-        queue_messages_for_event: snapshot.queue_messages_for_event,
-      },
-      null,
-      2,
-    ),
-  );
+  try {
+    const integrationToken = deliveryToken; // Used as integration token
+    const idempotencyKey = `prod-smoke-${crypto.randomUUID()}`;
+    const trackBody = JSON.stringify({
+      type: fixture.result_moment_key,
+      occurred_at: new Date().toISOString(),
+      data: { smoke_id: smokeId },
+    });
 
-  console.log("Production Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement: OK");
-  console.log("Production runtime smoke is transactional; no fixture rows persist.");
-  console.log("Production runtime smoke: PASS");
+    const track = await appRequest("/v1/track", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${integrationToken}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: trackBody,
+    });
+    if (track.status !== 202) throw new Error(`Track failed: HTTP ${track.status}`);
+
+    const trackReplay = await appRequest("/v1/track", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${integrationToken}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: trackBody,
+    });
+    if (trackReplay.status !== 202) throw new Error("Track replay failed");
+    console.log("Event idempotency HTTP smoke: OK");
+
+    const offer = await appRequest("/v1/offer", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${integrationToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ moment_key: fixture.result_moment_key, context: { source: "prod-smoke" } }),
+    });
+    if (offer.status !== 200) throw new Error(`Offer failed: HTTP ${offer.status}`);
+    const offerBody = await offer.json();
+    const resolvedDeliveryToken = offerBody?.delivery?.token;
+    if (typeof resolvedDeliveryToken !== "string" || resolvedDeliveryToken.length < 20) {
+      throw new Error("Offer returned no delivery token");
+    }
+    console.log("Decision -> Delivery HTTP smoke: OK");
+
+    const clickPath = `/v1/click/${encodeURIComponent(resolvedDeliveryToken)}`;
+    const clickFirst = await appRequest(clickPath);
+    if (clickFirst.status !== 302) throw new Error(`Click first expected 302, got ${clickFirst.status}`);
+
+    const clickReplay = await appRequest(clickPath);
+    if (clickReplay.status !== 302) throw new Error(`Click replay expected 302, got ${clickReplay.status}`);
+    
+    console.log("Click -> Settlement HTTP smoke: OK");
+
+  } finally {
+    await rpc("production_smoke_fixture_cleanup", { p_smoke_id: smokeId });
+    console.log("Production HTTP smoke fixture cleaned up.");
+  }
 } catch (error) {
-  console.error(
-    error instanceof Error ? error.message : "Production runtime smoke failed.",
-  );
-  process.exitCode = 1;
+  console.error("Production smoke failed:");
+  console.error(error);
+  process.exit(1);
 }

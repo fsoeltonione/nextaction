@@ -8,7 +8,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 const MAX_TOKEN_LENGTH = 256;
 const CLICK_RATE_LIMIT_PER_MINUTE = 120;
 
-type ClickResult = {
+type ClickQualifySettleResult = {
   result_outcome:
     | "created"
     | "replayed"
@@ -20,19 +20,25 @@ type ClickResult = {
   result_destination_url: string | null;
   result_reason_code: string | null;
   result_qualified_click_id: string | null;
-};
-
-type SettlementResult = {
-  result_outcome:
+  result_qualification_version: string | null;
+  result_qualified_at: string | null;
+  result_settlement_outcome:
     | "settled"
     | "replayed"
     | "not_found"
     | "not_qualified"
     | "no_capacity"
-    | "financial_unavailable";
+    | "financial_unavailable"
+    | null;
   result_settlement_id: string | null;
-  result_qualified_click_id: string | null;
-  result_reason_code: string | null;
+  result_advertiser_workspace_id: string | null;
+  result_publisher_workspace_id: string | null;
+  result_charge_cents: number | null;
+  result_publisher_share_cents: number | null;
+  result_platform_share_cents: number | null;
+  result_currency: string | null;
+  result_remaining_capacity: number | null;
+  result_settlement_reason_code: string | null;
 };
 
 function failure(
@@ -41,51 +47,37 @@ function failure(
   code: string,
   message: string,
 ) {
-  const response = jsonError(requestId, status, code, message);
-  response.headers.set("Cache-Control", "no-store");
-  response.headers.set("Referrer-Policy", "no-referrer");
-  response.headers.set("X-Request-Id", requestId);
-  return response;
+  return jsonError(requestId, status, code, message);
 }
 
 function rateLimited(requestId: string, retryAfterSeconds: number) {
-  const response = failure(
-    requestId,
-    429,
-    "rate_limited",
-    "Too many requests. Please retry later.",
+  return new NextResponse(
+    JSON.stringify({
+      error: {
+        request_id: requestId,
+        code: "rate_limited",
+        message: "Too many requests. Please try again later.",
+      },
+    }),
+    {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfterSeconds),
+      },
+    },
   );
-  response.headers.set("Retry-After", String(retryAfterSeconds));
-  return response;
 }
 
-function redirectToDestination(requestId: string, destinationUrl: string) {
-  let destination: URL;
-
-  try {
-    destination = new URL(destinationUrl);
-  } catch {
-    return failure(
-      requestId,
-      503,
-      "destination_unavailable",
-      "The offer destination is temporarily unavailable.",
-    );
-  }
-
-  if (destination.protocol !== "http:" && destination.protocol !== "https:") {
-    return failure(
-      requestId,
-      503,
-      "destination_unavailable",
-      "The offer destination is temporarily unavailable.",
-    );
-  }
-
-  const response = NextResponse.redirect(destination, 302);
-  response.headers.set("Cache-Control", "no-store");
-  response.headers.set("X-Request-Id", requestId);
-  return response;
+function redirectToDestination(requestId: string, url: string) {
+  return new NextResponse(null, {
+    status: 302,
+    headers: {
+      Location: url,
+      "Cache-Control": "no-store, max-age=0",
+      "X-NextAction-Request-Id": requestId,
+    },
+  });
 }
 
 export async function GET(
@@ -95,9 +87,10 @@ export async function GET(
   const requestId = createRequestId();
 
   try {
+    const ip = getRequestIp(request);
     const rateLimit = await checkRateLimit(
-      "runtime:click:ip",
-      getRequestIp(request),
+      "click_ip",
+      ip,
       CLICK_RATE_LIMIT_PER_MINUTE,
     );
 
@@ -124,7 +117,7 @@ export async function GET(
     const admin = createAdminClient();
 
     const { data, error } = await admin.rpc(
-      "runtime_record_and_qualify_click",
+      "runtime_click_qualify_and_settle",
       {
         p_delivery_token_hash: deliveryTokenHash,
       },
@@ -153,7 +146,7 @@ export async function GET(
       );
     }
 
-    const row = (Array.isArray(data) ? data[0] : data) as ClickResult | null;
+    const row = (Array.isArray(data) ? data[0] : data) as ClickQualifySettleResult | null;
 
     if (!row) {
       return failure(
@@ -212,43 +205,9 @@ export async function GET(
       );
     }
 
-    const {
-      data: settlementData,
-      error: settlementError,
-    } = await admin.rpc("runtime_settle_qualified_click", {
-      p_qualified_click_id: row.result_qualified_click_id,
-    });
-
-    if (settlementError) {
-      console.error("Runtime settlement failed", {
-        requestId,
-        code: settlementError.code,
-      });
-
-      return failure(
-        requestId,
-        503,
-        "settlement_unavailable",
-        "Click settlement is temporarily unavailable.",
-      );
-    }
-
-    const settlementRow = (
-      Array.isArray(settlementData) ? settlementData[0] : settlementData
-    ) as SettlementResult | null;
-
-    if (!settlementRow) {
-      return failure(
-        requestId,
-        503,
-        "settlement_unavailable",
-        "Click settlement is temporarily unavailable.",
-      );
-    }
-
     if (
-      settlementRow.result_outcome === "not_found" ||
-      settlementRow.result_outcome === "not_qualified"
+      row.result_settlement_outcome === "not_found" ||
+      row.result_settlement_outcome === "not_qualified"
     ) {
       return failure(
         requestId,
@@ -259,8 +218,8 @@ export async function GET(
     }
 
     if (
-      settlementRow.result_outcome === "no_capacity" ||
-      settlementRow.result_outcome === "financial_unavailable"
+      row.result_settlement_outcome === "no_capacity" ||
+      row.result_settlement_outcome === "financial_unavailable"
     ) {
       return failure(
         requestId,
@@ -271,8 +230,8 @@ export async function GET(
     }
 
     if (
-      settlementRow.result_outcome !== "settled" &&
-      settlementRow.result_outcome !== "replayed"
+      row.result_settlement_outcome !== "settled" &&
+      row.result_settlement_outcome !== "replayed"
     ) {
       return failure(
         requestId,
