@@ -177,6 +177,8 @@ assert.match(staging, /\/api\/health\/ready/);
 assert.match(staging, /operations\?\.schedule_active/);
 assert.match(production, /\/api\/health\/ready/);
 assert.match(production, /operations\?\.schedule_active/);
+assert.match(production, /EVENT_PROCESSING_TIMEOUT_MS = 90_000/);
+assert.match(production, /timeoutMs = EVENT_PROCESSING_TIMEOUT_MS/);
 
 // H2.2: Cloudflare is the explicit IP trust boundary.
 assert.match(runtimeHttp, /cf-connecting-ip/);
