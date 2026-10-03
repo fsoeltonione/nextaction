@@ -243,12 +243,24 @@ export async function GET(
       row.result_settlement_outcome === "no_capacity" ||
       row.result_settlement_outcome === "financial_unavailable"
     ) {
+      console.warn("Runtime settlement unavailable", {
+        requestId,
+        outcome: row.result_settlement_outcome,
+        reasonCode: row.result_settlement_reason_code,
+      });
       return failure(
         requestId,
         503,
         "settlement_unavailable",
         "Click settlement is temporarily unavailable.",
       );
+    }
+
+    if (row.result_settlement_outcome === "replayed") {
+      console.info("Runtime settlement replayed", {
+        requestId,
+        reasonCode: row.result_settlement_reason_code,
+      });
     }
 
     if (
