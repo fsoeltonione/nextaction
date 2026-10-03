@@ -210,6 +210,36 @@ assert.equal(decision?.result_offer_id, offer.id);
 assert.equal(decision?.result_reason_code, null);
 assert.ok(decision?.result_delivery_id);
 
+const baseUrl = process.env.STAGING_BASE_URL?.trim();
+if (baseUrl) {
+  const parsedBaseUrl = new URL(baseUrl);
+  assert.equal(parsedBaseUrl.protocol, "https:");
+
+  const response = await fetch(new URL("/v1/offer", parsedBaseUrl), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${integrationToken}`,
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+    body: JSON.stringify({
+      moment_key: publisherMoment.moment_key,
+      context: {
+        source: "h3-1-runtime-smoke",
+      },
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body?.delivery?.offer?.title, offer.title);
+  assert.equal(
+    typeof body?.delivery?.token,
+    "string",
+    "HTTP runtime smoke must return a Delivery token.",
+  );
+}
+
 console.log(
   `H3.1 Network Moment runtime smoke: PASS (${environment}) — cross-workspace offer matched`,
 );
