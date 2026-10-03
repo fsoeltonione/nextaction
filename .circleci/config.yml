@@ -379,6 +379,8 @@ jobs:
       - image: cimg/node:24.21.0
     steps:
       - checkout
+      - attach_workspace:
+          at: /tmp/nextaction-release
       - run:
           name: Install
           command: npm ci
@@ -392,6 +394,7 @@ jobs:
       - run:
           name: Run H3.1 staging runtime smoke
           command: |
+            export STAGING_BASE_URL="$(cat /tmp/nextaction-release/staging_base_url)"
             npm run test:h3-1-runtime-smoke
 
 
