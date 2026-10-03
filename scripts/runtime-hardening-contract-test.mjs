@@ -169,7 +169,7 @@ assert.match(readyRoute, /X-Request-Id/);
 assert.match(readyRoute, /Cache-Control/);
 
 // H2.2: Cloudflare is the explicit IP trust boundary; forwarded chains are ignored.
-assert.match(runtimeHttp, /CF-Connecting-IP is the Cloudflare-provided client IP header/);
+assert.match(runtimeHttp, /CF-Connecting-IP is the[\s\S]*Cloudflare-provided client IP header/);
 assert.match(runtimeHttp, /return cloudflareIp \|\| "unknown"/);
 assert.doesNotMatch(runtimeHttp, /x-forwarded-for/);
 
