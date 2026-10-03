@@ -20,7 +20,8 @@
     "test:analysis-output": "node --experimental-strip-types --test scripts/analysis-output-test.ts",
     "test:analysis-provider-content": "node --experimental-strip-types --test scripts/analysis-provider-content-test.ts",
     "test:stage16-activation": "node scripts/stage16-activation-contract-test.mjs",
-    "test:release-boundary": "node scripts/release-boundary-contract-test.mjs"
+    "test:release-boundary": "node scripts/release-boundary-contract-test.mjs",
+    "test:runtime-hardening": "node scripts/runtime-hardening-contract-test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
