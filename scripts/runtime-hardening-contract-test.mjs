@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [clickRoute, stage16, stage17, runtimeHttp, readyRoute, staging, production, circleci, packageJson] = await Promise.all([
+const [clickRoute, stage16, stage17, runtimeHttp, readyRoute, staging, production, qualityWorkflow, releaseWorkflow, packageJson] = await Promise.all([
   readFile("src/app/v1/click/[delivery_token]/route.ts", "utf8"),
   readFile("supabase/migrations/20260928053000_stage_16_activation_workspace_context.sql", "utf8"),
   readFile("supabase/migrations/20261003000000_stage_17_remediation.sql", "utf8"),
@@ -9,7 +9,8 @@ const [clickRoute, stage16, stage17, runtimeHttp, readyRoute, staging, productio
   readFile("src/app/api/health/ready/route.ts", "utf8"),
   readFile("scripts/staging-smoke.mjs", "utf8"),
   readFile("scripts/production-smoke.mjs", "utf8"),
-  readFile(".circleci/config.yml", "utf8"),
+  readFile(".github/workflows/quality.yml", "utf8"),
+  readFile(".github/workflows/release.yml", "utf8"),
   readFile("package.json", "utf8"),
 ]);
 
@@ -187,7 +188,9 @@ assert.doesNotMatch(runtimeHttp, /\.get\(["']x-forwarded-for["']\)/);
 
 const pkg = JSON.parse(packageJson);
 assert.equal(pkg.scripts["test:runtime-hardening"], "node scripts/runtime-hardening-contract-test.mjs");
-assert.match(circleci, /runtime_hardening_contract:/);
-assert.match(circleci, /npm run test:runtime-hardening/);
+assert.match(qualityWorkflow, /^  runtime_hardening_contract:/m);
+assert.match(qualityWorkflow, /npm run test:runtime-hardening/);
+assert.match(releaseWorkflow, /^  runtime_hardening_contract:/m);
+assert.match(releaseWorkflow, /npm run test:runtime-hardening/);
 
 console.log("runtime hardening contract: OK");
