@@ -36,6 +36,7 @@ function DashboardContent() {
   const [workspaceSelectionRequired, setWorkspaceSelectionRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
+  const [balanceError, setBalanceError] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -108,15 +109,21 @@ function DashboardContent() {
       const offerMomentLinksResult = momentsResult;
 
       try {
-        const balanceRes = await fetch(`/api/workspaces/balance?workspace_id=${currentWorkspaceId}`);
+        const balanceRes = await fetch(
+          `/api/workspaces/balance?workspace_id=${encodeURIComponent(currentWorkspaceId)}`,
+          { cache: "no-store" },
+        );
         if (balanceRes.ok) {
           const balanceData = await balanceRes.json();
-          setBalance(balanceData.balance ?? "$0.00");
+          setBalance(balanceData.balance ?? null);
+          setBalanceError(false);
         } else {
-          setBalance("$0.00");
+          setBalance(null);
+          setBalanceError(true);
         }
-      } catch (err) {
-        setBalance("$0.00");
+      } catch {
+        setBalance(null);
+        setBalanceError(true);
       }
 
       const targetIdsByOffer = new Map<string, string[]>();
@@ -319,7 +326,7 @@ function DashboardContent() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-sm">
-                  Balance: <span className="text-emerald-400 font-semibold">{balance === null ? "..." : balance}</span>
+                  Balance: <span className="text-emerald-400 font-semibold">{balanceError ? "Unavailable" : balance === null ? "..." : balance}</span>
                 </div>
                 <button
                   onClick={() => setShowCreateOffer(true)}
