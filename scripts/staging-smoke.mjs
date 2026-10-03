@@ -1,5 +1,10 @@
+import { createClient } from "@supabase/supabase-js";
+import crypto from "node:crypto";
+
 const baseUrl = process.env.STAGING_BASE_URL;
 const integrationToken = process.env.STAGING_INTEGRATION_TOKEN;
+const stagingSupabaseUrl = process.env.STAGING_NEXT_PUBLIC_SUPABASE_URL;
+const stagingSupabaseSecretKey = process.env.STAGING_SUPABASE_SECRET_KEY;
 
 // Stage 14 is a fixed release-gate fixture. Its Moment key is part of the
 // fixture contract and must not be supplied by mutable CI configuration.
@@ -167,6 +172,93 @@ console.log("Event idempotency smoke: OK");
 console.log(
   `Stage 14 Moment contract: ${STAGE14_SMOKE_MOMENT_KEY}`,
 );
+
+if (!stagingSupabaseUrl || !stagingSupabaseSecretKey) {
+  console.error(
+    "Missing STAGING_NEXT_PUBLIC_SUPABASE_URL or STAGING_SUPABASE_SECRET_KEY.",
+  );
+  process.exit(2);
+}
+
+const stagingSupabase = createClient(
+  stagingSupabaseUrl,
+  stagingSupabaseSecretKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  },
+);
+
+const EVENT_PROCESSING_TIMEOUT_MS = 90_000;
+
+async function waitForEventProcessing(
+  eventId,
+  timeoutMs = EVENT_PROCESSING_TIMEOUT_MS,
+) {
+  const { data: integrationRows, error: integrationError } =
+    await stagingSupabase.rpc("resolve_runtime_integration", {
+      p_credential_hash: crypto
+        .createHash("sha256")
+        .update(integrationToken)
+        .digest("hex"),
+    });
+
+  if (integrationError) {
+    throw new Error(
+      `Unable to resolve staging smoke integration: ${integrationError.message}`,
+    );
+  }
+
+  const integration = Array.isArray(integrationRows)
+    ? integrationRows[0]
+    : integrationRows;
+  const integrationId = integration?.result_integration_id;
+
+  if (typeof integrationId !== "string" || integrationId.length === 0) {
+    throw new Error("Staging smoke integration resolution returned no integration id.");
+  }
+
+  const startedAt = Date.now();
+  let lastSnapshot = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const { data, error } = await stagingSupabase.rpc(
+      "production_smoke_fixture_verify",
+      {
+        p_integration_id: integrationId,
+        p_event_id: eventId,
+      },
+    );
+
+    if (error) {
+      throw new Error(
+        `Unable to verify staging Event processing: ${error.message}`,
+      );
+    }
+
+    const snapshot = Array.isArray(data) ? data[0] : data;
+    lastSnapshot = snapshot;
+
+    if (
+      snapshot?.event_found === true &&
+      snapshot?.occurrence_found === true &&
+      snapshot?.queue_messages_for_event === 0
+    ) {
+      return snapshot;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error(
+    `Timed out waiting for Event → Moment processing. Last state: ${JSON.stringify(lastSnapshot)}`,
+  );
+}
+
+await waitForEventProcessing(trackBodyJson.event_id);
+console.log("Event → Moment processing smoke: OK");
 
 const offer = await request("/v1/offer", {
   method: "POST",
