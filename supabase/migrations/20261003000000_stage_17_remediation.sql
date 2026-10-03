@@ -1,9 +1,36 @@
 -- NextAction Stage 17: Remediation for ECON-005 and ECON-003
 BEGIN;
 
--- ECON-005: Add UNIQUE constraint on qualified_click_id
-CREATE UNIQUE INDEX IF NOT EXISTS settlements_qualified_click_id_key
-  ON private.settlements (qualified_click_id);
+-- ECON-005: Converge every environment on one database-level uniqueness
+-- invariant for qualified_click_id without creating redundant indexes.
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'settlements_qualified_click_id_key'
+      AND conrelid = 'private.settlements'::regclass
+      AND contype = 'u'
+  ) THEN
+    IF EXISTS (
+      SELECT 1
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = 'settlements_qualified_click_id_key'
+        AND n.nspname = 'private'
+        AND c.relkind = 'i'
+    ) THEN
+      ALTER TABLE private.settlements
+        ADD CONSTRAINT settlements_qualified_click_id_key
+        UNIQUE USING INDEX settlements_qualified_click_id_key;
+    ELSE
+      ALTER TABLE private.settlements
+        ADD CONSTRAINT settlements_qualified_click_id_key
+        UNIQUE (qualified_click_id);
+    END IF;
+  END IF;
+END
+$;
 
 -- ECON-003: Atomic Qualify + Settle Transaction
 CREATE OR REPLACE FUNCTION public.runtime_click_qualify_and_settle(
@@ -107,8 +134,6 @@ GRANT EXECUTE ON FUNCTION public.runtime_click_qualify_and_settle(TEXT)
 -- Economic history is intentionally immutable, so a successful settlement
 -- cannot be deleted afterward. The canary has no workspace membership and
 -- therefore remains outside normal user workspace visibility.
-DROP FUNCTION IF EXISTS public.production_smoke_fixture_cleanup(TEXT);
-
 CREATE OR REPLACE FUNCTION public.production_smoke_fixture_create(
   p_smoke_id TEXT,
   p_user_id UUID,
