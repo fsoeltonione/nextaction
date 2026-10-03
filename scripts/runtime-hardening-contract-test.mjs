@@ -173,6 +173,30 @@ assert.match(runtimeHttp, /CF-Connecting-IP is the[\s\S]*Cloudflare-provided cli
 assert.match(runtimeHttp, /return cloudflareIp \|\| "unknown"/);
 assert.doesNotMatch(runtimeHttp, /x-forwarded-for/);
 
+
+// H2.2 follow-up: latest scheduler run must drive readiness, not any older success.
+const h22FollowupPath = "supabase/migrations/20261004021000_h2_2_runtime_ops_hardening.sql";
+let h22Followup;
+try {
+  h22Followup = await readFile(h22FollowupPath, "utf8");
+} catch {
+  throw new Error("H2.2 runtime operations hardening migration is missing.");
+}
+assert.match(h22Followup, /DELETE FROM private\.runtime_dead_letters/);
+assert.match(h22Followup, /INTERVAL '30 days'/);
+assert.match(h22Followup, /SELECT d\.status, d\.start_time/);
+assert.match(h22Followup, /ORDER BY d\.start_time DESC/);
+assert.match(h22Followup, /v_worker_recent_success :=/);
+assert.match(h22Followup, /v_operations_recent_success :=/);
+assert.match(h22Followup, /last_run_status/);
+assert.match(h22Followup, /last_run_started_at/);
+
+// Release smoke must verify the runtime readiness endpoint in both environments.
+assert.match(staging, /\/api\/health\/ready/);
+assert.match(staging, /operations\?\.schedule_active/);
+assert.match(production, /\/api\/health\/ready/);
+assert.match(production, /operations\?\.schedule_active/);
+
 const pkg = JSON.parse(packageJson);
 assert.equal(pkg.scripts["test:runtime-hardening"], "node scripts/runtime-hardening-contract-test.mjs");
 assert.match(circleci, /runtime_hardening_contract:/);
