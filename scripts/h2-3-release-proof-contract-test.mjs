@@ -31,6 +31,10 @@ assert.match(healthRoute, /NEXT_PUBLIC_RELEASE_SHA/);
 assert.match(healthRoute, /release_sha: releaseSha/);
 assert.match(deploy, /NEXT_PUBLIC_RELEASE_SHA/);
 assert.match(deploy, /CIRCLE_SHA1/);
+assert.match(
+  deploy,
+  /process\.env\.CIRCLECI === "true"[\s\S]*process\.env\.CIRCLE_SHA1 \|\| ""/,
+);
 assert.match(deploy, /valid 40-character release SHA/);
 assert.match(staging, /STAGING_EXPECTED_RELEASE_SHA/);
 assert.match(staging, /healthBody\?\.release_sha !== expectedReleaseSha/);
@@ -89,5 +93,29 @@ assert.match(
   releaseWorkflow,
   /requires:[\s\S]*production_smoke[\s\S]*cloudflare_production_audit/,
 );
+
+// Release smoke/proof jobs must bind expected provenance to the pipeline revision.
+for (const [job, expectedVar] of [
+  ["staging_smoke", "STAGING_EXPECTED_RELEASE_SHA"],
+  ["production_smoke", "PRODUCTION_EXPECTED_RELEASE_SHA"],
+  ["production_release_proof", "PRODUCTION_EXPECTED_RELEASE_SHA"],
+]) {
+  const start = releaseWorkflow.indexOf("      - " + job + ":");
+  assert.notEqual(start, -1, `${job} must exist in release-gate`);
+  const end = releaseWorkflow.indexOf("\n      - ", start + 9);
+  const block = releaseWorkflow.slice(start, end === -1 ? releaseWorkflow.length : end);
+  assert.match(block, new RegExp(`environment:[\\s\\S]*${expectedVar}: << pipeline\\.git\\.revision >>`));
+}
+
+// The final proof must be production-only and must run after the live smoke.
+const proofStart = releaseWorkflow.indexOf("      - production_release_proof:");
+const proofEnd = releaseWorkflow.indexOf("\n      - ", proofStart + 9);
+const proofBlock = releaseWorkflow.slice(
+  proofStart,
+  proofEnd === -1 ? releaseWorkflow.length : proofEnd,
+);
+assert.match(proofBlock, /context:\n\s+- nextaction-production/);
+assert.match(proofBlock, /filters:\n\s+branches:\n\s+only: master/);
+assert.match(proofBlock, /requires:[\s\S]*production_smoke/);
 
 console.log("H2.3 release proof contract: OK");
