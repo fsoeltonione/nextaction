@@ -265,7 +265,10 @@ jobs:
           name: Validate staging smoke inputs
           command: |
             bash scripts/require-file.sh /tmp/nextaction-release/staging_base_url
-            bash scripts/require-env.sh STAGING_INTEGRATION_TOKEN
+            bash scripts/require-env.sh \
+              STAGING_INTEGRATION_TOKEN \
+              STAGING_NEXT_PUBLIC_SUPABASE_URL \
+              STAGING_SUPABASE_SECRET_KEY
       - run:
           name: Run staging smoke
           command: |
