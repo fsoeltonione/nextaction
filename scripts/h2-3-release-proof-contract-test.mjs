@@ -65,6 +65,7 @@ assert.match(releaseProof, /runtime_release_proof/);
 assert.match(releaseProof, /release_sha !== expectedReleaseSha/);
 assert.match(releaseProof, /dead_letter_count !== 0/);
 assert.match(releaseProof, /stale_rate_limit_bucket_count !== 0/);
+assert.match(releaseProof, /h2_3_release_reliability_proof !== true/);
 assert.match(releaseProof, /Production release proof: PASS/);
 assert.equal(
   JSON.parse(packageJson).scripts["production:release-proof"],
