@@ -33,19 +33,23 @@ assert.ok(integration?.result_workspace_id);
 const publisherIntegrationId = integration.result_integration_id;
 const publisherProductId = integration.result_product_id;
 const publisherWorkspaceId = integration.result_workspace_id;
+const STAGE14_SMOKE_MOMENT_KEY = "stage14_smoke_moment";
 
 const { data: moments, error: momentError } = await supabase
   .from("moments")
   .select("id,moment_key")
   .eq("product_id", publisherProductId)
+  .eq("moment_key", STAGE14_SMOKE_MOMENT_KEY)
   .eq("status", "active")
-  .order("moment_key")
   .limit(1);
 
 if (momentError) throw momentError;
 const publisherMoment = moments?.[0];
-assert.ok(publisherMoment?.id);
-assert.ok(publisherMoment?.moment_key);
+assert.ok(
+  publisherMoment?.id,
+  `Staging smoke fixture Moment ${STAGE14_SMOKE_MOMENT_KEY} must exist for the publisher product.`,
+);
+assert.equal(publisherMoment?.moment_key, STAGE14_SMOKE_MOMENT_KEY);
 
 const { data: networkRows, error: networkError } = await supabase
   .from("network_moments")
