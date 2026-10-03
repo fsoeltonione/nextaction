@@ -70,6 +70,7 @@ assert.match(migration, /inactive_target_count/);
 assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.runtime_h3_1_release_proof\(\)[\s\S]*TO service_role/);
 
 assert.match(offerRoute, /network_moment_keys/);
+assert.match(offerRoute, /must be an array/);
 assert.match(offerRoute, /conflicting_offer_targets/);
 assert.match(offerRoute, /create_network_offer_activation_v1/);
 assert.match(offerRoute, /create_offer_activation_v2/);
