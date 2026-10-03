@@ -19,6 +19,7 @@ DECLARE
   v_migration_h2_1 BOOLEAN := FALSE;
   v_migration_h2_2_recovery BOOLEAN := FALSE;
   v_migration_h2_2_hardening BOOLEAN := FALSE;
+  v_migration_h2_3 BOOLEAN := FALSE;
   v_status TEXT;
 BEGIN
   v_readiness := public.runtime_readiness();
@@ -48,6 +49,11 @@ BEGIN
     WHERE name = 'h2_2_runtime_ops_hardening'
   ) INTO v_migration_h2_2_hardening;
 
+  SELECT EXISTS (
+    SELECT 1 FROM supabase_migrations.schema_migrations
+    WHERE name = 'h2_3_release_reliability_proof'
+  ) INTO v_migration_h2_3;
+
   IF COALESCE(v_readiness->>'status', 'not_ready') = 'ready'
      AND COALESCE(v_readiness->'worker'->>'recent_success', 'false') = 'true'
      AND COALESCE(v_readiness->'worker'->>'schedule_active', 'false') = 'true'
@@ -61,6 +67,7 @@ BEGIN
      AND v_migration_h2_1
      AND v_migration_h2_2_recovery
      AND v_migration_h2_2_hardening
+     AND v_migration_h2_3
   THEN
     v_status := 'ready';
   ELSE
@@ -79,7 +86,8 @@ BEGIN
     'required_migrations', pg_catalog.jsonb_build_object(
       'h2_1_runtime_failure_containment', v_migration_h2_1,
       'h2_2_recovery_operations', v_migration_h2_2_recovery,
-      'h2_2_runtime_ops_hardening', v_migration_h2_2_hardening
+      'h2_2_runtime_ops_hardening', v_migration_h2_2_hardening,
+      'h2_3_release_reliability_proof', v_migration_h2_3
     )
   );
 END;
