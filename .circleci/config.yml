@@ -441,6 +441,9 @@ workflows:
       - runtime_hardening_contract:
           requires:
             - quality
+      - h2_3_release_proof_contract:
+          requires:
+            - quality
       - analysis_provider_smoke:
           context:
             - nextaction-staging
