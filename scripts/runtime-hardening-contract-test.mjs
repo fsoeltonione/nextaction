@@ -59,6 +59,8 @@ assert.match(h1, /unsettled_qualified_click_count/);
 assert.match(h1, /runtime-integrity-audit|nextaction-runtime-integrity-audit/);
 assert.match(h1, /cron\.schedule/);
 assert.match(h1, /SELECT public\.runtime_integrity_audit\(\)/);
+assert.match(h1, /GRANT EXECUTE ON FUNCTION public\.runtime_integrity_audit\(\)[\s\S]*TO service_role/);
+assert.match(h1, /GRANT EXECUTE ON FUNCTION public\.runtime_integrity_latest\(\)[\s\S]*TO service_role/);
 assert.match(h1, /Scheduling an existing job name replaces that job definition/);
 
 const pkg = JSON.parse(packageJson);
