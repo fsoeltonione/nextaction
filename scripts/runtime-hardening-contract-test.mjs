@@ -63,6 +63,22 @@ assert.match(h1, /GRANT EXECUTE ON FUNCTION public\.runtime_integrity_audit\(\)[
 assert.match(h1, /GRANT EXECUTE ON FUNCTION public\.runtime_integrity_latest\(\)[\s\S]*TO service_role/);
 assert.match(h1, /Scheduling an existing job name replaces that job definition/);
 
+
+const h1CanaryPath = "supabase/migrations/20261004001500_h1_canary_exclusion.sql";
+let h1Canary;
+try {
+  h1Canary = await readFile(h1CanaryPath, "utf8");
+} catch {
+  throw new Error("H1 canary exclusion migration is missing.");
+}
+assert.match(h1Canary, /CREATE TABLE IF NOT EXISTS private\.runtime_excluded_workspaces/);
+assert.match(h1Canary, /production\\/staging smoke canary/);
+assert.match(h1Canary, /runtime_excluded_workspaces_no_access/);
+assert.match(h1Canary, /ON private\.runtime_excluded_workspaces/);
+assert.match(h1Canary, /runtime_integrity_audit\(\)/);
+assert.match(h1Canary, /NOT EXISTS \(\s*SELECT 1[\s\S]*runtime_excluded_workspaces/);
+assert.match(h1Canary, /excluded_workspace_count/);
+
 const pkg = JSON.parse(packageJson);
 assert.equal(pkg.scripts["test:runtime-hardening"], "node scripts/runtime-hardening-contract-test.mjs");
 assert.match(circleci, /runtime_hardening_contract:/);
