@@ -52,7 +52,12 @@ BEGIN
       0
     ),
     COALESCE(
-      EXTRACT(EPOCH FROM (v_checked_at - avg(enqueued_at)))::INTEGER,
+      EXTRACT(
+        EPOCH FROM (
+          SELECT avg(v_checked_at - q.enqueued_at)
+          FROM pgmq."q_runtime-events" AS q
+        )
+      )::INTEGER,
       0
     )
   INTO
