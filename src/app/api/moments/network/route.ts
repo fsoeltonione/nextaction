@@ -37,9 +37,17 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!Object.prototype.hasOwnProperty.call(body, "network_moment_key")) {
+      throw new HttpError(
+        400,
+        "network_moment_key_required",
+        "network_moment_key must be provided; use null to remove a mapping.",
+      );
+    }
+
     let networkMomentKey: string | null = null;
 
-    if (body.network_moment_key !== null && body.network_moment_key !== undefined) {
+    if (body.network_moment_key !== null) {
       if (typeof body.network_moment_key !== "string") {
         throw new HttpError(
           400,
