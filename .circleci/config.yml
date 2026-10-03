@@ -374,6 +374,27 @@ jobs:
             npm run h3-1:release-proof -- staging
 
 
+  h3_1_staging_runtime_smoke:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Validate H3.1 runtime smoke inputs
+          command: |
+            bash scripts/require-env.sh \
+              STAGING_NEXT_PUBLIC_SUPABASE_URL \
+              STAGING_SUPABASE_SECRET_KEY \
+              STAGING_INTEGRATION_TOKEN
+      - run:
+          name: Run H3.1 staging runtime smoke
+          command: |
+            npm run test:h3-1-runtime-smoke
+
+
   h3_1_production_release_proof:
     docker:
       - image: cimg/node:24.21.0
@@ -552,6 +573,16 @@ workflows:
             - staging_smoke
             - h3_1_network_moment_contract
             - release_source_guard
+
+      - h3_1_staging_runtime_smoke:
+          context:
+            - nextaction-staging
+          filters:
+            branches:
+              only: master
+          requires:
+            - h3_1_staging_release_proof
+            - release_source_guard
       - hold_production:
           type: approval
           filters:
@@ -560,6 +591,7 @@ workflows:
           requires:
             - staging_smoke
             - h3_1_staging_release_proof
+            - h3_1_staging_runtime_smoke
             - release_source_guard
       - deploy_production:
           context:
