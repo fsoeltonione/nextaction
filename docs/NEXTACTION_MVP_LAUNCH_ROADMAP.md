@@ -5,7 +5,7 @@
 **Repository:** `fsoeltonione/nextaction`  
 **Roadmap baseline master:** `f9cb8442214e7c840076682c5ec10c2b9536924e`  
 **Completed through:** Stage 15  
-**Next milestone:** Stage 16 — Activation Flow v2 Completion (contract locked; implementation not started)
+**Next milestone:** Stage 16 — Activation Flow v2 Completion (implementation merged; closure verification pending)
 
 ---
 
@@ -56,6 +56,26 @@ $0.25 NextAction
 
 ---
 
+## H3 — Product & Commercial Completion
+
+H3 groups the remaining product/commercial work before final launch.
+
+The authoritative Stage sequence remains:
+
+```
+Stage 16  Activation Flow v2 Completion
+Stage 17  Control Plane & Commercial UX Completion
+Stage 18  Runtime Reliability, Observability & Performance
+Stage 19  Commercial Operations & Abuse Controls
+```
+
+### H3 execution rule
+
+H3 does not reopen closed H0–H2 runtime-hardening scope and does not change the locked domain chain or MVP economics.
+
+The first H3 work item is **Stage 16 closure verification**. Stage 16 implementation is already present in `master`; closure requires evidence against the Stage 16 exit criteria, including the real activation/recovery paths and staging/production verification.
+
+After Stage 16 is formally closed, H3 proceeds to Stage 17, then Stage 18 and Stage 19 in the order defined by the roadmap.
 ## 2. Roadmap audit result
 
 ### Completed and operational
