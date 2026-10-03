@@ -65,7 +65,9 @@ function run(command, args) {
 }
 
 const releaseSha =
-  process.env.NEXTACTION_RELEASE_SHA || process.env.CIRCLE_SHA1 || "unknown";
+  process.env.CIRCLECI === "true"
+    ? process.env.CIRCLE_SHA1 || ""
+    : process.env.NEXTACTION_RELEASE_SHA || "unknown";
 if (process.env.CIRCLECI === "true" && !/^[0-9a-f]{40}$/i.test(releaseSha)) {
   console.error("CircleCI release deployment requires a valid 40-character release SHA.");
   process.exit(2);
