@@ -1,9 +1,10 @@
 
 # NextAction Stage 16 — Activation Flow v2 Contract
 
-**Status:** CONTRACT LOCKED — implementation not started  
+**Status:** CONTRACT LOCKED — implementation merged; closure verification pending  
 **Audit date:** 2026-09-28  
 **Audit baseline master:** f9cb8442214e7c840076682c5ec10c2b9536924e  
+**Current implementation master:** 3e0162777ca0709ca5b33c1b5adcefe2aca4cb0e  
 **Repository:** fsoeltonione/nextaction
 
 ## 1. Purpose
