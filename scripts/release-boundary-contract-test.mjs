@@ -28,6 +28,25 @@ assert.notEqual(
   -1,
   "release_source_guard must be listed as a job in the release-gate workflow",
 );
+
+const h31JobStart = releaseWorkflow.indexOf(
+  "      - h3_1_network_moment_contract:",
+);
+assert.notEqual(
+  h31JobStart,
+  -1,
+  "h3_1_network_moment_contract must be listed as a job in the release-gate workflow",
+);
+const h31JobEnd = releaseWorkflow.indexOf("\n      - ", h31JobStart + 9);
+const h31JobBlock = releaseWorkflow.slice(
+  h31JobStart,
+  h31JobEnd === -1 ? releaseWorkflow.length : h31JobEnd,
+);
+assert.match(
+  h31JobBlock,
+  /requires:\n\s+- quality/,
+  "h3_1_network_moment_contract must require quality in release-gate",
+);
 const guardJobEnd = releaseWorkflow.indexOf("\n      - ", guardJobStart + 9);
 const guardJobBlock = releaseWorkflow.slice(
   guardJobStart,
