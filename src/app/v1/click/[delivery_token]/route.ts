@@ -287,3 +287,6 @@ export async function GET(
       500,
       "runtime_error",
       "Unable to process the click.",
+    );
+  }
+}
