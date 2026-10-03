@@ -47,37 +47,51 @@ function failure(
   code: string,
   message: string,
 ) {
-  return jsonError(requestId, status, code, message);
+  const response = jsonError(requestId, status, code, message);
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  response.headers.set("X-Request-Id", requestId);
+  return response;
 }
 
 function rateLimited(requestId: string, retryAfterSeconds: number) {
-  return new NextResponse(
-    JSON.stringify({
-      error: {
-        request_id: requestId,
-        code: "rate_limited",
-        message: "Too many requests. Please try again later.",
-      },
-    }),
-    {
-      status: 429,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": String(retryAfterSeconds),
-      },
-    },
+  const response = failure(
+    requestId,
+    429,
+    "rate_limited",
+    "Too many requests. Please try again later.",
   );
+  response.headers.set("Retry-After", String(retryAfterSeconds));
+  return response;
 }
 
-function redirectToDestination(requestId: string, url: string) {
-  return new NextResponse(null, {
-    status: 302,
-    headers: {
-      Location: url,
-      "Cache-Control": "no-store, max-age=0",
-      "X-NextAction-Request-Id": requestId,
-    },
-  });
+function redirectToDestination(requestId: string, destinationUrl: string) {
+  let destination: URL;
+
+  try {
+    destination = new URL(destinationUrl);
+  } catch {
+    return failure(
+      requestId,
+      503,
+      "destination_unavailable",
+      "The offer destination is temporarily unavailable.",
+    );
+  }
+
+  if (destination.protocol !== "http:" && destination.protocol !== "https:") {
+    return failure(
+      requestId,
+      503,
+      "destination_unavailable",
+      "The offer destination is temporarily unavailable.",
+    );
+  }
+
+  const response = NextResponse.redirect(destination, 302);
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("X-Request-Id", requestId);
+  return response;
 }
 
 export async function GET(
@@ -87,10 +101,9 @@ export async function GET(
   const requestId = createRequestId();
 
   try {
-    const ip = getRequestIp(request);
     const rateLimit = await checkRateLimit(
-      "click_ip",
-      ip,
+      "runtime:click:ip",
+      getRequestIp(request),
       CLICK_RATE_LIMIT_PER_MINUTE,
     );
 

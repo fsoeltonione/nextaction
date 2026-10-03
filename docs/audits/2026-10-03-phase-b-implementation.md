@@ -47,17 +47,17 @@
 
 #### 3. TEST-001: Production Smoke Bypasses HTTP
 - **Phase A Classification:** P1
-- **Implementation:** Rewrote `scripts/production-smoke.mjs` to execute real HTTP `appRequest` against `/v1/track`, `/v1/offer`, and `/v1/click`. Added DB fixture RPCs to provision an ephemeral test workspace and explicitly clean it up.
-- **Verification:** The script executes a full economic transaction through the actual Cloudflare Worker routing and HTTP parsing stack.
+- **Implementation:** Rewrote `scripts/production-smoke.mjs` to execute real HTTP `/v1/track`, `/v1/offer`, and `/v1/click`; added bounded Event → Moment polling and explicit settlement/ledger/replay assertions. Because accounting history is immutable, the smoke uses a dedicated persistent canary instead of destructive cleanup.
+- **Verification:** The production smoke now requires Event → Moment processing and validates the economic state after the HTTP click.
 - **Final Severity:** P1
-- **Final Status:** **Resolved**.
+- **Final Status:** **Resolved / hardened**.
 
 #### 4. ECON-005: Settlements DB Invariant
 - **Phase A Classification:** P2
-- **Implementation:** Added `CREATE UNIQUE INDEX settlements_qualified_click_id_uq ON private.settlements (qualified_click_id)` in the Stage 17 migration.
-- **Verification:** Index enforces exact 1:1 mapping at the database persistence level.
+- **Implementation:** Reconciled Stage 17 migration to converge on the existing canonical `settlements_qualified_click_id_key` uniqueness invariant without creating a redundant index.
+- **Verification:** Production and staging both now expose exactly one UNIQUE constraint on `qualified_click_id`.
 - **Final Severity:** P2
-- **Final Status:** **Resolved**.
+- **Final Status:** **Resolved / reconciled**.
 
 #### 5. ECON-003: Atomic Qualify + Settle
 - **Phase A Classification:** P1
@@ -107,8 +107,11 @@
   - DASH-001 (Authoritative Dashboard Balance)
   - ECON-003 (Atomic Qualification/Settlement)
   - TEST-001 (Realistic Production HTTP Smoke)
-- **Blocking items unresolved:** None.
-- **External actions required:** 
-  - Must enable GitHub Branch Protection on `master` branch: Require Pull Request, Require Status Checks to pass before merging, Restrict direct pushes.
-- **Residual risks:** 
-  - SSRF-001: The TOCTOU DNS gap remains theoretically exploitable due to Cloudflare Worker runtime constraints preventing arbitrary IP pinning. Post-fetch checks mitigate standard attacks but fail against precise 0-TTL flip timing attacks.
+- **Blocking items unresolved:**
+  - SSRF-001 remains a residual runtime risk because the current Cloudflare Worker architecture does not provide generic arbitrary-host connection-level IP pinning.
+  - GitHub `master` branch protection remains an external governance action.
+- **External actions required:**
+  - Enable GitHub Branch Protection / Ruleset on `master`: require pull requests, require the release/quality checks, and restrict direct pushes as appropriate.
+  - Deploy the corrected Worker build through the existing release-gate after verification.
+- **Residual risks:**
+  - SSRF-001: The TOCTOU DNS gap remains theoretically exploitable despite pre/post validation.
