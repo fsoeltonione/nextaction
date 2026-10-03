@@ -394,7 +394,10 @@ jobs:
           bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY             ANALYSIS_API_KEY             ANALYSIS_BASE_URL             ANALYSIS_MODEL
 
       - name: Deploy staging
-        run: npm run deploy:cloudflare -- staging
+        run: |
+          mkdir -p /tmp/nextaction-release
+          export WRANGLER_OUTPUT_FILE_PATH="/tmp/nextaction-release/wrangler-staging.ndjson"
+          npm run deploy:cloudflare -- staging
 
       - name: Capture staging URL
         id: capture_url
@@ -474,6 +477,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - deploy_staging
       - h3_1_staging_release_proof
       - release_source_guard
     env:
@@ -556,7 +560,10 @@ jobs:
           bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY             ANALYSIS_API_KEY             ANALYSIS_BASE_URL             ANALYSIS_MODEL
 
       - name: Deploy production
-        run: npm run deploy:cloudflare -- production
+        run: |
+          mkdir -p /tmp/nextaction-release
+          export WRANGLER_OUTPUT_FILE_PATH="/tmp/nextaction-release/wrangler-production.ndjson"
+          npm run deploy:cloudflare -- production
 
       - name: Capture production URL
         id: capture_url
@@ -667,6 +674,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
+      - deploy_production
       - production_smoke
       - h3_1_production_release_proof
       - cloudflare_production_audit
