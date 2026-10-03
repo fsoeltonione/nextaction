@@ -72,7 +72,7 @@ try {
   throw new Error("H1 canary exclusion migration is missing.");
 }
 assert.match(h1Canary, /CREATE TABLE IF NOT EXISTS private\.runtime_excluded_workspaces/);
-assert.match(h1Canary, /production\\/staging smoke canary/);
+assert.match(h1Canary, /production\/staging smoke canary/);
 assert.match(h1Canary, /runtime_excluded_workspaces_no_access/);
 assert.match(h1Canary, /ON private\.runtime_excluded_workspaces/);
 assert.match(h1Canary, /runtime_integrity_audit\(\)/);
