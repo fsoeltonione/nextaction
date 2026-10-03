@@ -88,7 +88,7 @@ function DashboardContent() {
       }
 
       const currentWorkspaceId = requestedWorkspaceId ?? ids[0];
-      const [productsResult, offersResult, offerMomentLinksResult] = await Promise.all([
+      const [productsResult, offersResult] = await Promise.all([
         supabase
           .from('products')
           .select('*, moments(*)')
@@ -101,12 +101,10 @@ function DashboardContent() {
           .order('created_at', { ascending: false })
       ]);
 
-      const momentsResult = await supabase
+      const offerMomentLinksResult = await supabase
         .from('offer_moments')
         .select('offer_id, moment_id')
         .in('offer_id', offersResult.data?.map(o => o.id) || []);
-      
-      const offerMomentLinksResult = momentsResult;
 
       try {
         const balanceRes = await fetch(
