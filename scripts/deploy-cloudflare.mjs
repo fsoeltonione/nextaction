@@ -64,9 +64,18 @@ function run(command, args) {
   }
 }
 
+const releaseSha =
+  process.env.NEXTACTION_RELEASE_SHA || process.env.CIRCLE_SHA1 || "unknown";
+if (process.env.CIRCLECI === "true" && !/^[0-9a-f]{40}$/i.test(releaseSha)) {
+  console.error("CircleCI release deployment requires a valid 40-character release SHA.");
+  process.exit(2);
+}
+
+process.env.NEXT_PUBLIC_RELEASE_SHA = releaseSha;
 process.env.NEXT_PUBLIC_APP_ENV = target;
 process.env.CLOUDFLARE_ENV = target;
 console.log(`Deploying NextAction to Cloudflare environment: ${target}`);
+console.log(`Release SHA: ${releaseSha}`);
 console.log(`Cloudflare Vite environment: ${process.env.CLOUDFLARE_ENV}`);
 
 run(process.execPath, ["scripts/cloudflare-vinext-build.mjs"]);
