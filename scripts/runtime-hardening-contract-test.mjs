@@ -15,7 +15,7 @@ assert.match(clickRoute, /error\.code === "P0001"/);
 assert.match(clickRoute, /row\.result_settlement_outcome === "no_capacity"/);
 assert.match(clickRoute, /row\.result_settlement_outcome === "financial_unavailable"/);
 assert.match(clickRoute, /row\.result_outcome === "expired"/);
-assert.match(clickRoute, /row\.result_outcome === "replayed"/);
+assert.match(clickRoute, /row\.result_outcome !== "created"[\s\S]*row\.result_outcome !== "replayed"/);
 assert.match(clickRoute, /Cache-Control/);
 
 // H0: activation functions remain workspace-scoped and callable only through
