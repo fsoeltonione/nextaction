@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [clickRoute, stage16, stage17, runtimeHttp, readyRoute, circleci, packageJson] = await Promise.all([
+const [clickRoute, stage16, stage17, runtimeHttp, readyRoute, staging, production, circleci, packageJson] = await Promise.all([
   readFile("src/app/v1/click/[delivery_token]/route.ts", "utf8"),
   readFile("supabase/migrations/20260928053000_stage_16_activation_workspace_context.sql", "utf8"),
   readFile("supabase/migrations/20261003000000_stage_17_remediation.sql", "utf8"),
   readFile("src/lib/runtime/http.ts", "utf8"),
   readFile("src/app/api/health/ready/route.ts", "utf8"),
+  readFile("scripts/staging-smoke.mjs", "utf8"),
+  readFile("scripts/production-smoke.mjs", "utf8"),
   readFile(".circleci/config.yml", "utf8"),
   readFile("package.json", "utf8"),
 ]);
