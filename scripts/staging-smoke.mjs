@@ -58,6 +58,29 @@ if (
 
 console.log(`${expectedEnvironment} health check: OK`);
 
+const readiness = await request("/api/health/ready");
+if (readiness.status !== 200) {
+  console.error(`Runtime readiness check failed: HTTP ${readiness.status}`);
+  console.error("Readiness response body:", await readiness.text());
+  process.exit(1);
+}
+
+const readinessBody = await readiness.json();
+if (
+  readinessBody?.status !== "ready" ||
+  readinessBody?.queue?.exists !== true ||
+  readinessBody?.worker?.function_exists !== true ||
+  readinessBody?.worker?.schedule_active !== true ||
+  readinessBody?.worker?.recent_success !== true ||
+  readinessBody?.operations?.schedule_active !== true
+) {
+  console.error("Runtime readiness returned an unexpected state.");
+  console.error(JSON.stringify(readinessBody, null, 2));
+  process.exit(1);
+}
+
+console.log(`${expectedEnvironment} runtime readiness check: OK`);
+
 if (!integrationToken) {
   if (expectedEnvironment === "production") {
     console.log("Production health smoke: OK");

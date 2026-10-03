@@ -19,14 +19,9 @@ export function runtimeOptionsResponse(): Response {
 }
 
 export function getRequestIp(request: Request): string {
+  // Production runtime is Cloudflare Workers. CF-Connecting-IP is the
+  // Cloudflare-provided client IP header for inbound traffic; do not fall back
+  // to X-Forwarded-For because its chain may contain user/proxy supplied data.
   const cloudflareIp = request.headers.get("cf-connecting-ip")?.trim();
-  if (cloudflareIp) return cloudflareIp;
-
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const first = forwardedFor.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  return "unknown";
+  return cloudflareIp || "unknown";
 }
