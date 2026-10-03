@@ -514,8 +514,7 @@ jobs:
       - h3_1_staging_release_proof
       - h3_1_staging_runtime_smoke
       - release_source_guard
-    environment:
-      name: production
+    environment: production
     steps:
       - name: Confirm staging gates passed
         run: |
