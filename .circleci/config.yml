@@ -365,7 +365,9 @@ jobs:
       - run:
           name: Validate H3.1 staging proof inputs
           command: |
-            bash scripts/require-env.sh               STAGING_NEXT_PUBLIC_SUPABASE_URL               STAGING_SUPABASE_SECRET_KEY
+            bash scripts/require-env.sh \
+              STAGING_NEXT_PUBLIC_SUPABASE_URL \
+              STAGING_SUPABASE_SECRET_KEY
       - run:
           name: Run H3.1 staging release proof
           command: |
@@ -383,7 +385,9 @@ jobs:
       - run:
           name: Validate H3.1 production proof inputs
           command: |
-            bash scripts/require-env.sh               PRODUCTION_NEXT_PUBLIC_SUPABASE_URL               PRODUCTION_SUPABASE_SECRET_KEY
+            bash scripts/require-env.sh \
+              PRODUCTION_NEXT_PUBLIC_SUPABASE_URL \
+              PRODUCTION_SUPABASE_SECRET_KEY
       - run:
           name: Run H3.1 production release proof
           command: |
@@ -602,7 +606,7 @@ workflows:
           context:
             - nextaction-production
           filters:
-            - branches:
+            branches:
               only: master
           requires:
             - production_smoke
