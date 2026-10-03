@@ -3,7 +3,7 @@ BEGIN;
 
 -- ECON-005: Converge every environment on one database-level uniqueness
 -- invariant for qualified_click_id without creating redundant indexes.
-DO $
+DO $stage17$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -30,7 +30,7 @@ BEGIN
     END IF;
   END IF;
 END
-$;
+$stage17$;
 
 -- ECON-003: Atomic Qualify + Settle Transaction
 CREATE OR REPLACE FUNCTION public.runtime_click_qualify_and_settle(
