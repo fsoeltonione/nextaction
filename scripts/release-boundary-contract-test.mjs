@@ -1,133 +1,175 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [circleci, deploy, requireEnv, requireFile] = await Promise.all([
-  readFile(".circleci/config.yml", "utf8"),
-  readFile("scripts/deploy-cloudflare.mjs", "utf8"),
-  readFile("scripts/require-env.sh", "utf8"),
-  readFile("scripts/require-file.sh", "utf8"),
-]);
+const [releaseWorkflow, deploy, requireEnv, requireFile, stagingSmoke] =
+  await Promise.all([
+    readFile(".github/workflows/release.yml", "utf8"),
+    readFile("scripts/deploy-cloudflare.mjs", "utf8"),
+    readFile("scripts/require-env.sh", "utf8"),
+    readFile("scripts/require-file.sh", "utf8"),
+    readFile("scripts/staging-smoke.mjs", "utf8"),
+  ]);
 
-assert.match(circleci, /release_source_guard:/);
-assert.match(circleci, /NEXTACTION_RELEASE_BRANCH: << pipeline\.git\.branch >>/);
-assert.match(circleci, /require-env\.sh NEXTACTION_RELEASE_BRANCH/);
-assert.match(circleci, /Release gate may only run from master/);
+assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
+assert.match(
+  releaseWorkflow,
+  /release_source_guard:[\s\S]*?github\.ref_name[\s\S]*?master/,
+);
+assert.match(
+  releaseWorkflow,
+  /release_source_guard:[\s\S]*?Release gate may only run from master/,
+);
 
-const releaseWorkflowStart = circleci.indexOf("  release-gate:");
-assert.notEqual(releaseWorkflowStart, -1, "release-gate workflow must exist");
-const releaseWorkflow = circleci.slice(releaseWorkflowStart);
-
-// release_source_guard must be present as an actual job in the release-gate
-// workflow's jobs list, not just referenced from other jobs' requires: lists.
-// A requires: entry in CircleCI must name a job that exists in the same
-// workflow's jobs: block, otherwise the pipeline fails config validation
-// with "requires 'X', which is the name of 0 other jobs in workflow ...".
-const guardJobStart = releaseWorkflow.indexOf("      - release_source_guard:");
+const releaseWorkflowJobsStart = releaseWorkflow.indexOf("jobs:");
 assert.notEqual(
-  guardJobStart,
+  releaseWorkflowJobsStart,
   -1,
-  "release_source_guard must be listed as a job in the release-gate workflow",
+  "GitHub release workflow jobs section must exist",
 );
+const releaseJobs = releaseWorkflow.slice(releaseWorkflowJobsStart);
 
-const h31JobStart = releaseWorkflow.indexOf(
-  "      - h3_1_network_moment_contract:",
-);
-assert.notEqual(
-  h31JobStart,
-  -1,
-  "h3_1_network_moment_contract must be listed as a job in the release-gate workflow",
-);
-const h31JobEnd = releaseWorkflow.indexOf("\n      - ", h31JobStart + 9);
-const h31JobBlock = releaseWorkflow.slice(
-  h31JobStart,
-  h31JobEnd === -1 ? releaseWorkflow.length : h31JobEnd,
-);
-assert.match(
-  h31JobBlock,
-  /requires:\n\s+- quality/,
-  "h3_1_network_moment_contract must require quality in release-gate",
-);
-const guardJobEnd = releaseWorkflow.indexOf("\n      - ", guardJobStart + 9);
-const guardJobBlock = releaseWorkflow.slice(
-  guardJobStart,
-  guardJobEnd === -1 ? releaseWorkflow.length : guardJobEnd,
-);
-assert.match(guardJobBlock, /filters:\n\s+branches:\n\s+only: master/);
+for (const job of [
+  "quality",
+  "release_boundary_contract",
+  "product_scanner_security",
+  "analysis_provider_contract",
+  "analysis_output_contract",
+  "analysis_provider_content_contract",
+  "stage16_activation_contract",
+  "runtime_hardening_contract",
+  "h2_3_release_proof_contract",
+  "h3_1_network_moment_contract",
+  "cloudflare_compatibility",
+  "cloudflare_build",
+  "release_source_guard",
+  "analysis_provider_smoke",
+  "deploy_staging",
+  "staging_smoke",
+  "h3_1_staging_release_proof",
+  "h3_1_staging_runtime_smoke",
+  "hold_production",
+  "deploy_production",
+  "cloudflare_production_audit",
+  "production_smoke",
+  "h3_1_production_release_proof",
+  "production_release_proof",
+]) {
+  assert.match(
+    releaseJobs,
+    new RegExp("^  " + job + ":", "m"),
+    `${job} must exist in GitHub release workflow`,
+  );
+}
 
-assert.match(
-  await readFile("scripts/staging-smoke.mjs", "utf8"),
-  /production_smoke_fixture_verify/,
-  "staging smoke must wait for async Event -> Moment processing",
-);
-assert.match(
-  await readFile("scripts/staging-smoke.mjs", "utf8"),
-  /EVENT_PROCESSING_TIMEOUT_MS = 90_000/,
-  "staging smoke must use a bounded Event processing wait",
-);
-assert.match(
-  await readFile("scripts/staging-smoke.mjs", "utf8"),
-  /waitForEventProcessing\(trackBodyJson\.event_id\)/,
-  "staging smoke must wait before requesting an Offer",
-);
+function jobBlock(workflow, job) {
+  const start = workflow.indexOf("\n  " + job + ":");
+  assert.notEqual(start, -1, `${job} definition must exist`);
+  const rest = workflow.slice(start + 1);
+  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n/);
+  return nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
+}
+
+const guard = jobBlock(releaseWorkflow, "release_source_guard");
+assert.match(guard, /if:/);
+assert.match(guard, /github\.ref_name === 'master'|github\.ref_name == 'master'|github\.ref_name != 'master'/);
+
+const h31 = jobBlock(releaseWorkflow, "h3_1_network_moment_contract");
+assert.match(h31, /needs:[\s\S]*quality/);
 
 for (const job of [
   "analysis_provider_smoke",
   "deploy_staging",
   "staging_smoke",
-  "hold_production",
+  "h3_1_staging_release_proof",
+  "h3_1_staging_runtime_smoke",
   "deploy_production",
   "cloudflare_production_audit",
   "production_smoke",
+  "h3_1_production_release_proof",
+  "production_release_proof",
 ]) {
-  const start = releaseWorkflow.indexOf("      - " + job + ":");
-  assert.notEqual(start, -1, `${job} must exist in release-gate`);
-  const end = releaseWorkflow.indexOf("\n      - ", start + 9);
-  const block = releaseWorkflow.slice(start, end === -1 ? releaseWorkflow.length : end);
-  assert.match(block, /filters:\n\s+branches:\n\s+only: master/);
-  assert.match(block, /requires:[\s\S]*release_source_guard/);
+  const block = jobBlock(releaseWorkflow, job);
+  assert.match(block, /needs:[\s\S]*release_source_guard/);
 }
+
+const deployStaging = jobBlock(releaseWorkflow, "deploy_staging");
+const deployProduction = jobBlock(releaseWorkflow, "deploy_production");
+assert.match(
+  deployStaging,
+  /NEXTACTION_RELEASE_BRANCH:\s*\$\{\{\s*github\.ref_name\s*\}\}/,
+);
+assert.match(
+  deployStaging,
+  /NEXTACTION_RELEASE_SHA:\s*\$\{\{\s*github\.sha\s*\}\}/,
+);
+assert.match(
+  deployProduction,
+  /NEXTACTION_RELEASE_BRANCH:\s*\$\{\{\s*github\.ref_name\s*\}\}/,
+);
+assert.match(
+  deployProduction,
+  /NEXTACTION_RELEASE_SHA:\s*\$\{\{\s*github\.sha\s*\}\}/,
+);
+
+const holdProduction = jobBlock(releaseWorkflow, "hold_production");
+assert.match(holdProduction, /environment:\s*production/);
+assert.match(holdProduction, /needs:[\s\S]*staging_smoke/);
+assert.match(holdProduction, /needs:[\s\S]*h3_1_staging_release_proof/);
+assert.match(holdProduction, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
+
+const deployProductionNeeds = jobBlock(
+  releaseWorkflow,
+  "deploy_production",
+);
+assert.match(deployProductionNeeds, /needs:[\s\S]*hold_production/);
+
+assert.match(
+  stagingSmoke,
+  /production_smoke_fixture_verify/,
+  "staging smoke must wait for async Event -> Moment processing",
+);
+assert.match(
+  stagingSmoke,
+  /EVENT_PROCESSING_TIMEOUT_MS = 90_000/,
+  "staging smoke must use a bounded Event processing wait",
+);
+assert.match(
+  stagingSmoke,
+  /waitForEventProcessing\(trackBodyJson\.event_id\)/,
+  "staging smoke must wait before requesting an Offer",
+);
 
 assert.match(
   deploy,
-  /target === "production"[\s\S]*?process\.env\.CIRCLECI === "true"[\s\S]*?releaseBranch !== "master"/,
+  /target === "production"[\s\S]*?GITHUB_ACTIONS === "true"/,
 );
-assert.match(deploy, /Production Cloudflare deployment is permitted from master only\./);
-// The guard must not depend solely on NEXTACTION_RELEASE_BRANCH: a deploy job
-// that forgot to set it read `undefined` and refused a master deploy. The
-// built-in CIRCLE_BRANCH is the fallback so a missing explicit variable cannot
-// be mistaken for a non-master release.
-assert.match(deploy, /process\.env\.NEXTACTION_RELEASE_BRANCH \|\| process\.env\.CIRCLE_BRANCH/);
+assert.match(
+  deploy,
+  /process\.env\.GITHUB_SHA \|\| ""/,
+);
+assert.match(
+  deploy,
+  /process\.env\.NEXTACTION_RELEASE_SHA \|\| "unknown"/,
+);
+assert.match(
+  deploy,
+  /Production Cloudflare deployment is permitted from master only\./,
+);
 
-// Every job that runs the deploy script must also receive the release branch,
-// either as an explicit environment entry or (for staging) not at all is not
-// acceptable for production.
-for (const job of ["deploy_staging", "deploy_production"]) {
-  const start = circleci.search(new RegExp("\\n  " + job + ":\\n"));
-  assert.notEqual(start, -1, `${job} must exist`);
-  const rest = circleci.slice(start + 1);
-  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n    docker:/);
-  const block = nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
-  assert.match(
-    block,
-    /NEXTACTION_RELEASE_BRANCH: << pipeline\.git\.branch >>/,
-    `${job} must receive NEXTACTION_RELEASE_BRANCH`,
-  );
-}
-
-// Env/file presence checks in the release path must be loud: a bare
-// `test -n "${VAR}"` exits 1 with no output ("Exited with code exit status 1")
-// and hides which context variable was missing. Every release job that
-// validates context inputs must use the reporting helpers instead.
 assert.doesNotMatch(
-  circleci,
+  releaseWorkflow,
   /test -n "\$\{[A-Z0-9_]+\}"/,
-  "release config must not use silent `test -n` env checks",
+  "release workflow must not use silent test -n env checks",
 );
 assert.doesNotMatch(
-  circleci,
+  releaseWorkflow,
   /test -s \/tmp\/nextaction-release/,
-  "release config must not use silent `test -s` file checks",
+  "release workflow must not use silent test -s file checks",
 );
+
+assert.match(requireEnv, /Missing required environment variables:/);
+assert.match(requireFile, /Missing or empty required file\(s\):/);
+
 for (const job of [
   "deploy_staging",
   "staging_smoke",
@@ -135,17 +177,11 @@ for (const job of [
   "cloudflare_production_audit",
   "production_smoke",
 ]) {
-  const startMatch = new RegExp("\\n  " + job + ":\\n");
-  const start = circleci.search(startMatch);
-  assert.notEqual(start, -1, `${job} must exist`);
-  // A job definition starts at 2-space indentation with `name:` then `docker:`.
-  const rest = circleci.slice(start + 1);
-  const nextJobOffset = rest.search(/\n  [a-z][a-z0-9_]*:\n    docker:/);
-  const block =
-    nextJobOffset === -1 ? rest : rest.slice(0, nextJobOffset);
-  assert.match(block, /require-(env|file)\.sh/, `${job} must use loud validation`);
+  assert.match(
+    jobBlock(releaseWorkflow, job),
+    /require-(env|file)\.sh/,
+    `${job} must use loud validation`,
+  );
 }
-assert.match(requireEnv, /Missing required environment variables:/);
-assert.match(requireFile, /Missing or empty required file\(s\):/);
 
 console.log("release boundary contract: OK");
