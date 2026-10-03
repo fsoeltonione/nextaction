@@ -131,6 +131,7 @@ GRANT EXECUTE ON FUNCTION public.runtime_click_qualify_and_settle(TEXT)
 
 
 -- TEST-001: Real production HTTP smoke uses a persistent isolated canary.
+DROP FUNCTION IF EXISTS public.production_smoke_fixture_create(TEXT, UUID, TEXT);
 -- Economic history is intentionally immutable, so a successful settlement
 -- cannot be deleted afterward. The canary has no workspace membership and
 -- therefore remains outside normal user workspace visibility.
