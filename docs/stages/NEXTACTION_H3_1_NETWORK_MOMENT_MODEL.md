@@ -32,3 +32,20 @@ Publisher clients send only `moment_key`; they never send a Network Moment ID.
 
 ## H3.1 exit
 Controlled catalog, deterministic Product Moment mapping, Network Moment targeting, server-side runtime resolution, cross-workspace decisioning, migration-safe compatibility, negative-path tests, and release-gated verification.
+## Implementation status
+
+The H3.1 schema/runtime implementation is now present on branch `h3-1/network-moment-implementation-20261004`.
+
+Implemented boundaries:
+- additive `public.network_moments` catalog;
+- nullable `public.moments.network_moment_id` mapping;
+- normalized `public.offer_network_moments` targeting;
+- authenticated control-plane catalog and mapping APIs;
+- additive Network Moment support in `POST /api/offers/create`;
+- server-side Network Moment-first runtime candidate resolution with legacy fallback;
+- service-role H3.1 release proof;
+- static contract tests and release-gated staging/production proof jobs.
+
+The platform catalog is not populated with the example taxonomy from this specification. Taxonomy entries remain controlled platform configuration. Staging runtime verification uses a dedicated smoke fixture only and does not seed production business taxonomy.
+
+H3.1 does not change the locked lifecycle, settlement economics, capacity-consumption timing, or the H3.2 ranking/budget scope.

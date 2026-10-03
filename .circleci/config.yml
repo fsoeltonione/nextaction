@@ -168,6 +168,19 @@ jobs:
           command: npm run test:h2-3-release-proof
 
 
+  h3_1_network_moment_contract:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Run H3.1 Network Moment contract
+          command: npm run test:h3-1-network-moment
+
+
   analysis_provider_smoke:
     docker:
       - image: cimg/node:24.21.0
@@ -339,6 +352,72 @@ jobs:
             export PRODUCTION_BASE_URL="$(cat /tmp/nextaction-release/production_base_url)"
             npm run production:smoke
 
+  h3_1_staging_release_proof:
+    docker:
+      - image: cimg/node:24.21.0
+    environment:
+      STAGING_EXPECTED_RELEASE_SHA: << pipeline.git.revision >>
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Validate H3.1 staging proof inputs
+          command: |
+            bash scripts/require-env.sh \
+              STAGING_NEXT_PUBLIC_SUPABASE_URL \
+              STAGING_SUPABASE_SECRET_KEY
+      - run:
+          name: Run H3.1 staging release proof
+          command: |
+            npm run h3-1:release-proof -- staging
+
+
+  h3_1_staging_runtime_smoke:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/nextaction-release
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Validate H3.1 runtime smoke inputs
+          command: |
+            bash scripts/require-env.sh \
+              STAGING_NEXT_PUBLIC_SUPABASE_URL \
+              STAGING_SUPABASE_SECRET_KEY \
+              STAGING_INTEGRATION_TOKEN
+      - run:
+          name: Run H3.1 staging runtime smoke
+          command: |
+            export STAGING_BASE_URL="$(cat /tmp/nextaction-release/staging_base_url)"
+            npm run test:h3-1-runtime-smoke
+
+
+  h3_1_production_release_proof:
+    docker:
+      - image: cimg/node:24.21.0
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm ci
+      - run:
+          name: Validate H3.1 production proof inputs
+          command: |
+            bash scripts/require-env.sh \
+              PRODUCTION_NEXT_PUBLIC_SUPABASE_URL \
+              PRODUCTION_SUPABASE_SECRET_KEY
+      - run:
+          name: Run H3.1 production release proof
+          command: |
+            npm run h3-1:release-proof -- production
+
+
   production_release_proof:
     docker:
       - image: cimg/node:24.21.0
@@ -391,6 +470,9 @@ workflows:
           requires:
             - quality
       - h2_3_release_proof_contract:
+          requires:
+            - quality
+      - h3_1_network_moment_contract:
           requires:
             - quality
       - cloudflare_compatibility:
@@ -473,6 +555,7 @@ workflows:
             - stage16_activation_contract
             - runtime_hardening_contract
             - h2_3_release_proof_contract
+            - h3_1_network_moment_contract
       - staging_smoke:
           context:
             - nextaction-staging
@@ -482,6 +565,27 @@ workflows:
           requires:
             - deploy_staging
             - release_source_guard
+
+      - h3_1_staging_release_proof:
+          context:
+            - nextaction-staging
+          filters:
+            branches:
+              only: master
+          requires:
+            - staging_smoke
+            - h3_1_network_moment_contract
+            - release_source_guard
+
+      - h3_1_staging_runtime_smoke:
+          context:
+            - nextaction-staging
+          filters:
+            branches:
+              only: master
+          requires:
+            - h3_1_staging_release_proof
+            - release_source_guard
       - hold_production:
           type: approval
           filters:
@@ -489,6 +593,8 @@ workflows:
               only: master
           requires:
             - staging_smoke
+            - h3_1_staging_release_proof
+            - h3_1_staging_runtime_smoke
             - release_source_guard
       - deploy_production:
           context:
@@ -520,6 +626,17 @@ workflows:
             - cloudflare_production_audit
             - release_source_guard
 
+      - h3_1_production_release_proof:
+          context:
+            - nextaction-production
+          filters:
+            branches:
+              only: master
+          requires:
+            - production_smoke
+            - cloudflare_production_audit
+            - release_source_guard
+
       - production_release_proof:
           context:
             - nextaction-production
@@ -528,5 +645,6 @@ workflows:
               only: master
           requires:
             - production_smoke
+            - h3_1_production_release_proof
             - cloudflare_production_audit
             - release_source_guard

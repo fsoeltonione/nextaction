@@ -805,3 +805,126 @@ Stage 4 is complete as a specification when the implementation team can build au
 - runtime timeout behavior
 
 Only then should the production API routes be implemented.
+## 22. H3.1 Network Moment API amendment
+
+### Network Moment catalog
+
+```
+GET /api/network-moments
+```
+
+Authentication:
+Authenticated NextAction user session.
+
+Returns the currently active platform-owned Network Moment catalog for control-plane use.
+
+Clients may read:
+- `key`
+- `label`
+- `description`
+- `status`
+
+Clients do not receive or submit an internal Network Moment identifier for runtime requests.
+
+### Product Moment mapping
+
+```
+POST /api/moments/network
+```
+
+Authentication:
+Authenticated NextAction user session.
+
+Request:
+
+```json
+{
+  "moment_id": "product-moment-id",
+  "network_moment_key": "invoice_created"
+}
+```
+
+To remove a mapping:
+
+```json
+{
+  "moment_id": "product-moment-id",
+  "network_moment_key": null
+}
+```
+
+Rules:
+- the authenticated user must be a member of the Product Moment's workspace;
+- only active Product Moments may be mapped;
+- only active, catalog-defined Network Moment keys may be selected;
+- mapping is server-controlled;
+- clients never send a Network Moment UUID;
+- invalid, missing, or unauthorized resources are rejected without changing other tenant data.
+
+### Network-targeted offer creation
+
+The existing:
+
+```
+POST /api/offers/create
+```
+
+accepts the additive field:
+
+```json
+{
+  "network_moment_keys": [
+    "invoice_created",
+    "payment_failed"
+  ]
+}
+```
+
+`network_moment_keys` is mutually exclusive with legacy `moment_ids` and `target_moments`.
+
+Network-targeted offers are persisted through the normalized `offer_network_moments` relation. Existing Product Moment targeting remains supported for backward compatibility.
+
+### Runtime resolution
+
+`POST /v1/offer` remains unchanged from the publisher's perspective.
+
+The publisher still sends:
+
+```json
+{
+  "moment_key": "invoice_created"
+}
+```
+
+The server resolves:
+
+```
+integration credential
+  -> Product/Workspace
+  -> Product Moment
+  -> active Network Moment
+  -> eligible Network-targeted Offer
+  -> legacy Product Moment fallback when necessary
+  -> Decision
+  -> Delivery
+```
+
+No client-supplied Network Moment ID is accepted.
+
+Network resolution does not introduce:
+- end-user authentication
+- user identity tracking
+- device fingerprinting
+- LLM calls
+- scanner work
+- slow queue waits
+
+### H3.1 compatibility
+
+During additive migration:
+- `offer_moments` remains valid;
+- `offer_network_moments` is the normalized network-targeting relation;
+- an unmapped Product Moment may continue using the existing Product Moment path;
+- a mapped Product Moment first evaluates active Network Moment targeting and then uses the legacy Product Moment path when no network candidate is available.
+
+No ranking, budget enforcement, billing, or payout behavior is introduced by H3.1.
