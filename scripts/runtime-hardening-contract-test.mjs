@@ -122,7 +122,7 @@ assert.match(h2, /processing_status = CASE[\s\S]*'failed'[\s\S]*'accepted'/);
 assert.match(h2, /private\.runtime_quarantine_message\(/);
 
 assert.match(h2, /IF NOT v_process_returned[\s\S]*result_processed/);
-assert.match(h2, /integration_not_found/);
+assert.match(h2, /result_reason_code/);
 assert.match(h2, /Referenced event does not exist\./);
 
 // H2.1 must keep the worker callable only from the service boundary.
