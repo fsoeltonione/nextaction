@@ -405,8 +405,7 @@ jobs:
           mkdir -p /tmp/nextaction-release
           grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-staging.ndjson             | tail -1             > /tmp/nextaction-release/staging_base_url
           bash scripts/require-file.sh /tmp/nextaction-release/staging_base_url
-          printf 'staging_base_url=%s
-' "$(cat /tmp/nextaction-release/staging_base_url)" >> "${GITHUB_OUTPUT}"
+          printf 'staging_base_url=%s\n' "$(cat /tmp/nextaction-release/staging_base_url)" >> "${GITHUB_OUTPUT}"
 
   staging_smoke:
     name: Staging smoke
@@ -570,8 +569,7 @@ jobs:
           mkdir -p /tmp/nextaction-release
           grep -Eo 'https://[A-Za-z0-9._-]+[.]workers[.]dev' /tmp/nextaction-release/wrangler-production.ndjson             | tail -1             > /tmp/nextaction-release/production_base_url
           bash scripts/require-file.sh /tmp/nextaction-release/production_base_url
-          printf 'production_base_url=%s
-' "$(cat /tmp/nextaction-release/production_base_url)" >> "${GITHUB_OUTPUT}"
+          printf 'production_base_url=%s\n' "$(cat /tmp/nextaction-release/production_base_url)" >> "${GITHUB_OUTPUT}"
 
   cloudflare_production_audit:
     name: Cloudflare production audit
