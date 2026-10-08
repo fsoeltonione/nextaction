@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -10,6 +10,7 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, r
   read("src/app/dashboard/page.tsx"),
   read("src/app/globals.css"),
   read(".github/workflows/quality.yml"),
+  read(".github/workflows/quality-gates.yml"),
   read(".github/workflows/release.yml"),
   read("src/app/api/onboarding/state/route.ts"),
   read("src/app/api/products/confirm/route.ts"),
@@ -89,10 +90,12 @@ assert.doesNotMatch(dashboard, /\.limit\(1\)/);
 assert.match(globals, /\.input \{/);
 assert.match(globals, /\.btn \{/);
 assert.match(globals, /\.btn-secondary \{/);
-assert.match(qualityWorkflow, /^  stage16_activation_contract:/m);
-assert.match(qualityWorkflow, /npm run test:stage16-activation/);
-assert.match(releaseWorkflow, /^  stage16_activation_contract:/m);
-assert.match(releaseWorkflow, /deploy_staging:[\s\S]*?stage16_activation_contract/);
+assert.match(qualityWorkflow, /^  quality_gates:/m);
+assert.match(qualityWorkflow, /uses: \.\/\.github\/workflows\/quality-gates\.yml/);
+assert.match(qualityGatesWorkflow, /^  stage16_activation_contract:/m);
+assert.match(qualityGatesWorkflow, /npm run test:stage16-activation/);
+assert.match(releaseWorkflow, /^  quality_gates:/m);
+assert.match(releaseWorkflow, /deploy_staging:[\s\S]*?quality_gates/);
 assert.match(onboarding, /hasPendingProposal/);
 assert.match(onboarding, /setDraft\(null\)/);
 assert.match(callback, /auth_failed/);
