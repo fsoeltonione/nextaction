@@ -31,16 +31,6 @@ jobs:
       - release_source_guard
     uses: ./.github/workflows/quality-gates.yml
 
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: release-gate-${{ github.ref }}
-  cancel-in-progress: false
-
-jobs:
   analysis_provider_smoke:
     name: Analysis provider smoke
     runs-on: ubuntu-latest
