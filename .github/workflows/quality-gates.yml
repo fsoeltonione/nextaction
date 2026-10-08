@@ -1,0 +1,302 @@
+name: Quality Gates
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Verify runtime
+        run: |
+          node --version
+          npm --version
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+
+  release_boundary_contract:
+    name: Release boundary contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify release boundary contract
+        run: npm run test:release-boundary
+
+  product_scanner_security:
+    name: Product scanner security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+      - release_boundary_contract
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run product scanner security suite
+        run: npm run test:scanner
+
+  analysis_provider_contract:
+    name: Analysis provider contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run analysis provider response contract tests
+        run: npm run test:analysis-provider
+
+  analysis_output_contract:
+    name: Analysis output contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run analysis output contract tests
+        run: npm run test:analysis-output
+
+  analysis_provider_content_contract:
+    name: Analysis provider content contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run analysis provider content contract tests
+        run: npm run test:analysis-provider-content
+
+  stage16_activation_contract:
+    name: Stage 16 activation contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run Stage 16 activation contract checks
+        run: npm run test:stage16-activation
+
+  runtime_hardening_contract:
+    name: Runtime hardening contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run H0/H1 runtime hardening contract
+        run: npm run test:runtime-hardening
+
+  h2_3_release_proof_contract:
+    name: H2.3 release proof contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run H2.3 release proof contract
+        run: npm run test:h2-3-release-proof
+
+  h3_1_network_moment_contract:
+    name: H3.1 Network Moment contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Run H3.1 Network Moment contract
+        run: npm run test:h3-1-network-moment
+
+  cloudflare_compatibility:
+    name: Cloudflare compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - quality
+      - product_scanner_security
+      - runtime_hardening_contract
+      - analysis_provider_contract
+      - analysis_output_contract
+      - analysis_provider_content_contract
+      - stage16_activation_contract
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Check Cloudflare compatibility
+        run: npm run cloudflare:check
+
+  cloudflare_build:
+    name: Cloudflare build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - quality
+      - cloudflare_compatibility
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      SUPABASE_SECRET_KEY: ci-placeholder
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build Cloudflare artifact
+        env:
+          CLOUDFLARE_ENV: staging
+        run: npm run cloudflare:build
+
+      - name: Validate Wrangler configuration
+        run: npx --yes wrangler@4.139.0 deploy --dry-run --env staging
