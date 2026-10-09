@@ -32,10 +32,15 @@ const [
 assert.match(healthRoute, /NEXT_PUBLIC_RELEASE_SHA/);
 assert.match(healthRoute, /release_sha: releaseSha/);
 assert.match(deploy, /NEXT_PUBLIC_RELEASE_SHA/);
-assert.match(deploy, /CIRCLE_SHA1/);
 assert.match(
   deploy,
-  /process\.env\.CIRCLECI === "true"[\s\S]*process\.env\.CIRCLE_SHA1 \|\| ""/,
+  /process\.env\.GITHUB_ACTIONS === "true"[\s\S]*process\.env\.GITHUB_SHA \|\| ""/,
+  "GitHub Actions must supply the release provenance SHA",
+);
+assert.doesNotMatch(
+  deploy,
+  /CIRCLECI|CIRCLE_BRANCH|CIRCLE_SHA1/,
+  "retired CircleCI metadata must not remain in the deployment path",
 );
 assert.match(deploy, /valid 40-character release SHA/);
 assert.match(staging, /STAGING_EXPECTED_RELEASE_SHA/);
