@@ -11,18 +11,14 @@ if (!target || !targets.has(target)) {
   process.exit(2);
 }
 
-if (
-  target === "production" &&
-  (process.env.CIRCLECI === "true" || process.env.GITHUB_ACTIONS === "true")
-) {
-  // Production deployment is CI-controlled and must originate from master.
-  // The explicit NEXTACTION_RELEASE_BRANCH is preferred; CI-native branch
+if (target === "production" && process.env.GITHUB_ACTIONS === "true") {
+  // GitHub Actions production deployments must originate from master.
+  // The explicit NEXTACTION_RELEASE_BRANCH is preferred; GitHub-native branch
   // metadata is the fallback so a missing explicit variable cannot be
   // mistaken for a non-master release.
   const releaseBranch =
     process.env.NEXTACTION_RELEASE_BRANCH ||
     process.env.GITHUB_REF_NAME ||
-    process.env.CIRCLE_BRANCH ||
     "";
   if (releaseBranch !== "master") {
     console.error(
@@ -72,11 +68,9 @@ function run(command, args) {
 const releaseSha =
   process.env.GITHUB_ACTIONS === "true"
     ? process.env.GITHUB_SHA || ""
-    : process.env.CIRCLECI === "true"
-      ? process.env.CIRCLE_SHA1 || ""
-      : process.env.NEXTACTION_RELEASE_SHA || "unknown";
+    : process.env.NEXTACTION_RELEASE_SHA || "unknown";
 if (
-  (process.env.GITHUB_ACTIONS === "true" || process.env.CIRCLECI === "true") &&
+  process.env.GITHUB_ACTIONS === "true" &&
   !/^[0-9a-f]{40}$/i.test(releaseSha)
 ) {
   console.error(
