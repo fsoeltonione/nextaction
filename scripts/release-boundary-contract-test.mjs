@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, deploy, requireEnv, requireFile, stagingSmoke] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
+    readFile(".github/workflows/quality-gates.yml", "utf8"),
     readFile("scripts/deploy-cloudflare.mjs", "utf8"),
     readFile("scripts/require-env.sh", "utf8"),
     readFile("scripts/require-file.sh", "utf8"),
@@ -29,19 +30,8 @@ assert.notEqual(
 const releaseJobs = releaseWorkflow.slice(releaseWorkflowJobsStart);
 
 for (const job of [
-  "quality",
-  "release_boundary_contract",
-  "product_scanner_security",
-  "analysis_provider_contract",
-  "analysis_output_contract",
-  "analysis_provider_content_contract",
-  "stage16_activation_contract",
-  "runtime_hardening_contract",
-  "h2_3_release_proof_contract",
-  "h3_1_network_moment_contract",
-  "cloudflare_compatibility",
-  "cloudflare_build",
   "release_source_guard",
+  "quality_gates",
   "analysis_provider_smoke",
   "deploy_staging",
   "staging_smoke",
@@ -81,23 +71,45 @@ assert.match(
   "release source guard must reject non-master releases",
 );
 
-const h31 = jobBlock(releaseWorkflow, "h3_1_network_moment_contract");
-assert.match(h31, /needs:[\s\S]*quality/);
+assert.match(qualityGatesWorkflow, /^  h3_1_network_moment_contract:/m);
+assert.match(qualityGatesWorkflow, /npm run test:h3-1-network-moment/);
+
+const qualityGateBlock = jobBlock(releaseWorkflow, "quality_gates");
+assert.match(
+  qualityGateBlock,
+  /needs:[\s\S]*release_source_guard/,
+  "quality gates must be blocked by the release source guard",
+);
+assert.match(
+  jobBlock(releaseWorkflow, "analysis_provider_smoke"),
+  /needs:[\s\S]*quality_gates/,
+  "analysis provider smoke must wait for centralized quality gates",
+);
+assert.match(
+  jobBlock(releaseWorkflow, "deploy_staging"),
+  /needs:[\s\S]*quality_gates/,
+  "staging deployment must wait for centralized quality gates",
+);
 
 for (const job of [
-  "analysis_provider_smoke",
-  "deploy_staging",
-  "staging_smoke",
-  "h3_1_staging_release_proof",
-  "h3_1_staging_runtime_smoke",
-  "deploy_production",
-  "cloudflare_production_audit",
-  "production_smoke",
-  "h3_1_production_release_proof",
-  "production_release_proof",
+  "quality",
+  "release_boundary_contract",
+  "product_scanner_security",
+  "analysis_provider_contract",
+  "analysis_output_contract",
+  "analysis_provider_content_contract",
+  "stage16_activation_contract",
+  "runtime_hardening_contract",
+  "h2_3_release_proof_contract",
+  "h3_1_network_moment_contract",
+  "cloudflare_compatibility",
+  "cloudflare_build",
 ]) {
-  const block = jobBlock(releaseWorkflow, job);
-  assert.match(block, /needs:[\s\S]*release_source_guard/);
+  assert.doesNotMatch(
+    releaseJobs,
+    new RegExp("^  " + job + ":", "m"),
+    job + " must not be duplicated in release workflow",
+  );
 }
 
 const deployStaging = jobBlock(releaseWorkflow, "deploy_staging");

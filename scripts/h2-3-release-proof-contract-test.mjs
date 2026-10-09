@@ -9,6 +9,7 @@ const [
   releaseProof,
   migration,
   releaseWorkflow,
+  qualityGatesWorkflow,
   packageJson,
 ] = await Promise.all([
   readFile("src/app/api/health/route.ts", "utf8"),
@@ -21,6 +22,7 @@ const [
     "utf8",
   ),
   readFile(".github/workflows/release.yml", "utf8"),
+  readFile(".github/workflows/quality-gates.yml", "utf8"),
   readFile("package.json", "utf8"),
 ]);
 
@@ -84,7 +86,8 @@ assert.notEqual(
 const releaseJobs = releaseWorkflow.slice(releaseWorkflowJobsStart);
 
 for (const job of [
-  "h2_3_release_proof_contract",
+  "release_source_guard",
+  "quality_gates",
   "deploy_staging",
   "staging_smoke",
   "h3_1_staging_release_proof",
@@ -112,9 +115,24 @@ function jobBlock(job) {
 }
 
 assert.match(
+  qualityGatesWorkflow,
+  /^  h2_3_release_proof_contract:/m,
+  "quality gates must contain the H2.3 proof contract",
+);
+assert.match(
+  qualityGatesWorkflow,
+  /npm run test:h2-3-release-proof/,
+  "quality gates must execute the H2.3 proof contract",
+);
+assert.match(
+  jobBlock("quality_gates"),
+  /needs:[\s\S]*release_source_guard/,
+  "quality_gates must be blocked by the release source guard",
+);
+assert.match(
   jobBlock("deploy_staging"),
-  /needs:[\s\S]*h2_3_release_proof_contract/,
-  "deploy_staging must require H2.3 proof contract",
+  /needs:[\s\S]*quality_gates/,
+  "deploy_staging must require the centralized quality gates",
 );
 assert.match(
   jobBlock("production_release_proof"),
