@@ -138,7 +138,7 @@ let hostnameCheck = null;
 if (expectedHostname) {
   const normalizedHostname = expectedHostname.toLowerCase();
   if (
-    !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/.test(
+    !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(
       normalizedHostname,
     )
   ) {
