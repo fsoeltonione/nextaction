@@ -25,21 +25,32 @@ assert.match(audit, /totalPercentage !== 100/);
 assert.match(audit, /Number\(version\.percentage \?\? 0\) <= 0/);
 assert.match(audit, /Required Cloudflare Worker secret binding is missing/);
 
-// Worker Domains is an assertion only when a target hostname is configured.
-// Otherwise the optional endpoint must not make the release gate fail.
+// The public hostname is verified over HTTPS. workers.dev uses the app health
+// endpoint; custom hostnames additionally require a Cloudflare Worker Domain mapping.
+assert.match(audit, /const normalizedHostname = expectedHostname\.toLowerCase\(\)/);
+assert.match(audit, /normalizedHostname\.endsWith\("\.workers\.dev"\)/);
+assert.match(audit, /https:\/\/\$\{normalizedHostname\}\/api\/health/);
+assert.match(audit, /healthBody\?\.service !== workerName/);
+assert.match(audit, /healthBody\?\.environment !== environment/);
 assert.match(
   audit,
-  /let domains = \[\];\s*if \(expectedHostname\) \{[\s\S]*?const domainResponse = await cloudflareRequest\([\s\S]*?workers\/domains\?/,
+  /if \(!isWorkersDevHostname\) \{[\s\S]*?const domainResponse = await cloudflareRequest\([\s\S]*?workers\/domains\?/,
 );
 assert.match(
   audit,
-  /CLOUDFLARE_EXPECTED_HOSTNAME is not set; skipping optional Worker Domains API query\./,
+  /CLOUDFLARE_EXPECTED_HOSTNAME is not set; skipping public hostname verification\./,
 );
 assert.match(audit, /expected_hostname_checked: Boolean\(expectedHostname\)/);
+assert.match(audit, /hostname_check: hostnameCheck/);
 assert.match(
   releaseWorkflow,
-  /CLOUDFLARE_EXPECTED_HOSTNAME:\s*\$\{\{\s*vars\.CLOUDFLARE_EXPECTED_HOSTNAME\s*\}\}/,
-  "Release Gate must pass the optional expected hostname from a repository variable",
+  /CLOUDFLARE_EXPECTED_HOSTNAME:\s*\$\{\{\s*vars\.CLOUDFLARE_EXPECTED_HOSTNAME\s*\|\|\s*'nextaction\.fsoeltoni-one\.workers\.dev'\s*\}\}/,
+  "Release Gate must default to the hostname verified in the production deploy log",
+);
+assert.match(
+  auditOnlyWorkflow,
+  /CLOUDFLARE_EXPECTED_HOSTNAME:\s*\$\{\{\s*vars\.CLOUDFLARE_EXPECTED_HOSTNAME\s*\|\|\s*'nextaction\.fsoeltoni-one\.workers\.dev'\s*\}\}/,
+  "Read-only workflow must use the same known production hostname by default",
 );
 
 // A diagnostic rerun must not deploy production or pass through the approval gate.

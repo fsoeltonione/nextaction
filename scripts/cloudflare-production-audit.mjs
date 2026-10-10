@@ -130,35 +130,99 @@ if (!latestVersions.some((version) => version.id === latestVersionId)) {
   throw new Error("Latest active deployment version is not present in the Worker version list.");
 }
 
-// Domain listing is only a required check when a specific hostname is configured.
-// Without that input, the API call adds no pass/fail assertion and can introduce an
-// unnecessary account-scope permission dependency into the production release gate.
+// Always verify the configured public hostname over HTTPS. Cloudflare's Worker
+// Domains API is for custom hostnames, so workers.dev hosts are checked through the
+// deployed app's health endpoint instead of being incorrectly looked up as custom domains.
 let domains = [];
+let hostnameCheck = null;
 if (expectedHostname) {
-  const domainParams = new URLSearchParams({
-    service: workerName,
-    environment,
-    hostname: expectedHostname,
-    per_page: "100",
-  });
+  const normalizedHostname = expectedHostname.toLowerCase();
+  if (
+    !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(
+      normalizedHostname,
+    )
+  ) {
+    throw new Error("CLOUDFLARE_EXPECTED_HOSTNAME must be a hostname without a scheme, path, or port.");
+  }
 
-  const domainResponse = await cloudflareRequest(
-    `/workers/domains?${domainParams.toString()}`,
+  const healthResponse = await fetch(
+    `https://${normalizedHostname}/api/health`,
+    {
+      headers: {
+        Accept: "application/json",
+        "cache-control": "no-store",
+      },
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    },
   );
-  domains = Array.isArray(domainResponse) ? domainResponse : [];
 
-  const matching = domains.filter(
-    (domain) => domain.hostname === expectedHostname,
-  );
-
-  if (matching.length === 0) {
+  if (!healthResponse.ok) {
     throw new Error(
-      `Expected Cloudflare Worker hostname was not found: ${expectedHostname}`,
+      `Expected production hostname health check failed for ${normalizedHostname} (HTTP ${healthResponse.status}).`,
     );
+  }
+
+  let healthBody;
+  try {
+    healthBody = await healthResponse.json();
+  } catch {
+    throw new Error(
+      `Expected production hostname returned non-JSON health data: ${normalizedHostname}.`,
+    );
+  }
+
+  if (
+    healthBody?.status !== "ok" ||
+    healthBody?.service !== workerName ||
+    healthBody?.environment !== environment
+  ) {
+    throw new Error(
+      `Expected production hostname returned the wrong service or environment: ${normalizedHostname}.`,
+    );
+  }
+
+  const isWorkersDevHostname = normalizedHostname.endsWith(".workers.dev");
+  hostnameCheck = {
+    hostname: normalizedHostname,
+    mode: isWorkersDevHostname ? "workers_dev_health_endpoint" : "custom_worker_domain",
+    http_status: healthResponse.status,
+    service: healthBody.service,
+    environment: healthBody.environment,
+  };
+
+  if (!isWorkersDevHostname) {
+    const domainParams = new URLSearchParams({
+      service: workerName,
+      environment,
+      hostname: normalizedHostname,
+      per_page: "100",
+    });
+
+    const domainResponse = await cloudflareRequest(
+      `/workers/domains?${domainParams.toString()}`,
+    );
+    domains = Array.isArray(domainResponse) ? domainResponse : [];
+
+    const matching = domains.filter(
+      (domain) =>
+        typeof domain.hostname === "string" &&
+        domain.hostname.toLowerCase() === normalizedHostname &&
+        domain.service === workerName &&
+        (!domain.environment || domain.environment === environment),
+    );
+
+    if (matching.length === 0) {
+      throw new Error(
+        `Expected Cloudflare Worker custom hostname was not found for ${workerName} (${environment}): ${normalizedHostname}`,
+      );
+    }
+
+    hostnameCheck.custom_domain_api_verified = true;
   }
 } else {
   console.log(
-    "CLOUDFLARE_EXPECTED_HOSTNAME is not set; skipping optional Worker Domains API query.",
+    "CLOUDFLARE_EXPECTED_HOSTNAME is not set; skipping public hostname verification.",
   );
 }
 
@@ -183,6 +247,7 @@ console.log(
         "ANALYSIS_API_KEY",
       ],
       expected_hostname_checked: Boolean(expectedHostname),
+      hostname_check: hostnameCheck,
     },
     null,
     2,
