@@ -75,8 +75,9 @@ async function buildAuthCookies(session) {
     const result = {
       name,
       value,
+      // Playwright requires either `url` OR `domain` + `path`, not both.
+      // Using `url` lets Chromium infer the cookie path from the staging origin.
       url: baseUrl,
-      path: options?.path ?? "/",
       secure: options?.secure ?? browserCookieOptions.secure,
       httpOnly: options?.httpOnly ?? false,
       sameSite: cookieSameSite(options?.sameSite),

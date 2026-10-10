@@ -160,6 +160,17 @@ assert.match(stagingAcceptance, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
 assert.match(stagingAcceptance, /STAGING_SUPABASE_SECRET_KEY/);
 assert.match(stagingAcceptance, /playwright@1\.64\.0/);
 assert.match(stagingAcceptance, /node scripts\/staging-authenticated-acceptance\.mjs/);
+const cookieResultBlock = stagingAcceptanceScript.slice(
+  stagingAcceptanceScript.indexOf("const result = {"),
+  stagingAcceptanceScript.indexOf("return result;", stagingAcceptanceScript.indexOf("const result = {")),
+);
+assert.match(cookieResultBlock, /url:\s*baseUrl/);
+assert.doesNotMatch(
+  cookieResultBlock,
+  /path:/,
+  "Playwright cookies scoped with url must not also set path",
+);
+
 assert.match(stagingAcceptanceScript, /auth\.admin\.createUser/);
 assert.match(stagingAcceptanceScript, /auth\.admin\.deleteUser/);
 assert.match(stagingAcceptanceScript, /\/v1\/connection\/verify/);
