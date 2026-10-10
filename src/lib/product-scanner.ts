@@ -194,15 +194,8 @@ async function readLimitedBody(
   maxBytes: number,
 ): Promise<string> {
   if (!response.body) {
-    const text = await response.text();
-    if (new TextEncoder().encode(text).byteLength > maxBytes) {
-      throw new ProductScannerError(
-        "response_too_large",
-        "Product response is too large.",
-        413,
-      );
-    }
-    return text;
+    const bytes = new TextEncoder().encode(await response.text());
+    return new TextDecoder().decode(bytes.subarray(0, maxBytes));
   }
 
   const reader = response.body.getReader();
@@ -210,21 +203,30 @@ async function readLimitedBody(
   let totalBytes = 0;
 
   try {
-    while (true) {
+    while (totalBytes < maxBytes) {
       const result = await reader.read();
       if (result.done) break;
 
-      totalBytes += result.value.byteLength;
-      if (totalBytes > maxBytes) {
-        await reader.cancel();
-        throw new ProductScannerError(
-          "response_too_large",
-          "Product response is too large.",
-          413,
-        );
+      const remainingBytes = maxBytes - totalBytes;
+      if (result.value.byteLength > remainingBytes) {
+        if (remainingBytes > 0) {
+          chunks.push(result.value.subarray(0, remainingBytes));
+          totalBytes += remainingBytes;
+        }
+        await reader.cancel().catch(() => undefined);
+        break;
       }
 
       chunks.push(result.value);
+      totalBytes += result.value.byteLength;
+
+      if (totalBytes >= maxBytes) {
+        // The scanner only needs a bounded HTML prefix for metadata and text
+        // extraction. Cancel any remainder instead of rejecting large pages
+        // or buffering the complete document.
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
     }
   } finally {
     reader.releaseLock();
@@ -416,19 +418,8 @@ export async function scanProductUrl(
         );
       }
 
-      const contentLength = Number(response.headers.get("content-length"));
-      if (
-        Number.isFinite(contentLength) &&
-        contentLength > PRODUCT_SCANNER_LIMITS.maxResponseBytes
-      ) {
-        await response.body?.cancel();
-        throw new ProductScannerError(
-          "response_too_large",
-          "Product response is too large.",
-          413,
-        );
-      }
-
+      // readLimitedBody enforces maxResponseBytes on the decoded stream.
+      // Content-Length may describe a large page; only its bounded prefix is needed.
       const body = await readLimitedBody(
         response,
         PRODUCT_SCANNER_LIMITS.maxResponseBytes,
