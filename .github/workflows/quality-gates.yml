@@ -300,3 +300,25 @@ jobs:
 
       - name: Validate Wrangler configuration
         run: npx --yes wrangler@4.139.0 deploy --dry-run --env staging
+
+  cloudflare_production_audit_contract:
+    name: Cloudflare production audit contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify Cloudflare production audit contract
+        run: npm run test:cloudflare-production-audit-contract
