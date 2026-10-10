@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, runtimeConnectionVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, runtimeConnectionVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck, anonymousAcceptanceScript] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -31,10 +31,18 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, q
   read("src/lib/stage16-database.types.ts"),
   read("scripts/cloudflare-vinext-build.mjs"),
   read("scripts/cloudflare-vinext-check.mjs"),
+  read("scripts/staging-anonymous-proposal-acceptance.mjs"),
 ]);
 
 assert.match(home, /\/onboarding\?url=/);
 assert.doesNotMatch(home, /signInWithOAuth|router\.push\(["']\/login\?url=/);
+assert.match(anonymousAcceptanceScript, /api\/onboarding\/state/);
+assert.match(anonymousAcceptanceScript, /Confirm product understanding/);
+assert.match(anonymousAcceptanceScript, /confirmResponse\.status\(\)/);
+assert.match(anonymousAcceptanceScript, /assert\.equal\([\s\S]*?confirmResponse\.status\(\),[\s\S]*?401/);
+assert.match(anonymousAcceptanceScript, /loginUrl\.searchParams\.get\("url"\)/);
+assert.match(anonymousAcceptanceScript, /Staging anonymous URL-first proposal acceptance: PASS/);
+
 assert.match(onboarding, /\/api\/analyze/);assert.match(onboarding, /import \{ normalizeProductUrl \} from "@\/lib\/url";/);
 assert.match(onboarding, /const \[hostname, setHostname\] = useState\(\(\) =>/);
 assert.match(onboarding, /const \[isValidUrl, setIsValidUrl\] = useState\(\(\) =>/);
