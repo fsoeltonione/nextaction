@@ -96,6 +96,11 @@ assert.match(
 
 assert.match(qualityGatesWorkflow, /^  h3_1_network_moment_contract:/m);
 assert.match(qualityGatesWorkflow, /npm run test:h3-1-network-moment/);
+assert.match(qualityGatesWorkflow, /^  dependency_security_audit:/m);
+assert.match(qualityGatesWorkflow, /npm run test:braces-security-backport/);
+assert.match(qualityGatesWorkflow, /npm audit --audit-level=low/);
+assert.match(qualityGatesWorkflow, /npm audit --omit=dev --audit-level=low/);
+assert.match(qualityGatesWorkflow, /runs-on: ubuntu-24\.04/);
 
 const qualityGateBlock = jobBlock(releaseWorkflow, "quality_gates");
 assert.match(
