@@ -2,6 +2,15 @@ name: Release Gate
 
 on:
   workflow_dispatch:
+    inputs:
+      release_target:
+        description: "Choose staging validation only, or explicitly opt into the full production release"
+        type: choice
+        required: true
+        default: staging
+        options:
+          - staging
+          - production
 
 permissions:
   contents: read
@@ -202,6 +211,7 @@ jobs:
         run: npm run test:h3-1-runtime-smoke
 
   hold_production:
+    if: ${{ inputs.release_target == 'production' }}
     name: Hold for production approval
     runs-on: ubuntu-latest
     timeout-minutes: 4320
@@ -217,6 +227,7 @@ jobs:
           echo "Production deployment is now permitted by the production environment gate."
 
   deploy_production:
+    if: ${{ inputs.release_target == 'production' }}
     name: Deploy production
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -267,6 +278,7 @@ jobs:
           printf 'production_base_url=%s\n' "$(cat /tmp/nextaction-release/production_base_url)" >> "${GITHUB_OUTPUT}"
 
   cloudflare_production_audit:
+    if: ${{ inputs.release_target == 'production' }}
     name: Cloudflare production audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -298,6 +310,7 @@ jobs:
         run: npm run cloudflare:production-audit
 
   production_smoke:
+    if: ${{ inputs.release_target == 'production' }}
     name: Production smoke
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -330,6 +343,7 @@ jobs:
         run: npm run production:smoke
 
   h3_1_production_release_proof:
+    if: ${{ inputs.release_target == 'production' }}
     name: H3.1 production release proof
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -360,6 +374,7 @@ jobs:
         run: npm run h3-1:release-proof -- production
 
   production_release_proof:
+    if: ${{ inputs.release_target == 'production' }}
     name: Production release proof
     runs-on: ubuntu-latest
     timeout-minutes: 10
