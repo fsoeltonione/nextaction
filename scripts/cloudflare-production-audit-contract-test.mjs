@@ -17,9 +17,9 @@ assert.match(
 );
 
 // Core safety assertions must remain required regardless of domain configuration.
-assert.match(audit, /\/workers\/scripts\\?\$\{encodeURIComponent\(workerName\)\}\\\/deployments/);
-assert.match(audit, /\/workers\/scripts\\?\$\{encodeURIComponent\(workerName\)\}\\\/secrets/);
-assert.match(audit, /\/workers\/scripts\\?\$\{encodeURIComponent\(workerName\)\}\\\/versions/);
+assert.match(audit, /\/workers\/scripts\/\$\{encodeURIComponent\(workerName\)\}\/deployments/);
+assert.match(audit, /\/workers\/scripts\/\$\{encodeURIComponent\(workerName\)\}\/secrets/);
+assert.match(audit, /\/workers\/scripts\/\$\{encodeURIComponent\(workerName\)\}\/versions/);
 assert.match(audit, /totalPercentage !== 100/);
 assert.match(audit, /Number\(version\.percentage \?\? 0\) <= 0/);
 assert.match(audit, /Required Cloudflare Worker secret binding is missing/);
