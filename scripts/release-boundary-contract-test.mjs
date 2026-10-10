@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript, anonymousAcceptanceScript] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
     readFile(".github/workflows/quality-gates.yml", "utf8"),
@@ -10,6 +10,7 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
     readFile("scripts/require-file.sh", "utf8"),
     readFile("scripts/staging-smoke.mjs", "utf8"),
     readFile("scripts/staging-authenticated-acceptance.mjs", "utf8"),
+    readFile("scripts/staging-anonymous-proposal-acceptance.mjs", "utf8"),
   ]);
 
 assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
@@ -59,6 +60,7 @@ for (const job of [
   "staging_smoke",
   "h3_1_staging_release_proof",
   "h3_1_staging_runtime_smoke",
+  "anonymous_staging_proposal_acceptance",
   "authenticated_staging_acceptance",
   "hold_production",
   "deploy_production",
@@ -159,12 +161,25 @@ assert.match(
   /NEXTACTION_RELEASE_SHA:\s*\$\{\{\s*github\.sha\s*\}\}/,
 );
 
+const anonymousStagingAcceptance = jobBlock(releaseWorkflow, "anonymous_staging_proposal_acceptance");
+assert.match(anonymousStagingAcceptance, /needs:[\s\S]*deploy_staging/);
+assert.match(anonymousStagingAcceptance, /needs:[\s\S]*staging_smoke/);
+assert.match(anonymousStagingAcceptance, /STAGING_BASE_URL:/);
+assert.doesNotMatch(anonymousStagingAcceptance, /STAGING_SUPABASE_SECRET_KEY|STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+assert.match(anonymousStagingAcceptance, /node scripts\/staging-anonymous-proposal-acceptance\.mjs/);
+
 const stagingAcceptance = jobBlock(releaseWorkflow, "authenticated_staging_acceptance");
+assert.match(stagingAcceptance, /needs:[\s\S]*anonymous_staging_proposal_acceptance/);
 assert.match(stagingAcceptance, /needs:[\s\S]*deploy_staging/);
 assert.match(stagingAcceptance, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
 assert.match(stagingAcceptance, /STAGING_SUPABASE_SECRET_KEY/);
 assert.match(stagingAcceptance, /playwright@1\.64\.0/);
 assert.match(stagingAcceptance, /node scripts\/staging-authenticated-acceptance\.mjs/);
+assert.match(anonymousAcceptanceScript, /api\/onboarding\/state/);
+assert.match(anonymousAcceptanceScript, /Confirm product understanding/);
+assert.match(anonymousAcceptanceScript, /confirmResponse\.status\(\)/);
+assert.match(anonymousAcceptanceScript, /loginUrl\.searchParams\.get\("url"\)/);
+assert.match(anonymousAcceptanceScript, /Staging anonymous URL-first proposal acceptance: PASS/);
 const cookieResultBlock = stagingAcceptanceScript.slice(
   stagingAcceptanceScript.indexOf("const result = {"),
   stagingAcceptanceScript.indexOf("return result;", stagingAcceptanceScript.indexOf("const result = {")),

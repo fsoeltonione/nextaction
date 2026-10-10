@@ -210,6 +210,37 @@ jobs:
       - name: Run H3.1 staging runtime smoke
         run: npm run test:h3-1-runtime-smoke
 
+  anonymous_staging_proposal_acceptance:
+    name: Anonymous URL-first proposal acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    needs:
+      - deploy_staging
+      - staging_smoke
+    env:
+      STAGING_BASE_URL: ${{ needs.deploy_staging.outputs.staging_base_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install pinned browser automation tooling
+        run: npm install --no-save --package-lock=false playwright@1.64.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run anonymous URL-first proposal acceptance
+        run: node scripts/staging-anonymous-proposal-acceptance.mjs
+
   authenticated_staging_acceptance:
     name: Authenticated staging acceptance
     runs-on: ubuntu-24.04
@@ -217,6 +248,7 @@ jobs:
     needs:
       - deploy_staging
       - h3_1_staging_runtime_smoke
+      - anonymous_staging_proposal_acceptance
     env:
       STAGING_BASE_URL: ${{ needs.deploy_staging.outputs.staging_base_url }}
       STAGING_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
@@ -254,6 +286,7 @@ jobs:
       - staging_smoke
       - h3_1_staging_release_proof
       - h3_1_staging_runtime_smoke
+      - anonymous_staging_proposal_acceptance
       - authenticated_staging_acceptance
     environment: production
     steps:
