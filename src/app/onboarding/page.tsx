@@ -305,26 +305,27 @@ function OnboardingContent() {
     }
   }
 
-  const connectionSnippet = `const baseUrl = process.env.NEXTACTION_API_BASE_URL;
-const token = process.env.NEXTACTION_INTEGRATION_TOKEN;
+  const connectionSnippet = `export async function verifyNextActionConnection() {
+  const baseUrl = process.env.NEXTACTION_API_BASE_URL;
+  const token = process.env.NEXTACTION_INTEGRATION_TOKEN;
 
-if (!baseUrl || !token) {
-  throw new Error("Set NEXTACTION_API_BASE_URL and NEXTACTION_INTEGRATION_TOKEN on your server.");
-}
+  if (!baseUrl || !token) {
+    throw new Error("Set NEXTACTION_API_BASE_URL and NEXTACTION_INTEGRATION_TOKEN on your server.");
+  }
 
-const response = await fetch(new URL("/v1/connection/verify", baseUrl), {
-  method: "POST",
-  headers: { Authorization: `Bearer ${token}` },
-  cache: "no-store",
-});
-const payload = await response.json();
+  const response = await fetch(new URL("/v1/connection/verify", baseUrl), {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token },
+    cache: "no-store",
+  });
+  const payload = await response.json();
 
-if (!response.ok || payload?.verified !== true) {
-  throw new Error(payload?.error?.message ?? "NextAction connection verification failed.");
-}
+  if (!response.ok || payload?.verified !== true) {
+    throw new Error(payload?.error?.message ?? "NextAction connection verification failed.");
+  }
 
-console.log("NextAction connection verified.");`;
-
+  return payload;
+};
   async function copyConnectionSnippet() {
     try {
       await navigator.clipboard.writeText(connectionSnippet);
