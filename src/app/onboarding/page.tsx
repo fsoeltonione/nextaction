@@ -305,7 +305,7 @@ function OnboardingContent() {
     }
   }
 
-  const connectionSnippet = `export async function verifyNextActionConnection() {
+  const connectionSnippet = `(async () => {
   const baseUrl = process.env.NEXTACTION_API_BASE_URL;
   const token = process.env.NEXTACTION_INTEGRATION_TOKEN;
 
@@ -324,8 +324,11 @@ function OnboardingContent() {
     throw new Error(payload?.error?.message ?? "NextAction connection verification failed.");
   }
 
-  return payload;
-};
+  console.log("NextAction connection verified:", payload.integration_id, payload.verified_at);
+})().catch((error) => {
+  console.error("NextAction connection verification failed:", error);
+  process.exitCode = 1;
+});`;
   async function copyConnectionSnippet() {
     try {
       await navigator.clipboard.writeText(connectionSnippet);
@@ -401,7 +404,7 @@ function OnboardingContent() {
 
       <div className="rounded-xl border border-neutral-800 p-4">
         <div className="mb-2 text-sm font-medium text-neutral-200">2. Verify from your backend</div>
-        <p className="mb-3 text-sm text-neutral-400">Run this server-side code from your application backend, not from a browser or client component.</p>
+        <p className="mb-3 text-sm text-neutral-400">Save this as verify-nextaction.mjs and run it in your backend environment with node --env-file=.env verify-nextaction.mjs. Never run it in a browser or client component.</p>
         <pre className="max-h-72 overflow-x-auto rounded-lg bg-black p-3 text-xs text-neutral-300">{connectionSnippet}</pre>
         <button onClick={() => void copyConnectionSnippet()} className="btn-secondary mt-3">
           <Copy className="h-4 w-4" />Copy server code
