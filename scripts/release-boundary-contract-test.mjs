@@ -12,6 +12,27 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
   ]);
 
 assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
+
+assert.match(
+  releaseWorkflow,
+  /release_target:[\s\S]*?default:\s*staging[\s\S]*?options:[\s\S]*?- staging[\s\S]*?- production/,
+  "manual Release Gate must default to staging-only validation",
+);
+
+for (const job of [
+  "hold_production",
+  "deploy_production",
+  "cloudflare_production_audit",
+  "production_smoke",
+  "h3_1_production_release_proof",
+  "production_release_proof",
+]) {
+  assert.match(
+    jobBlock(releaseWorkflow, job),
+    /if:\s*\$\{\{\s*inputs\.release_target\s*==\s*'production'\s*\}\}/,
+    job + " must require an explicit production target",
+  );
+}
 assert.match(
   releaseWorkflow,
   /release_source_guard:[\s\S]*?github\.ref_name[\s\S]*?master/,
