@@ -170,7 +170,6 @@ function OnboardingContent() {
   useEffect(() => {
     let active = true;
     // This effect synchronizes initial client state with the authenticated server state.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadState(initialWorkspaceId).catch((err) => { if (active) setError(err instanceof Error ? err.message : "Unable to load activation state."); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [initialWorkspaceId, loadState]);
