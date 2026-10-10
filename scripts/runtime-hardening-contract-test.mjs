@@ -179,6 +179,11 @@ assert.match(staging, /\/api\/health\/ready/);
 assert.match(staging, /operations\?\.schedule_active/);
 assert.match(production, /\/api\/health\/ready/);
 assert.match(production, /operations\?\.schedule_active/);
+assert.match(readyRoute, /runtime_readiness/);
+assert.match(readyRoute, /row\?\.status === "ready"/);
+assert.match(readyRoute, /Cache-Control/);
+assert.match(readyRoute, /X-Request-Id/);
+
 assert.match(production, /EVENT_PROCESSING_TIMEOUT_MS = 90_000/);
 assert.match(production, /timeoutMs = EVENT_PROCESSING_TIMEOUT_MS/);
 
