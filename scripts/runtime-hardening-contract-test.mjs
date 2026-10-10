@@ -194,6 +194,18 @@ assert.doesNotMatch(runtimeHttp, /\.get\(["']x-forwarded-for["']\)/);
 
 const pkg = JSON.parse(packageJson);
 assert.equal(pkg.scripts["test:runtime-hardening"], "node scripts/runtime-hardening-contract-test.mjs");
+for (const approvedInstallScript of [
+  "unrs-resolver@1.12.2",
+  "esbuild@0.28.1",
+  "workerd@1.20260916.1",
+  "workerd@1.20260923.1",
+]) {
+  assert.equal(
+    pkg.allowScripts?.[approvedInstallScript],
+    true,
+    `The reviewed native tooling install script ${approvedInstallScript} must be pinned in allowScripts.`,
+  );
+}
 assert.match(qualityWorkflow, /^  quality_gates:/m);
 assert.match(qualityWorkflow, /uses: \.\/\.github\/workflows\/quality-gates\.yml/);
 assert.match(qualityGatesWorkflow, /^  runtime_hardening_contract:/m);
