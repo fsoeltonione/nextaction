@@ -1,11 +1,11 @@
 # NextAction — Roadmap Audit & Official MVP-to-Launch Roadmap
 
 **Status:** Official post-Stage-15 roadmap  
-**Audit date:** 2026-09-28  
+**Audit date:** 2026-10-11  
 **Repository:** `fsoeltonione/nextaction`  
 **Roadmap baseline master:** `f9cb8442214e7c840076682c5ec10c2b9536924e`  
 **Completed through:** Stage 15  
-**Next milestone:** Stage 16 — Activation Flow v2 Completion (contract locked; implementation not started)
+**Current milestone:** Stage 16 — Activation Flow v2 completion (URL-first UI and authenticated activation are implemented; automated anonymous proposal proof is being added)
 
 ---
 
@@ -119,27 +119,24 @@ The authoritative data/security and architecture documents explicitly require:
 - bounded LLM input;
 - structured output validation.
 
-#### B. The desired URL-first activation sequence is not fully aligned with the live UI
+#### B. Stage 16 URL-first activation is implemented; anonymous browser proof is now part of release acceptance
 
-The locked product flow is:
+The live homepage sends a normalized SaaS URL directly to `/onboarding?url=...`, without inserting a login wall. The onboarding page calls the public `/api/analyze` endpoint and renders an editable Product Understanding proposal before persistence.
 
-```
-URL
-→ conditional auth
-→ product understanding
-→ intent
-→ Make Money / Reach Customers / Both
-→ capability-specific setup
-→ verification
-→ truly ready
-→ dashboard
-```
+Saving is a separate boundary:
+- `GET /api/onboarding/state` remains private and returns HTTP 401 to anonymous users;
+- `POST /api/products/confirm` returns HTTP 401 until a user authenticates;
+- the browser preserves the pending normalized URL in the login query and the OAuth callback preserves approved internal activation context;
+- confirmed Products/Moments, workspace selection, capabilities, integration verification, and starter-offer setup are covered by the authenticated staging acceptance runner.
 
-The current homepage still routes the submitted URL to `/login?url=...`, while the onboarding page performs analysis after authentication.
+The remaining acceptance gap was that the anonymous proposal/persistence boundary had only been checked manually while the automated Release Gate exercised the authenticated journey. The Stage 16 change adds a separate headless browser job that:
+1. opens staging as a truly anonymous browser;
+2. verifies the Product Understanding proposal and 3–8 Moments render before login;
+3. confirms the activation state endpoint remains private;
+4. attempts the UI confirmation, requires `POST /api/products/confirm` to return HTTP 401, and checks redirect to login preserves the exact normalized pending URL;
+5. never signs in or creates Product/Moment data.
 
-That means the repository contains the correct **state model and supporting APIs**, but the complete user-facing sequence is not yet identical to the locked product flow.
-
-Stage 16 closes this mismatch.
+This job receives only the staging base URL, no Supabase service credentials, and is a required dependency of authenticated staging acceptance and the production approval gate. Stage 16 should be marked closed only after a Release Gate run on the new commit passes both anonymous and authenticated staging acceptance.
 
 #### C. Some dashboard behavior is still prototype-shaped
 
