@@ -16,10 +16,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -31,6 +31,33 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      # Temporary diagnostic: capture exact npm advisories without blocking quality CI.
+      - name: Report npm audit findings (temporary)
+        run: |
+          audit_file="${RUNNER_TEMP}/npm-audit.json"
+          npm audit --json > "${audit_file}" || true
+          node --input-type=module - "${audit_file}" <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const vulnerabilities = Object.entries(report.vulnerabilities ?? {}).map(([name, item]) => ({
+            name,
+            severity: item.severity,
+            isDirect: item.isDirect,
+            range: item.range,
+            fixAvailable: item.fixAvailable,
+            via: (item.via ?? []).map((entry) => typeof entry === "string" ? entry : ({
+              name: entry.name,
+              title: entry.title,
+              severity: entry.severity,
+              range: entry.range,
+              url: entry.url,
+              cwe: entry.cwe,
+              cvss: entry.cvss?.score
+            }))
+          }));
+          console.log(JSON.stringify({ metadata: report.metadata?.vulnerabilities, vulnerabilities }, null, 2));
+          NODE
 
       - name: Lint
         run: npm run lint
@@ -50,10 +77,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -73,10 +100,10 @@ jobs:
       - release_boundary_contract
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -95,10 +122,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -117,10 +144,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -139,10 +166,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -161,10 +188,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -183,10 +210,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -205,10 +232,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -227,10 +254,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -255,10 +282,10 @@ jobs:
       - stage16_activation_contract
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -282,10 +309,10 @@ jobs:
       SUPABASE_SECRET_KEY: ci-placeholder
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -309,10 +336,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
