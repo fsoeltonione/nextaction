@@ -42,7 +42,6 @@ assert.match(
 );
 assert.match(audit, /expected_hostname_checked: Boolean\(expectedHostname\)/);
 assert.match(audit, /hostname_check: hostnameCheck/);
-const expectedHostnameDefault = "nextaction.fsoeltoni-one.workers.dev";
 assert.match(
   releaseWorkflow,
   /CLOUDFLARE_EXPECTED_HOSTNAME:\s*\$\{\{\s*vars\.CLOUDFLARE_EXPECTED_HOSTNAME\s*\|\|\s*'nextaction\.fsoeltoni-one\.workers\.dev'\s*\}\}/,
