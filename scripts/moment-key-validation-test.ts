@@ -58,7 +58,7 @@ test("database trigger enforces the same semantic-key boundary", async () => {
   assert.match(migration, /CREATE OR REPLACE FUNCTION private\.guard_moment_key_semantics/);
   assert.match(migration, /CREATE TRIGGER moments_semantic_key_guard/);
   assert.match(migration, /BEFORE INSERT OR UPDATE OF moment_key ON public\.moments/);
-  assert.match(migration, /moment_key must be meaningful lower_snake_case/i);
+  assert.match(migration, /Moment key must be meaningful lower_snake_case/i);
   assert.match(migration, /'new',[\s\S]*'temp',[\s\S]*'thing',[\s\S]*'foo'/);
   assert.ok(migration.includes("OR NEW.moment_key ~ '^(moment|new_moment|new)_[0-9]+$'"));
 });
