@@ -211,7 +211,7 @@ for (const smoke of [staging, production]) {
 assert.match(settlementMigration, /FOR UPDATE OF qc/);
 assert.match(settlementMigration, /FOR UPDATE/);
 for (const requiredValue of ["'debit'", "'credit'", "100", "75", "25"]) {
-  assert.ok(settlementMigration.includes(requiredValue), \`settlement migration must encode \${requiredValue}\`);
+  assert.ok(settlementMigration.includes(requiredValue), 'settlement migration must encode ' + requiredValue);
 }
 assert.match(settlementMigration, /available_units = available_units - 1/);
 assert.match(settlementMigration, /financial_entries_settlement_account_uq/);
