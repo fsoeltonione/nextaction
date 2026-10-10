@@ -54,6 +54,9 @@
     "braces": "$braces"
   },
   "allowScripts": {
-    "unrs-resolver@1.12.2": true
+    "unrs-resolver@1.12.2": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20260916.1": true,
+    "workerd@1.20260923.1": true
   }
 }
