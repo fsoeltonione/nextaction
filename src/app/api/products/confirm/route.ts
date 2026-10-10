@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { normalizeProductUrl } from "@/lib/url";
+import { isMeaningfulMomentKey } from "@/lib/moment-key";
 import { createRequestId, jsonError, jsonSuccess, readJsonBody, isRecord, HttpError } from "@/lib/http";
 
 function asString(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
@@ -30,8 +31,12 @@ export async function POST(request: Request) {
       const key = asString(item.key ?? item.id);
       const label = asString(item.label);
       const momentDescription = asString(item.description);
-      if (!/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(key) || key.length > 100 || !label || label.length > 160) {
-        throw new HttpError(400, "invalid_moment", "A Moment needs a meaningful lower_snake_case key and label.");
+      if (!isMeaningfulMomentKey(key) || !label || label.length > 160) {
+        throw new HttpError(
+          400,
+          "invalid_moment",
+          "A Moment needs a meaningful lower_snake_case key and label; generic placeholder keys are not allowed.",
+        );
       }
       return { key, label, description: momentDescription || null };
     });
