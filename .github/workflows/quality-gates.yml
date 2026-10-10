@@ -9,7 +9,7 @@ permissions:
 jobs:
   quality:
     name: Quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
@@ -42,9 +42,37 @@ jobs:
         run: npm run build
 
 
+  dependency_security_audit:
+    name: Dependency security (braces backport)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs:
+      - quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test local braces security backport
+        run: npm run test:braces-security-backport
+
+      - name: Audit the complete dependency tree
+        run: npm audit --audit-level=low
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=low
+
   release_boundary_contract:
     name: Release boundary contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -66,7 +94,7 @@ jobs:
 
   product_scanner_security:
     name: Product scanner security
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -89,7 +117,7 @@ jobs:
 
   analysis_provider_contract:
     name: Analysis provider contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -111,7 +139,7 @@ jobs:
 
   analysis_output_contract:
     name: Analysis output contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -133,7 +161,7 @@ jobs:
 
   analysis_provider_content_contract:
     name: Analysis provider content contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -155,7 +183,7 @@ jobs:
 
   stage16_activation_contract:
     name: Stage 16 activation contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -177,7 +205,7 @@ jobs:
 
   runtime_hardening_contract:
     name: Runtime hardening contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -199,7 +227,7 @@ jobs:
 
   h2_3_release_proof_contract:
     name: H2.3 release proof contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -221,7 +249,7 @@ jobs:
 
   h3_1_network_moment_contract:
     name: H3.1 Network Moment contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality
@@ -243,7 +271,7 @@ jobs:
 
   cloudflare_compatibility:
     name: Cloudflare compatibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs:
       - quality
@@ -271,7 +299,7 @@ jobs:
 
   cloudflare_build:
     name: Cloudflare build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs:
       - quality
@@ -303,7 +331,7 @@ jobs:
 
   cloudflare_production_audit_contract:
     name: Cloudflare production audit contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality

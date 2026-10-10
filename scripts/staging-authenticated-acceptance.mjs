@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";

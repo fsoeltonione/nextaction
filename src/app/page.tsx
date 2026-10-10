@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Globe, Sparkles } from "lucide-react";
 import { normalizeProductUrl } from "@/lib/url";
@@ -66,8 +67,14 @@ export default function Home() {
           <form onSubmit={handleContinue} className="flex flex-col gap-3">
             <div className="relative flex items-center">
               {hostname ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={"https://s2.googleusercontent.com/s2/favicons?domain=" + hostname + "&sz=64"} alt="" className="absolute left-4 w-5 h-5 rounded-sm" />
+                <Image
+                  src={"https://s2.googleusercontent.com/s2/favicons?domain=" + hostname + "&sz=64"}
+                  alt=""
+                  width={20}
+                  height={20}
+                  unoptimized
+                  className="absolute left-4 w-5 h-5 rounded-sm"
+                />
               ) : (
                 <Globe className="absolute left-4 w-5 h-5 text-neutral-500" />
               )}
