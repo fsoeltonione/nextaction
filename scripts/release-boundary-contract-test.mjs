@@ -164,7 +164,7 @@ const cookieResultBlock = stagingAcceptanceScript.slice(
   stagingAcceptanceScript.indexOf("const result = {"),
   stagingAcceptanceScript.indexOf("return result;", stagingAcceptanceScript.indexOf("const result = {")),
 );
-assert.match(cookieResultBlock, /url:\\s*baseUrl/);
+assert.match(cookieResultBlock, /url:\s*baseUrl/);
 assert.doesNotMatch(
   cookieResultBlock,
   /path:/,
