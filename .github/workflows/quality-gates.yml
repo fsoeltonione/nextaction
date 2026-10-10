@@ -32,9 +32,12 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Temporary diagnostic: capture exact npm advisories without blocking quality CI.
-      - name: Report npm audit findings (temporary)
+      # Temporary diagnostics on this isolated PR branch. Removed before final validation.
+      - name: Resolve patched dependency lock (temporary)
         run: |
+          npm pkg set dependencies.next=16.4.0 devDependencies.eslint-config-next=16.4.0
+          npm install --package-lock-only --ignore-scripts
+          npm audit fix --package-lock-only --ignore-scripts || true
           audit_file="${RUNNER_TEMP}/npm-audit.json"
           npm audit --json > "${audit_file}" || true
           node --input-type=module - "${audit_file}" <<'NODE'
@@ -56,8 +59,13 @@ jobs:
               cvss: entry.cvss?.score
             }))
           }));
+          console.log("NPM_AUDIT_REPORT_START");
           console.log(JSON.stringify({ metadata: report.metadata?.vulnerabilities, vulnerabilities }, null, 2));
+          console.log("NPM_AUDIT_REPORT_END");
           NODE
+          printf 'NPM_LOCKFILE_START\n'
+          cat package-lock.json
+          printf '\nNPM_LOCKFILE_END\n'
 
       - name: Lint
         run: npm run lint
