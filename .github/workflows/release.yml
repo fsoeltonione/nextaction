@@ -22,7 +22,7 @@ concurrency:
 jobs:
   release_source_guard:
     name: Release source guard
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       NEXTACTION_RELEASE_BRANCH: ${{ github.ref_name }}
@@ -42,7 +42,7 @@ jobs:
 
   analysis_provider_smoke:
     name: Analysis provider smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - quality_gates
@@ -68,7 +68,7 @@ jobs:
 
   deploy_staging:
     name: Deploy staging
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - quality_gates
@@ -119,7 +119,7 @@ jobs:
 
   staging_smoke:
     name: Staging smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - deploy_staging
@@ -151,7 +151,7 @@ jobs:
 
   h3_1_staging_release_proof:
     name: H3.1 staging release proof
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - staging_smoke
@@ -180,7 +180,7 @@ jobs:
 
   h3_1_staging_runtime_smoke:
     name: H3.1 staging runtime smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - deploy_staging
@@ -212,7 +212,7 @@ jobs:
 
   authenticated_staging_acceptance:
     name: Authenticated staging acceptance
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs:
       - deploy_staging
@@ -248,7 +248,7 @@ jobs:
   hold_production:
     if: ${{ inputs.release_target == 'production' }}
     name: Hold for production approval
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 4320
     needs:
       - staging_smoke
@@ -265,7 +265,7 @@ jobs:
   deploy_production:
     if: ${{ inputs.release_target == 'production' }}
     name: Deploy production
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - hold_production
@@ -316,7 +316,7 @@ jobs:
   cloudflare_production_audit:
     if: ${{ inputs.release_target == 'production' }}
     name: Cloudflare production audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - deploy_production
@@ -348,7 +348,7 @@ jobs:
   production_smoke:
     if: ${{ inputs.release_target == 'production' }}
     name: Production smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs:
       - deploy_production
@@ -381,7 +381,7 @@ jobs:
   h3_1_production_release_proof:
     if: ${{ inputs.release_target == 'production' }}
     name: H3.1 production release proof
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - production_smoke
@@ -412,7 +412,7 @@ jobs:
   production_release_proof:
     if: ${{ inputs.release_target == 'production' }}
     name: Production release proof
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - deploy_production
