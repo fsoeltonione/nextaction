@@ -15,7 +15,7 @@ assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
 
 assert.match(
   releaseWorkflow,
-  /release_target:[\\s\\S]*?default:\\s*staging[\\s\\S]*?options:[\\s\\S]*?- staging[\\s\\S]*?- production/,
+  /release_target:[\s\S]*?default:\s*staging[\s\S]*?options:[\s\S]*?- staging[\s\S]*?- production/,
   "manual Release Gate must default to staging-only validation",
 );
 
@@ -29,7 +29,7 @@ for (const job of [
 ]) {
   assert.match(
     jobBlock(releaseWorkflow, job),
-    /if:\\s*\\$\\{\\{\\s*inputs\\.release_target\\s*==\\s*'production'\\s*\\}\\}/,
+    /if:\s*\$\{\{\s*inputs\.release_target\s*==\s*'production'\s*\}\}/,
     job + " must require an explicit production target",
   );
 }
