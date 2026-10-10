@@ -26,12 +26,12 @@ export async function POST(request: Request) {
     catch { return jsonError(requestId, 503, "integration_not_configured", "Connection status is not available yet."); }
 
     const { data: integration, error: integrationError } = await admin.from("integrations")
-      .select("id, product_id, status, last_seen_at").eq("id", integrationId).maybeSingle();
+      .select("id, product_id, status, revoked_at, last_seen_at").eq("id", integrationId).maybeSingle();
     if (integrationError) {
       console.error("Integration status lookup failed", { requestId, code: integrationError.code });
       return jsonError(requestId, 500, "verification_failed", "Unable to check connection status.");
     }
-    if (!integration || integration.status !== "active") {
+    if (!integration || integration.status !== "active" || integration.revoked_at !== null) {
       return jsonError(requestId, 404, "integration_not_found", "An active connection was not found.");
     }
     const { data: product } = await admin.from("products").select("id, workspace_id")
