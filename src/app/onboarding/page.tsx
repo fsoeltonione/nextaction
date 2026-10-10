@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Check, Globe, Plus, RefreshCw, ShieldCheck, Target, Trash2, Zap } from "lucide-react";
+import { ArrowRight, Check, Copy, Globe, Plus, RefreshCw, ShieldCheck, Target, Trash2, Zap } from "lucide-react";
 import { normalizeProductUrl } from "@/lib/url";
 
 type Capability = "make_money" | "reach_customers";
@@ -98,7 +98,8 @@ function OnboardingContent() {
   const [loading, setLoading] = useState(true);
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  const [refreshingConnection, setRefreshingConnection] = useState(false);
+  const [integrationNotice, setIntegrationNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const autoAnalysisUrlRef = useRef<string | null>(null);
   const initialAutoAnalysisUrlRef = useRef(initialFlowUrl);
@@ -281,7 +282,7 @@ function OnboardingContent() {
 
   async function createIntegration() {
     if (!state?.product || saving || !selectedWorkspaceId) return;
-    setSaving(true); setError(null); setIntegrationToken(null);
+    setSaving(true); setError(null); setIntegrationToken(null); setIntegrationNotice(null);
     try {
       const response = await fetch("/api/integrations/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: selectedWorkspaceId, product_id: state.product.id }) });
       if (!response.ok) throw new Error(await readApiError(response, "Unable to create the product connection."));
@@ -293,16 +294,66 @@ function OnboardingContent() {
     finally { setSaving(false); }
   }
 
-  async function verifyIntegration() {
-    if (!integrationToken || verifying || !selectedWorkspaceId) return;
-    setVerifying(true); setError(null);
+  async function copyIntegrationCredential() {
+    if (!integrationToken) return;
     try {
-      const response = await fetch("/api/integrations/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: selectedWorkspaceId, token: integrationToken }) });
-      if (!response.ok) throw new Error(await readApiError(response, "Unable to verify the connection credential."));
-      setIntegrationToken(null);
-      await loadState(selectedWorkspaceId);
-    } catch (err) { setError(err instanceof Error ? err.message : "Unable to verify the connection credential."); }
-    finally { setVerifying(false); }
+      await navigator.clipboard.writeText(integrationToken);
+      setError(null);
+      setIntegrationNotice("Credential copied. Store it in your SaaS backend environment; never commit it or expose it in browser code.");
+    } catch {
+      setError("Clipboard access was blocked. Select and copy the credential manually.");
+    }
+  }
+
+  const connectionSnippet = `const baseUrl = process.env.NEXTACTION_API_BASE_URL;
+const token = process.env.NEXTACTION_INTEGRATION_TOKEN;
+
+if (!baseUrl || !token) {
+  throw new Error("Set NEXTACTION_API_BASE_URL and NEXTACTION_INTEGRATION_TOKEN on your server.");
+}
+
+const response = await fetch(new URL("/v1/connection/verify", baseUrl), {
+  method: "POST",
+  headers: { Authorization: `Bearer ${token}` },
+  cache: "no-store",
+});
+const payload = await response.json();
+
+if (!response.ok || payload?.verified !== true) {
+  throw new Error(payload?.error?.message ?? "NextAction connection verification failed.");
+}
+
+console.log("NextAction connection verified.");`;
+
+  async function copyConnectionSnippet() {
+    try {
+      await navigator.clipboard.writeText(connectionSnippet);
+      setError(null);
+      setIntegrationNotice("Server-side code copied. Configure both environment variables before running it.");
+    } catch {
+      setError("Clipboard access was blocked. Select and copy the server code manually.");
+    }
+  }
+
+  async function refreshConnectionStatus() {
+    if (!selectedWorkspaceId || refreshingConnection) return;
+    setRefreshingConnection(true);
+    setError(null);
+    setIntegrationNotice(null);
+    try {
+      const nextState = await loadState(selectedWorkspaceId);
+      if (!nextState) throw new Error("Unable to refresh connection status.");
+      if (nextState.setup.make_money.verified) {
+        setIntegrationToken(null);
+        setIntegrationNotice("Connection verified: NextAction received an authenticated request from your runtime.");
+      } else {
+        setIntegrationNotice("No successful server-side verification request has been received yet.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to refresh connection status.");
+    } finally {
+      setRefreshingConnection(false);
+    }
   }
 
   async function createOffer() {
@@ -324,6 +375,51 @@ function OnboardingContent() {
   const currentStep = hasPendingProposal ? "product_understanding" : isAddProductMode ? "url" : state?.step ?? "url";
   const moments = state?.product?.moments ?? [];
 
+  const connectionInstructions = (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+        <div className="mb-2 text-sm font-medium text-neutral-200">Server credential</div>
+        {integrationToken ? (
+          <>
+            <div className="mb-3 break-all rounded-lg bg-black p-3 font-mono text-xs text-neutral-200">{integrationToken}</div>
+            <button onClick={() => void copyIntegrationCredential()} className="btn-secondary">
+              <Copy className="h-4 w-4" />Copy credential
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-neutral-400">The credential is only shown when issued. If you did not save it, issue a replacement credential below.</p>
+        )}
+        <p className="mt-3 text-xs text-amber-200">Keep this secret on your server. Never put it in a client component, public JavaScript, HTML, or a public repository.</p>
+      </div>
+
+      <div className="rounded-xl border border-neutral-800 p-4">
+        <div className="mb-2 text-sm font-medium text-neutral-200">1. Add backend environment variables</div>
+        <pre className="overflow-x-auto rounded-lg bg-black p-3 text-xs text-neutral-300">{'NEXTACTION_API_BASE_URL=YOUR_NEXTACTION_DEPLOYMENT_URL\nNEXTACTION_INTEGRATION_TOKEN=YOUR_SECRET_TOKEN'}</pre>
+        <p className="mt-2 text-xs text-neutral-500">Use the HTTPS URL of the NextAction deployment you are connecting to. Set the real credential as a server-only secret.</p>
+      </div>
+
+      <div className="rounded-xl border border-neutral-800 p-4">
+        <div className="mb-2 text-sm font-medium text-neutral-200">2. Verify from your backend</div>
+        <p className="mb-3 text-sm text-neutral-400">Run this server-side code from your application backend, not from a browser or client component.</p>
+        <pre className="max-h-72 overflow-x-auto rounded-lg bg-black p-3 text-xs text-neutral-300">{connectionSnippet}</pre>
+        <button onClick={() => void copyConnectionSnippet()} className="btn-secondary mt-3">
+          <Copy className="h-4 w-4" />Copy server code
+        </button>
+      </div>
+
+      {integrationNotice && <p className="text-sm text-emerald-300">{integrationNotice}</p>}
+
+      <div className="flex flex-wrap gap-2">
+        <button disabled={saving || !selectedWorkspaceId} onClick={() => void createIntegration()} className="btn-secondary">
+          Issue new credential
+        </button>
+        <button disabled={refreshingConnection || !selectedWorkspaceId} onClick={() => void refreshConnectionStatus()} className="btn">
+          <RefreshCw className="h-4 w-4" />{refreshingConnection ? "Checking..." : "Refresh connection status"}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <Shell>
       <div className="w-full max-w-4xl mx-auto px-4 py-10">
@@ -342,30 +438,13 @@ function OnboardingContent() {
                   <Zap className="h-5 w-5" />
                   <h2 className="text-xl font-semibold text-white">Make Money</h2>
                 </div>
-                <p className="mb-5 text-sm text-neutral-400">Create and verify the product connection.</p>
+                <p className="mb-5 text-sm text-neutral-400">Install the server integration and verify a real authenticated runtime request.</p>
                 {!state.setup.make_money.exists && (
                   <button disabled={saving || !selectedWorkspaceId} onClick={() => void createIntegration()} className="btn">
                     Create connection
                   </button>
                 )}
-                {state.setup.make_money.exists && !state.setup.make_money.verified && (
-                  <div className="space-y-3">
-                    {integrationToken && (
-                      <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3 font-mono text-xs break-all text-neutral-300">
-                        {integrationToken}
-                      </div>
-                    )}
-                    <div className="text-sm text-neutral-300">Connection created. Install the credential, then verify it.</div>
-                    <div className="flex flex-wrap gap-2">
-                      <button disabled={saving || !selectedWorkspaceId} onClick={() => void createIntegration()} className="btn-secondary">
-                        Issue new credential
-                      </button>
-                      <button disabled={verifying || !integrationToken || !selectedWorkspaceId} onClick={() => void verifyIntegration()} className="btn">
-                        Verify connection
-                      </button>
-                    </div>
-                  </div>
-                )}
+                {state.setup.make_money.exists && !state.setup.make_money.verified && connectionInstructions}
                 {state.setup.make_money.verified && (
                   <div className="text-sm text-green-300 flex items-center gap-2">
                     <Check className="h-4 w-4" />Verified
@@ -419,7 +498,7 @@ function OnboardingContent() {
           </section>
         )}
 
-        {currentStep === "verification" && state && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><RefreshCw className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Verify your activation</h1></div><p className="mb-6 text-neutral-400">Complete any required verification, then continue to the dashboard.</p>{integrationToken && <div className="mb-4 rounded-xl border border-neutral-800 bg-neutral-950 p-3 font-mono text-xs break-all text-neutral-300">{integrationToken}</div>}<div className="flex flex-wrap gap-2"><button disabled={saving || !selectedWorkspaceId} onClick={() => void createIntegration()} className="btn-secondary">Issue new credential</button><button disabled={verifying || !integrationToken || !selectedWorkspaceId} onClick={() => void verifyIntegration()} className="btn">Verify connection</button><button onClick={() => void loadState(selectedWorkspaceId)} className="btn-secondary">Refresh status</button></div></section>}
+        {currentStep === "verification" && state && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><RefreshCw className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Verify your server connection</h1></div><p className="mb-6 text-neutral-400">Install the credential on your SaaS backend and execute the verification request there. NextAction will show success only after it receives the authenticated runtime request.</p>{connectionInstructions}</section>}
         {currentStep === "ready" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Check className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">You are ready</h1></div><p className="mb-6 text-neutral-400">Your activation is complete.</p><button onClick={() => router.push("/dashboard?workspace_id=" + encodeURIComponent(selectedWorkspaceId ?? ""))} className="btn">Open dashboard<ArrowRight className="h-4 w-4" /></button></section>}
       </div>
     </Shell>

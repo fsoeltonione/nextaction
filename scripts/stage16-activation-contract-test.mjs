@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, runtimeConnectionVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -17,6 +17,7 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, q
   read("src/app/api/workspaces/capabilities/route.ts"),
   read("src/app/api/integrations/create/route.ts"),
   read("src/app/api/integrations/verify/route.ts"),
+  read("src/app/v1/connection/verify/route.ts"),
   read("src/app/api/offers/create/route.ts"),
   read("supabase/migrations/20260928053000_stage_16_activation_workspace_context.sql"),
   read("supabase/migrations/20260928061500_stage_16_initial_workspace_creation.sql"),
@@ -112,9 +113,22 @@ assert.match(capabilities, /set_workspace_capabilities_v2/);
 assert.match(integrationCreate, /workspace_id/);
 assert.match(integrationCreate, /provision_integration_credential_v2/);
 assert.doesNotMatch(integrationCreate, /schema\(["']private["']\)/);
-assert.match(integrationVerify, /workspace_id/);
-assert.match(integrationVerify, /resolve_integration_credential_v2/);
-assert.doesNotMatch(integrationVerify, /schema\(["']private["']\)/);
+assert.match(integrationVerify, /integration_id/);
+assert.match(integrationVerify, /last_seen_at/);
+assert.doesNotMatch(integrationVerify, /resolve_integration_credential_v2/);
+assert.doesNotMatch(integrationVerify, /\.update\(/);
+assert.match(runtimeConnectionVerify, /resolveRuntimeIntegration/);
+assert.match(runtimeConnectionVerify, /runtime:connection-verify/);
+assert.match(runtimeConnectionVerify, /last_seen_at/);
+assert.match(runtimeConnectionVerify, /verified: true/);
+assert.doesNotMatch(runtimeConnectionVerify, /runtime_accept_event/);
+assert.doesNotMatch(runtimeConnectionVerify, /Access-Control-Allow-Origin/);
+assert.doesNotMatch(onboarding, /function verifyIntegration/);
+assert.equal(onboarding.includes('fetch("/api/integrations/verify"'), false);
+assert.match(onboarding, /NEXTACTION_API_BASE_URL/);
+assert.match(onboarding, /NEXTACTION_INTEGRATION_TOKEN/);
+assert.match(onboarding, /Copy credential/);
+assert.match(onboarding, /Copy server code/);
 assert.match(offers, /create_offer_activation_v2/);
 assert.match(offers, /reach_customers/);
 assert.match(migration, /workspace selection required/);
