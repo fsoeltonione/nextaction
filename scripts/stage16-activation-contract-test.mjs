@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
-const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, runtimeConnectionVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck] = await Promise.all([
+const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, state, confirm, capabilities, integrationCreate, integrationVerify, runtimeConnectionVerify, offers, migration, initialWorkspaceMigration, privilegeMigration, privateDenyMigration, firstWorkspaceRlsMigration, firstWorkspaceReturningRlsMigration, atomicIntegrationCredentialMigration, atomicIntegrationCredentialVerificationMigration, readOnlyControlPlaneMigration, databaseTypes, cloudflareBuild, cloudflareCheck, momentKeyMigration] = await Promise.all([
   read("src/app/page.tsx"),
   read("src/app/onboarding/page.tsx"),
   read("src/app/auth/callback/route.ts"),
@@ -31,6 +31,7 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, q
   read("src/lib/stage16-database.types.ts"),
   read("scripts/cloudflare-vinext-build.mjs"),
   read("scripts/cloudflare-vinext-check.mjs"),
+  read("supabase/migrations/20261011010000_stage_16_moment_key_semantics.sql"),
 ]);
 
 assert.match(home, /\/onboarding\?url=/);
@@ -50,6 +51,13 @@ assert.match(onboarding, /response\.status === 401/);
 assert.match(onboarding, /sessionStorage/);
 assert.match(onboarding, /workspace_id/);
 assert.doesNotMatch(onboarding, /moment_1|moment_2/);
+assert.match(onboarding, /isMeaningfulMomentKey/);
+assert.match(confirm, /isMeaningfulMomentKey/);
+assert.ok(momentKeyMigration.includes("CREATE OR REPLACE FUNCTION private.guard_moment_key_semantics"));
+assert.ok(momentKeyMigration.includes("CREATE TRIGGER moments_semantic_key_guard"));
+assert.ok(momentKeyMigration.includes("BEFORE INSERT OR UPDATE OF moment_key ON public.moments"));
+assert.ok(momentKeyMigration.includes("'new', 'temp', 'thing', 'foo'"));
+
 assert.match(onboarding, /hasPendingProposal/);
 assert.match(onboarding, /initialWorkspaceId/);
 assert.match(onboarding, /const loadStateRequestRef = useRef\(0\)/);
