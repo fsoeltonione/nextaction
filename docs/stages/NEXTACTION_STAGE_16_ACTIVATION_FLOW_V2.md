@@ -1,7 +1,7 @@
 
 # NextAction Stage 16 — Activation Flow v2 Contract
 
-**Status:** CONTRACT LOCKED — implementation not started  
+**Status:** CONTRACT LOCKED — implementation in progress  
 **Audit date:** 2026-09-28  
 **Audit baseline master:** f9cb8442214e7c840076682c5ec10c2b9536924e  
 **Repository:** fsoeltonione/nextaction
@@ -474,11 +474,20 @@ Generic placeholders are not acceptable final keys:
 ~~~
 moment_1
 moment_2
+new_moment_1
 new
 temp
 thing
 foo
 ~~~
+
+This rule is enforced at all three boundaries:
+
+- Product Understanding UI validation blocks confirmation.
+- `POST /api/products/confirm` rejects invalid keys even if called outside the UI.
+- The `moments_semantic_key_guard` database trigger rejects placeholder keys even if a caller bypasses the UI/API and attempts direct mutation.
+
+The shared validator accepts semantic lower snake case keys (for example `invoice_created`) and rejects generic placeholders, malformed forms, and keys longer than 100 characters. The migration is additive and does not rewrite existing Moments; existing rows must be audited separately before claiming the full dataset is clean.
 
 ## 9. Conditional authentication contract
 
