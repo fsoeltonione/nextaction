@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { ArrowRight, Check, Copy, Globe, Plus, RefreshCw, ShieldCheck, Target, Trash2, Zap } from "lucide-react";
 import { normalizeProductUrl } from "@/lib/url";
+import { isGenericMomentKey, isMeaningfulMomentKey } from "@/lib/moment-key";
 
 type Capability = "make_money" | "reach_customers";
 type ActivationStep = "url" | "product_understanding" | "intent" | "capability_setup" | "verification" | "ready";
@@ -36,9 +37,6 @@ type ActivationState = {
 
 function slugifyMoment(label: string): string {
   return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80);
-}
-function isGenericMomentKey(key: string): boolean {
-  return /^(moment|new_moment|new)_[0-9]+$/.test(key) || ["new", "temp", "thing", "foo"].includes(key);
 }
 function normalizeDraftMoment(moment: { key?: string; id?: string; label?: string; description?: string }): MomentDraft {
   const label = typeof moment.label === "string" ? moment.label.trim() : "";
@@ -243,8 +241,11 @@ function OnboardingContent() {
   async function confirmProduct() {
     if (!draft || saving) return;
     const keys = draft.moments.map((moment) => moment.key.trim());
-    const invalid = !draft.name.trim() || draft.moments.length < 1 || draft.moments.length > 20 || draft.moments.some((moment) => !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(moment.key.trim()) || !moment.label.trim()) || new Set(keys).size !== keys.length;
-    if (invalid) { setError("Every Moment needs a meaningful lower_snake_case key and a label. Duplicate keys are not allowed."); return; }
+    const invalid = !draft.name.trim() || draft.moments.length < 1 || draft.moments.length > 20 || draft.moments.some((moment) => !isMeaningfulMomentKey(moment.key) || !moment.label.trim()) || new Set(keys).size !== keys.length;
+    if (invalid) {
+      setError("Each Moment needs a meaningful lower_snake_case key and label. Generic placeholders (such as moment_1, new, temp, or foo) and duplicate keys are not allowed.");
+      return;
+    }
     setSaving(true); setError(null); savePending(draft.url, draft);
     try {
       const response = await fetch("/api/products/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: selectedWorkspaceId, url: draft.url, name: draft.name, description: draft.description, moments: draft.moments.map((moment) => ({ key: moment.key.trim(), label: moment.label.trim(), description: moment.description.trim() })) }) });
