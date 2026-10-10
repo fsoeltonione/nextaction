@@ -81,4 +81,4 @@ The release gate uses a dedicated production runtime smoke after deployment. It 
 
 Production smoke also calls `/api/analyze` against `https://example.com` to verify the deployed scanner/provider path.
 
-A separate Cloudflare production audit verifies that the active Worker deployment exists, has a valid 100% traffic allocation, and reports the configured Worker domains. Set `CLOUDFLARE_EXPECTED_HOSTNAME` in the production context to make the release gate assert a specific custom hostname.
+A separate read-only Cloudflare production audit verifies that the active Worker deployment exists, has a valid 100% traffic allocation, and responds from its expected hostname. By default, the release gate checks the deployed production `workers.dev` hostname `nextaction.fsoeltoni-one.workers.dev` using `/api/health`. Set the repository variable `CLOUDFLARE_EXPECTED_HOSTNAME` to a custom hostname to verify its live health endpoint and its Cloudflare Worker Domain mapping.
