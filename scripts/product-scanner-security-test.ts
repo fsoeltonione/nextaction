@@ -267,32 +267,32 @@ test("scanner enforces fetch timeout", async () => {
   );
 });
 
-test("scanner enforces streaming response byte limit", async () => {
+test("scanner truncates oversized streaming responses at the byte limit", async () => {
+  const prefix = new TextEncoder().encode(
+    "<!doctype html><html><head><title>Bounded Product</title><meta name=\"description\" content=\"A bounded test page.\"></head><body>",
+  );
+  const remaining = PRODUCT_SCANNER_LIMITS.maxResponseBytes - prefix.byteLength;
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
-      controller.enqueue(
-        new Uint8Array(PRODUCT_SCANNER_LIMITS.maxResponseBytes),
-      );
-      controller.enqueue(new Uint8Array(1));
+      controller.enqueue(prefix);
+      controller.enqueue(new Uint8Array(remaining + 1));
       controller.close();
     },
   });
 
-  await assert.rejects(
-    () =>
-      scanProductUrl(
-        "https://example.com",
-        async () =>
-          new Response(body, {
-            status: 200,
-            headers: { "content-type": "text/html" },
-          }),
-        publicAddresses,
-      ),
-    (error: unknown) =>
-      error instanceof ProductScannerError &&
-      error.code === "response_too_large",
+  const result = await scanProductUrl(
+    "https://example.com",
+    async () =>
+      new Response(body, {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    publicAddresses,
   );
+
+  assert.equal(result.title, "Bounded Product");
+  assert.equal(result.description, "A bounded test page.");
+  assert.ok(result.text.length <= PRODUCT_SCANNER_LIMITS.maxTextChars);
 });
 
 test("scanner enforces content type and response size", async () => {
@@ -312,24 +312,30 @@ test("scanner enforces content type and response size", async () => {
       error.code === "unsupported_content_type",
   );
 
-  await assert.rejects(
-    () =>
-      scanProductUrl(
-        "https://example.com",
-        async () =>
-          new Response("data", {
-            status: 200,
-            headers: {
-              "content-type": "text/html",
-              "content-length": String(PRODUCT_SCANNER_LIMITS.maxResponseBytes + 1),
-            },
-          }),
-        publicAddresses,
-      ),
-    (error: unknown) =>
-      error instanceof ProductScannerError &&
-      error.code === "response_too_large",
+  const oversizedHtml = [
+    "<!doctype html><html><head><title>Large Advertised Page</title>",
+    '<meta name="description" content="This page can be safely sampled.">',
+    "</head><body>",
+    "x".repeat(PRODUCT_SCANNER_LIMITS.maxResponseBytes),
+    "</body></html>",
+  ].join("");
+
+  const result = await scanProductUrl(
+    "https://example.com",
+    async () =>
+      new Response(oversizedHtml, {
+        status: 200,
+        headers: {
+          "content-type": "text/html",
+          "content-length": String(PRODUCT_SCANNER_LIMITS.maxResponseBytes + 1),
+        },
+      }),
+    publicAddresses,
   );
+
+  assert.equal(result.title, "Large Advertised Page");
+  assert.equal(result.description, "This page can be safely sampled.");
+  assert.ok(result.text.length <= PRODUCT_SCANNER_LIMITS.maxTextChars);
 });
 
 test("scanner rejects redirect targets containing credentials", async () => {
