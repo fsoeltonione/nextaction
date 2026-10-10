@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "vite.config.mjs",
+    // Vendored upstream security backport is validated by its own regression suite.
+    "vendor/braces/**",
   ]),
 ]);
 
