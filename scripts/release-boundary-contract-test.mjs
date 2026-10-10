@@ -155,24 +155,24 @@ assert.match(
 );
 
 const stagingAcceptance = jobBlock(releaseWorkflow, "authenticated_staging_acceptance");
-assert.match(stagingAcceptance, /needs:[\\s\\S]*deploy_staging/);
-assert.match(stagingAcceptance, /needs:[\\s\\S]*h3_1_staging_runtime_smoke/);
+assert.match(stagingAcceptance, /needs:[\s\S]*deploy_staging/);
+assert.match(stagingAcceptance, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
 assert.match(stagingAcceptance, /STAGING_SUPABASE_SECRET_KEY/);
-assert.match(stagingAcceptance, /playwright@1\\.64\\.0/);
-assert.match(stagingAcceptance, /node scripts\\/staging-authenticated-acceptance\\.mjs/);
-assert.match(stagingAcceptanceScript, /auth\\.admin\\.createUser/);
-assert.match(stagingAcceptanceScript, /auth\\.admin\\.deleteUser/);
-assert.match(stagingAcceptanceScript, /integration\\/verify/);
+assert.match(stagingAcceptance, /playwright@1\.64\.0/);
+assert.match(stagingAcceptance, /node scripts\/staging-authenticated-acceptance\.mjs/);
+assert.match(stagingAcceptanceScript, /auth\.admin\.createUser/);
+assert.match(stagingAcceptanceScript, /auth\.admin\.deleteUser/);
+assert.match(stagingAcceptanceScript, /\/v1\/connection\/verify/);
 assert.match(stagingAcceptanceScript, /You are ready/);
 assert.doesNotMatch(
   stagingAcceptanceScript,
-  /console\\.log\\([^\\n]*integrationToken/,
+  /console\.log\([^\n]*integrationToken/,
   "the staging acceptance runner must never log integration credentials",
 );
 
 const holdProduction = jobBlock(releaseWorkflow, "hold_production");
-assert.match(holdProduction, /environment:\\s*production/);
-assert.match(holdProduction, /needs:[\\s\\S]*authenticated_staging_acceptance/);
+assert.match(holdProduction, /environment:\s*production/);
+assert.match(holdProduction, /needs:[\s\S]*authenticated_staging_acceptance/);
 assert.match(holdProduction, /needs:[\s\S]*staging_smoke/);
 assert.match(holdProduction, /needs:[\s\S]*h3_1_staging_release_proof/);
 assert.match(holdProduction, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
