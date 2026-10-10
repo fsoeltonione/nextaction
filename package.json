@@ -17,6 +17,7 @@
     "test:analysis-provider": "node --experimental-strip-types --test scripts/analysis-provider-response-test.ts",
     "production:smoke": "node scripts/production-smoke.mjs",
     "cloudflare:production-audit": "node scripts/cloudflare-production-audit.mjs",
+    "test:cloudflare-production-audit-contract": "node scripts/cloudflare-production-audit-contract-test.mjs",
     "test:analysis-output": "node --experimental-strip-types --test scripts/analysis-output-test.ts",
     "test:analysis-provider-content": "node --experimental-strip-types --test scripts/analysis-provider-content-test.ts",
     "test:stage16-activation": "node scripts/stage16-activation-contract-test.mjs",

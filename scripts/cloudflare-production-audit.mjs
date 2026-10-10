@@ -31,8 +31,24 @@ async function cloudflareRequest(path) {
   }
 
   if (!response.ok || body?.success !== true) {
+    const apiErrors = Array.isArray(body?.errors)
+      ? body.errors
+          .map((error) => {
+            const code =
+              typeof error?.code === "number" || typeof error?.code === "string"
+                ? String(error.code)
+                : "unknown";
+            const message =
+              typeof error?.message === "string"
+                ? error.message
+                : "Unknown Cloudflare API error";
+            return `${code}: ${message}`;
+          })
+          .join("; ")
+      : "";
+    const details = apiErrors ? `: ${apiErrors}` : "";
     throw new Error(
-      `Cloudflare API failed for ${path} (HTTP ${response.status})`,
+      `Cloudflare API failed for ${path} (HTTP ${response.status})${details}`,
     );
   }
 
@@ -114,26 +130,36 @@ if (!latestVersions.some((version) => version.id === latestVersionId)) {
   throw new Error("Latest active deployment version is not present in the Worker version list.");
 }
 
-const domainParams = new URLSearchParams({
-  service: workerName,
-  environment,
-  per_page: "100",
-});
-
-const domains = await cloudflareRequest(
-  `/workers/domains?${domainParams.toString()}`,
-);
-
+// Domain listing is only a required check when a specific hostname is configured.
+// Without that input, the API call adds no pass/fail assertion and can introduce an
+// unnecessary account-scope permission dependency into the production release gate.
+let domains = [];
 if (expectedHostname) {
-  const matching = Array.isArray(domains)
-    ? domains.filter((domain) => domain.hostname === expectedHostname)
-    : [];
+  const domainParams = new URLSearchParams({
+    service: workerName,
+    environment,
+    hostname: expectedHostname,
+    per_page: "100",
+  });
+
+  const domainResponse = await cloudflareRequest(
+    `/workers/domains?${domainParams.toString()}`,
+  );
+  domains = Array.isArray(domainResponse) ? domainResponse : [];
+
+  const matching = domains.filter(
+    (domain) => domain.hostname === expectedHostname,
+  );
 
   if (matching.length === 0) {
     throw new Error(
       `Expected Cloudflare Worker hostname was not found: ${expectedHostname}`,
     );
   }
+} else {
+  console.log(
+    "CLOUDFLARE_EXPECTED_HOSTNAME is not set; skipping optional Worker Domains API query.",
+  );
 }
 
 console.log(
@@ -147,13 +173,11 @@ console.log(
         version_id: version.version_id,
         percentage: version.percentage,
       })),
-      worker_domains: Array.isArray(domains)
-        ? domains.map((domain) => ({
-            hostname: domain.hostname,
-            environment: domain.environment,
-            service: domain.service,
-          }))
-        : [],
+      worker_domains: domains.map((domain) => ({
+        hostname: domain.hostname,
+        environment: domain.environment,
+        service: domain.service,
+      })),
       secret_bindings_checked: [
         "SUPABASE_SECRET_KEY",
         "ANALYSIS_API_KEY",

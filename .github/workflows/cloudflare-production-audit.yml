@@ -1,0 +1,40 @@
+name: Cloudflare Production Audit (Read-Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production-audit-readonly
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Audit active production Worker (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ENVIRONMENT: production
+      CLOUDFLARE_EXPECTED_HOSTNAME: ${{ vars.CLOUDFLARE_EXPECTED_HOSTNAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate audit inputs
+        run: bash scripts/require-env.sh CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
+
+      - name: Audit active production Worker
+        run: npm run cloudflare:production-audit
