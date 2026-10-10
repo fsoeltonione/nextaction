@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 
@@ -192,6 +193,10 @@ const stagingSupabase = createClient(
 );
 
 const EVENT_PROCESSING_TIMEOUT_MS = 90_000;
+const ECONOMIC_SETTLEMENT_TIMEOUT_MS = 20_000;
+const CLICK_REPLAY_CONCURRENCY = 6;
+const SETTLEMENT_REPLAY_CONCURRENCY = 4;
+let smokeIntegrationId = null;
 
 async function waitForEventProcessing(
   eventId,
@@ -219,6 +224,7 @@ async function waitForEventProcessing(
   if (typeof integrationId !== "string" || integrationId.length === 0) {
     throw new Error("Staging smoke integration resolution returned no integration id.");
   }
+  smokeIntegrationId = integrationId;
 
   const startedAt = Date.now();
   let lastSnapshot = null;
@@ -257,6 +263,85 @@ async function waitForEventProcessing(
   );
 }
 
+async function readEconomicSnapshot(eventId) {
+  assert.ok(smokeIntegrationId, "Staging smoke integration id was not resolved.");
+  const { data, error } = await stagingSupabase.rpc(
+    "production_smoke_fixture_verify",
+    {
+      p_integration_id: smokeIntegrationId,
+      p_event_id: eventId,
+    },
+  );
+  if (error) {
+    throw new Error(`Unable to verify staging economic state: ${error.message}`);
+  }
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function waitForEconomicSettlement(eventId, timeoutMs = ECONOMIC_SETTLEMENT_TIMEOUT_MS) {
+  const startedAt = Date.now();
+  let lastSnapshot = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    lastSnapshot = await readEconomicSnapshot(eventId);
+    if (
+      lastSnapshot?.event_found === true &&
+      lastSnapshot?.occurrence_found === true &&
+      lastSnapshot?.queue_messages_for_event === 0 &&
+      lastSnapshot?.decision_count === 1 &&
+      lastSnapshot?.delivery_count === 1 &&
+      lastSnapshot?.click_count === 1 &&
+      lastSnapshot?.qualified_click_count === 1 &&
+      lastSnapshot?.settlement_count === 1 &&
+      lastSnapshot?.financial_entry_count === 3
+    ) {
+      return lastSnapshot;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(
+    `Timed out waiting for an exact economic settlement. Last state: ${JSON.stringify(lastSnapshot)}`,
+  );
+}
+
+function assertEconomicSettlement(snapshot) {
+  assert.equal(snapshot.event_found, true);
+  assert.equal(snapshot.occurrence_found, true);
+  assert.equal(snapshot.queue_messages_for_event, 0);
+  assert.equal(snapshot.decision_count, 1);
+  assert.equal(snapshot.delivery_count, 1);
+  assert.equal(snapshot.click_count, 1);
+  assert.equal(snapshot.qualified_click_count, 1);
+  assert.equal(snapshot.settlement_count, 1);
+  assert.equal(snapshot.financial_entry_count, 3);
+  assert.equal(snapshot.settlement_charge_cents, 100);
+  assert.equal(snapshot.publisher_share_cents, 75);
+  assert.equal(snapshot.platform_share_cents, 25);
+  assert.equal(snapshot.currency, "USD");
+  assert.equal(snapshot.financial_debit_cents, 100);
+  assert.equal(snapshot.financial_credit_cents, 100);
+  assert.equal(snapshot.credit_consumption_entry_count, 1);
+  assert.ok(snapshot.credit_available_units >= 0);
+}
+
+function economicState(snapshot) {
+  return {
+    decision_count: snapshot.decision_count,
+    delivery_count: snapshot.delivery_count,
+    click_count: snapshot.click_count,
+    qualified_click_count: snapshot.qualified_click_count,
+    settlement_count: snapshot.settlement_count,
+    financial_entry_count: snapshot.financial_entry_count,
+    settlement_charge_cents: snapshot.settlement_charge_cents,
+    publisher_share_cents: snapshot.publisher_share_cents,
+    platform_share_cents: snapshot.platform_share_cents,
+    currency: snapshot.currency,
+    financial_debit_cents: snapshot.financial_debit_cents,
+    financial_credit_cents: snapshot.financial_credit_cents,
+    credit_consumption_entry_count: snapshot.credit_consumption_entry_count,
+    credit_available_units: snapshot.credit_available_units,
+  };
+}
+
 await waitForEventProcessing(trackBodyJson.event_id);
 console.log("Event → Moment processing smoke: OK");
 
@@ -289,39 +374,83 @@ if (typeof deliveryToken !== "string" || deliveryToken.length < 20) {
 console.log("Decision → Delivery smoke: OK");
 
 const clickPath = `/v1/click/${encodeURIComponent(deliveryToken)}`;
-const first = await request(clickPath);
-if (first.status !== 302) {
-  console.error(`First click smoke expected HTTP 302, got ${first.status}`);
-  process.exit(1);
-}
 
-const location = first.headers.get("location");
-if (!location) {
-  console.error("First click smoke returned no Location header.");
-  process.exit(1);
-}
-
-const destination = new URL(location);
-if (destination.protocol !== "http:" && destination.protocol !== "https:") {
-  console.error("First click smoke returned a non-HTTP destination.");
-  process.exit(1);
-}
-
-const replay = await request(clickPath);
-if (replay.status !== 302) {
-  console.error(`Replay click smoke expected HTTP 302, got ${replay.status}`);
-  process.exit(1);
-}
-
-const replayLocation = replay.headers.get("location");
-if (replayLocation !== location) {
-  console.error("Replay click smoke changed the redirect destination.");
-  process.exit(1);
-}
-
-console.log(
-  "Click → Qualified Click → Settlement + replay smoke: OK",
+// Race several requests against the same first Delivery. The public runtime
+// must collapse them into one Click, one Qualified Click, and one Settlement.
+const concurrentClickResponses = await Promise.all(
+  Array.from({ length: CLICK_REPLAY_CONCURRENCY }, () => request(clickPath)),
 );
+for (const response of concurrentClickResponses) {
+  assert.equal(
+    response.status,
+    302,
+    `Concurrent Click request expected HTTP 302, got ${response.status}`,
+  );
+}
+const locations = concurrentClickResponses.map((response) =>
+  response.headers.get("location"),
+);
+assert.ok(locations[0], "Concurrent Click requests returned no redirect destination.");
+assert.ok(
+  locations.every((candidate) => candidate === locations[0]),
+  "Concurrent Click/replay requests changed the trusted redirect destination.",
+);
+const location = locations[0];
+const destination = new URL(location);
+assert.ok(
+  destination.protocol === "http:" || destination.protocol === "https:",
+  "Click returned a non-HTTP(S) destination.",
+);
+
+const settledSnapshot = await waitForEconomicSettlement(trackBodyJson.event_id);
+assertEconomicSettlement(settledSnapshot);
+
+// Hit the service-only combined runtime with several concurrent replays to
+// prove the database returns the same Click/Qualified Click/Settlement IDs.
+const deliveryTokenHash = crypto
+  .createHash("sha256")
+  .update(deliveryToken)
+  .digest("hex");
+const settlementReplays = await Promise.all(
+  Array.from({ length: SETTLEMENT_REPLAY_CONCURRENCY }, async () => {
+    const { data, error } = await stagingSupabase.rpc(
+      "runtime_click_qualify_and_settle",
+      { p_delivery_token_hash: deliveryTokenHash },
+    );
+    if (error) throw new Error(`Settlement replay RPC failed: ${error.message}`);
+    return Array.isArray(data) ? data[0] : data;
+  }),
+);
+const expectedClickId = settlementReplays[0]?.result_click_id;
+const expectedQualifiedClickId = settlementReplays[0]?.result_qualified_click_id;
+const expectedSettlementId = settlementReplays[0]?.result_settlement_id;
+assert.ok(expectedClickId);
+assert.ok(expectedQualifiedClickId);
+assert.ok(expectedSettlementId);
+for (const replayResult of settlementReplays) {
+  assert.equal(replayResult?.result_outcome, "replayed");
+  assert.equal(replayResult?.result_qualification_status, "qualified");
+  assert.equal(replayResult?.result_settlement_outcome, "replayed");
+  assert.equal(replayResult?.result_click_id, expectedClickId);
+  assert.equal(replayResult?.result_qualified_click_id, expectedQualifiedClickId);
+  assert.equal(replayResult?.result_settlement_id, expectedSettlementId);
+  assert.equal(replayResult?.result_charge_cents, 100);
+  assert.equal(replayResult?.result_publisher_share_cents, 75);
+  assert.equal(replayResult?.result_platform_share_cents, 25);
+  assert.equal(replayResult?.result_currency, "USD");
+}
+
+const afterReplaySnapshot = await readEconomicSnapshot(trackBodyJson.event_id);
+assertEconomicSettlement(afterReplaySnapshot);
+assert.deepEqual(
+  economicState(afterReplaySnapshot),
+  economicState(settledSnapshot),
+  "Settlement replay changed ledger totals or advertiser capacity.",
+);
+
+console.log("Concurrent Event replay: OK");
+console.log("Concurrent Click → Qualified Click → Settlement idempotency: OK");
+console.log("Settlement IDs stable across replay and no duplicate economic entries: OK");
 
 if (expectedEnvironment === "staging") {
   const analyzeTarget =

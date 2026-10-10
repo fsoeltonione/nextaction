@@ -86,6 +86,9 @@ async function verifyFixture(integrationId, eventId) {
 // Keep one full scheduler interval plus margin so the smoke proves the
 // production async path rather than racing the cron cadence.
 const EVENT_PROCESSING_TIMEOUT_MS = 90_000;
+const ECONOMIC_SETTLEMENT_TIMEOUT_MS = 20_000;
+const CLICK_REPLAY_CONCURRENCY = 6;
+const SETTLEMENT_REPLAY_CONCURRENCY = 4;
 
 async function waitForEventProcessing(
   integrationId,
@@ -107,19 +110,71 @@ async function waitForEventProcessing(
   throw new Error("Timed out waiting for Event → Moment processing.");
 }
 
-async function waitForSettlement(integrationId, eventId, timeoutMs = 15000) {
+async function waitForSettlement(integrationId, eventId, timeoutMs = ECONOMIC_SETTLEMENT_TIMEOUT_MS) {
   const startedAt = Date.now();
+  let lastSnapshot = null;
   while (Date.now() - startedAt < timeoutMs) {
-    const snapshot = await verifyFixture(integrationId, eventId);
+    lastSnapshot = await verifyFixture(integrationId, eventId);
     if (
-      snapshot?.settlement_count === 1 &&
-      snapshot?.financial_entry_count === 3
+      lastSnapshot?.event_found === true &&
+      lastSnapshot?.occurrence_found === true &&
+      lastSnapshot?.queue_messages_for_event === 0 &&
+      lastSnapshot?.decision_count === 1 &&
+      lastSnapshot?.delivery_count === 1 &&
+      lastSnapshot?.click_count === 1 &&
+      lastSnapshot?.qualified_click_count === 1 &&
+      lastSnapshot?.settlement_count === 1 &&
+      lastSnapshot?.financial_entry_count === 3
     ) {
-      return snapshot;
+      return lastSnapshot;
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error("Timed out waiting for settlement verification.");
+  throw new Error(`Timed out waiting for exact settlement invariants: ${JSON.stringify(lastSnapshot)}`);
+}
+
+function assertEconomicSettlement(snapshot) {
+  if (
+    snapshot?.event_found !== true ||
+    snapshot?.occurrence_found !== true ||
+    snapshot?.queue_messages_for_event !== 0 ||
+    snapshot?.decision_count !== 1 ||
+    snapshot?.delivery_count !== 1 ||
+    snapshot?.click_count !== 1 ||
+    snapshot?.qualified_click_count !== 1 ||
+    snapshot?.settlement_count !== 1 ||
+    snapshot?.financial_entry_count !== 3 ||
+    snapshot?.settlement_charge_cents !== 100 ||
+    snapshot?.publisher_share_cents !== 75 ||
+    snapshot?.platform_share_cents !== 25 ||
+    snapshot?.currency !== "USD" ||
+    snapshot?.financial_debit_cents !== 100 ||
+    snapshot?.financial_credit_cents !== 100 ||
+    snapshot?.credit_consumption_entry_count !== 1 ||
+    typeof snapshot?.credit_available_units !== "number" ||
+    snapshot.credit_available_units < 0
+  ) {
+    throw new Error(`Economic settlement invariants failed: ${JSON.stringify(snapshot)}`);
+  }
+}
+
+function economicState(snapshot) {
+  return {
+    decision_count: snapshot.decision_count,
+    delivery_count: snapshot.delivery_count,
+    click_count: snapshot.click_count,
+    qualified_click_count: snapshot.qualified_click_count,
+    settlement_count: snapshot.settlement_count,
+    financial_entry_count: snapshot.financial_entry_count,
+    settlement_charge_cents: snapshot.settlement_charge_cents,
+    publisher_share_cents: snapshot.publisher_share_cents,
+    platform_share_cents: snapshot.platform_share_cents,
+    currency: snapshot.currency,
+    financial_debit_cents: snapshot.financial_debit_cents,
+    financial_credit_cents: snapshot.financial_credit_cents,
+    credit_consumption_entry_count: snapshot.credit_consumption_entry_count,
+    credit_available_units: snapshot.credit_available_units,
+  };
 }
 try {
   const health = await appRequest("/api/health");
@@ -334,65 +389,85 @@ try {
   console.log("Decision → Delivery HTTP smoke: OK");
 
   const clickPath = `/v1/click/${encodeURIComponent(deliveryTokenFromOffer)}`;
-  const clickFirst = await appRequest(clickPath);
-  if (clickFirst.status !== 302) {
-    throw new Error(`Click first expected HTTP 302, got ${clickFirst.status}`);
-  }
 
-  const firstLocation = clickFirst.headers.get("location");
-  if (!firstLocation) {
-    throw new Error("First click did not return a Location header.");
+  // Exercise first-click/replay races through the real HTTP endpoint. Every
+  // navigation must redirect to the same trusted destination.
+  const concurrentClickResponses = await Promise.all(
+    Array.from({ length: CLICK_REPLAY_CONCURRENCY }, () => appRequest(clickPath)),
+  );
+  for (const response of concurrentClickResponses) {
+    if (response.status !== 302) {
+      throw new Error(`Concurrent Click expected HTTP 302, got ${response.status}`);
+    }
+  }
+  const locations = concurrentClickResponses.map((response) => response.headers.get("location"));
+  const firstLocation = locations[0];
+  if (!firstLocation || !locations.every((candidate) => candidate === firstLocation)) {
+    throw new Error("Concurrent Click/replay requests changed the redirect destination.");
   }
   const destination = new URL(firstLocation);
   if (destination.protocol !== "http:" && destination.protocol !== "https:") {
-    throw new Error("First click returned a non-HTTP destination.");
+    throw new Error("Click returned a non-HTTP destination.");
   }
 
   const settlement = await waitForSettlement(
     fixture.result_integration_id,
     trackBodyJson.event_id,
   );
-  if (
-    settlement.settlement_count !== 1 ||
-    settlement.financial_entry_count !== 3 ||
-    settlement.settlement_charge_cents !== 100 ||
-    settlement.publisher_share_cents !== 75 ||
-    settlement.platform_share_cents !== 25 ||
-    settlement.currency !== "USD" ||
-    settlement.financial_debit_cents !== 100 ||
-    settlement.financial_credit_cents !== 100 ||
-    settlement.credit_consumption_entry_count !== 1 ||
-    settlement.decision_count !== 1 ||
-    settlement.delivery_count !== 1 ||
-    settlement.click_count !== 1 ||
-    settlement.qualified_click_count !== 1 ||
-    settlement.credit_available_units < 0
-  ) {
-    throw new Error("Production economic settlement invariants failed.");
-  }
+  assertEconomicSettlement(settlement);
 
-  const clickReplay = await appRequest(clickPath);
-  if (clickReplay.status !== 302) {
-    throw new Error(`Click replay expected HTTP 302, got ${clickReplay.status}`);
+  // Replay the exact token directly through the service-only combined database
+  // boundary and prove every replay returns the same Click/QC/Settlement IDs.
+  const deliveryTokenHashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(deliveryTokenFromOffer),
+  );
+  const deliveryTokenHash = Array.from(
+    new Uint8Array(deliveryTokenHashBuffer),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
+  const settlementReplays = await Promise.all(
+    Array.from({ length: SETTLEMENT_REPLAY_CONCURRENCY }, async () => {
+      const result = await rpc("runtime_click_qualify_and_settle", {
+        p_delivery_token_hash: deliveryTokenHash,
+      });
+      return Array.isArray(result) ? result[0] : result;
+    }),
+  );
+  const expectedClickId = settlementReplays[0]?.result_click_id;
+  const expectedQualifiedClickId = settlementReplays[0]?.result_qualified_click_id;
+  const expectedSettlementId = settlementReplays[0]?.result_settlement_id;
+  if (!expectedClickId || !expectedQualifiedClickId || !expectedSettlementId) {
+    throw new Error("Settlement replay did not return Click, Qualified Click, and Settlement identifiers.");
   }
-
-  const replayLocation = clickReplay.headers.get("location");
-  if (replayLocation !== firstLocation) {
-    throw new Error("Click replay changed the redirect destination.");
+  for (const replayResult of settlementReplays) {
+    if (
+      replayResult?.result_outcome !== "replayed" ||
+      replayResult?.result_qualification_status !== "qualified" ||
+      replayResult?.result_settlement_outcome !== "replayed" ||
+      replayResult?.result_click_id !== expectedClickId ||
+      replayResult?.result_qualified_click_id !== expectedQualifiedClickId ||
+      replayResult?.result_settlement_id !== expectedSettlementId ||
+      replayResult?.result_charge_cents !== 100 ||
+      replayResult?.result_publisher_share_cents !== 75 ||
+      replayResult?.result_platform_share_cents !== 25 ||
+      replayResult?.result_currency !== "USD"
+    ) {
+      throw new Error("Settlement replay was not idempotent or changed the financial contract.");
+    }
   }
 
   const replaySnapshot = await verifyFixture(
     fixture.result_integration_id,
     trackBodyJson.event_id,
   );
-  if (
-    replaySnapshot?.settlement_count !== 1 ||
-    replaySnapshot?.financial_entry_count !== 3
-  ) {
-    throw new Error("Click replay created duplicate economic entries.");
+  assertEconomicSettlement(replaySnapshot);
+  if (JSON.stringify(economicState(replaySnapshot)) !== JSON.stringify(economicState(settlement))) {
+    throw new Error("Settlement replay changed ledger totals or advertiser capacity.");
   }
 
-  console.log("Click → Qualified Click → Settlement + replay economic smoke: OK");
+  console.log("Concurrent Click → Qualified Click → Settlement idempotency: OK");
+  console.log("Settlement replay preserves IDs, balanced ledger, and advertiser capacity: OK");
   console.log(JSON.stringify({
     event_found: settlement.event_found,
     occurrence_found: settlement.occurrence_found,
@@ -406,6 +481,8 @@ try {
     settlement_charge_cents: settlement.settlement_charge_cents,
     publisher_share_cents: settlement.publisher_share_cents,
     platform_share_cents: settlement.platform_share_cents,
+    financial_debit_cents: settlement.financial_debit_cents,
+    financial_credit_cents: settlement.financial_credit_cents,
     credit_available_units: settlement.credit_available_units,
     credit_consumption_entry_count: settlement.credit_consumption_entry_count,
   }, null, 2));
