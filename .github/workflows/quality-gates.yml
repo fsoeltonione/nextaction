@@ -203,6 +203,9 @@ jobs:
       - name: Run Stage 16 activation contract checks
         run: npm run test:stage16-activation
 
+      - name: Test semantic Moment key boundary
+        run: npm run test:moment-key
+
   runtime_hardening_contract:
     name: Runtime hardening contract
     runs-on: ubuntu-24.04
