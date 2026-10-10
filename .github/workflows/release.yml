@@ -210,6 +210,41 @@ jobs:
       - name: Run H3.1 staging runtime smoke
         run: npm run test:h3-1-runtime-smoke
 
+  authenticated_staging_acceptance:
+    name: Authenticated staging acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - deploy_staging
+      - h3_1_staging_runtime_smoke
+    env:
+      STAGING_BASE_URL: ${{ needs.deploy_staging.outputs.staging_base_url }}
+      STAGING_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+      STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      STAGING_SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
+      GITHUB_RUN_ID: ${{ github.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install pinned browser automation tooling
+        run: npm install --no-save --package-lock=false playwright@1.64.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run authenticated staging acceptance
+        run: node scripts/staging-authenticated-acceptance.mjs
+
   hold_production:
     if: ${{ inputs.release_target == 'production' }}
     name: Hold for production approval
@@ -219,6 +254,7 @@ jobs:
       - staging_smoke
       - h3_1_staging_release_proof
       - h3_1_staging_runtime_smoke
+      - authenticated_staging_acceptance
     environment: production
     steps:
       - name: Confirm staging gates passed

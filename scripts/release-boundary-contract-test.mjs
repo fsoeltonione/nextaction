@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
     readFile(".github/workflows/quality-gates.yml", "utf8"),
@@ -9,6 +9,7 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
     readFile("scripts/require-env.sh", "utf8"),
     readFile("scripts/require-file.sh", "utf8"),
     readFile("scripts/staging-smoke.mjs", "utf8"),
+    readFile("scripts/staging-authenticated-acceptance.mjs", "utf8"),
   ]);
 
 assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
@@ -58,6 +59,7 @@ for (const job of [
   "staging_smoke",
   "h3_1_staging_release_proof",
   "h3_1_staging_runtime_smoke",
+  "authenticated_staging_acceptance",
   "hold_production",
   "deploy_production",
   "cloudflare_production_audit",
@@ -152,8 +154,25 @@ assert.match(
   /NEXTACTION_RELEASE_SHA:\s*\$\{\{\s*github\.sha\s*\}\}/,
 );
 
+const stagingAcceptance = jobBlock(releaseWorkflow, "authenticated_staging_acceptance");
+assert.match(stagingAcceptance, /needs:[\s\S]*deploy_staging/);
+assert.match(stagingAcceptance, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
+assert.match(stagingAcceptance, /STAGING_SUPABASE_SECRET_KEY/);
+assert.match(stagingAcceptance, /playwright@1\.64\.0/);
+assert.match(stagingAcceptance, /node scripts\/staging-authenticated-acceptance\.mjs/);
+assert.match(stagingAcceptanceScript, /auth\.admin\.createUser/);
+assert.match(stagingAcceptanceScript, /auth\.admin\.deleteUser/);
+assert.match(stagingAcceptanceScript, /\/v1\/connection\/verify/);
+assert.match(stagingAcceptanceScript, /You are ready/);
+assert.doesNotMatch(
+  stagingAcceptanceScript,
+  /console\.log\([^\n]*integrationToken/,
+  "the staging acceptance runner must never log integration credentials",
+);
+
 const holdProduction = jobBlock(releaseWorkflow, "hold_production");
 assert.match(holdProduction, /environment:\s*production/);
+assert.match(holdProduction, /needs:[\s\S]*authenticated_staging_acceptance/);
 assert.match(holdProduction, /needs:[\s\S]*staging_smoke/);
 assert.match(holdProduction, /needs:[\s\S]*h3_1_staging_release_proof/);
 assert.match(holdProduction, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
