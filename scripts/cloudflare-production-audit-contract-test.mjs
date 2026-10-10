@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [audit, releaseWorkflow] = await Promise.all([
+const [audit, releaseWorkflow, auditOnlyWorkflow] = await Promise.all([
   readFile("scripts/cloudflare-production-audit.mjs", "utf8"),
   readFile(".github/workflows/release.yml", "utf8"),
+  readFile(".github/workflows/cloudflare-production-audit.yml", "utf8"),
 ]);
 
 // Cloudflare's API error payload must be visible enough to diagnose permissions
@@ -40,5 +41,11 @@ assert.match(
   /CLOUDFLARE_EXPECTED_HOSTNAME:\s*\$\{\{\s*vars\.CLOUDFLARE_EXPECTED_HOSTNAME\s*\}\}/,
   "Release Gate must pass the optional expected hostname from a repository variable",
 );
+
+// A diagnostic rerun must not deploy production or pass through the approval gate.
+assert.match(auditOnlyWorkflow, /on:\s*\n\s+workflow_dispatch:/);
+assert.match(auditOnlyWorkflow, /npm run cloudflare:production-audit/);
+assert.doesNotMatch(auditOnlyWorkflow, /npm run deploy:cloudflare|deploy_production|hold_production/);
+assert.match(auditOnlyWorkflow, /CLOUDFLARE_API_TOKEN:\s*\$\{\{\s*secrets\.CLOUDFLARE_API_TOKEN\s*\}\}/);
 
 console.log("Cloudflare production audit contract: OK");
