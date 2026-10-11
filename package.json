@@ -24,6 +24,7 @@
     "test:stage16-activation": "node scripts/stage16-activation-contract-test.mjs",
     "test:moment-key": "node --experimental-strip-types --test scripts/moment-key-validation-test.ts",
     "test:release-boundary": "node scripts/release-boundary-contract-test.mjs",
+    "test:effective-cloudflare-config": "node --test scripts/effective-cloudflare-config-test.mjs",
     "test:runtime-hardening": "node scripts/runtime-hardening-contract-test.mjs",
     "test:h2-3-release-proof": "node scripts/h2-3-release-proof-contract-test.mjs",
     "production:release-proof": "node scripts/production-release-proof.mjs",
