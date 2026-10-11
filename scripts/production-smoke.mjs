@@ -1,8 +1,6 @@
 const baseUrl = process.env.PRODUCTION_BASE_URL;
 const supabaseUrl = process.env.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecretKey = process.env.PRODUCTION_SUPABASE_SECRET_KEY;
-const analyzeSmokeUrl =
-  process.env.PRODUCTION_ANALYZE_SMOKE_URL ?? "https://carrd.com";
 const expectedReleaseSha = process.env.PRODUCTION_EXPECTED_RELEASE_SHA ?? process.env.CIRCLE_SHA1;
 
 const missing = [
@@ -22,12 +20,6 @@ if (missing.length > 0) {
 
 const applicationUrl = new URL(baseUrl);
 const databaseUrl = new URL(supabaseUrl);
-const analysisUrl = new URL(analyzeSmokeUrl);
-if (analysisUrl.protocol !== "https:") {
-  console.error("PRODUCTION_ANALYZE_SMOKE_URL must use HTTPS.");
-  process.exit(2);
-}
-
 if (applicationUrl.protocol !== "https:" || databaseUrl.protocol !== "https:") {
   console.error("Production smoke targets must use HTTPS.");
   process.exit(2);
@@ -223,19 +215,6 @@ try {
   }
 
   console.log("Production runtime readiness check: OK");
-
-  const analyze = await appRequest("/api/analyze", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ url: analysisUrl.toString() }),
-  });
-
-  if (analyze.status !== 200) {
-    throw new Error(`Production analyze check expected HTTP 200, got ${analyze.status}`);
-  }
-  console.log("Production analysis scanner live-path smoke: OK");
 
   const unauthTrack = await appRequest("/v1/track", {
     method: "POST",

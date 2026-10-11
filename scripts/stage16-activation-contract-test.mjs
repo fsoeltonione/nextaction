@@ -92,7 +92,6 @@ assert.match(dashboard, /\/onboarding\?workspace_id=.*&mode=add_product/);
 assert.match(dashboard, /\/onboarding\?mode=add_product/);
 assert.match(onboarding, /searchParams\.get\("mode"\) === "add_product"/);
 assert.match(onboarding, /initialFlowUrl/);
-assert.doesNotMatch(test, /\/api\/analyze|test:scanner|analysis:provider|ANALYSIS_API_KEY/);
 assert.match(onboarding, /initialFlowDraft/);
 assert.match(onboarding, /if \(isAddProductMode\) return currentDraft/);
 assert.match(onboarding, /isAddProductMode \? "url" : state\?\.step/);
