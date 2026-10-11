@@ -24,14 +24,16 @@ The successful staging smoke in Release Gate #25 exercised the two known self-or
 
 ## Controlled runtime attempt
 
-A one-off request was sent to staging \`POST /api/analyze\` with:
+Three bounded staging probes were made against the public DNS rebinding test service; no production endpoint was called:
 
-\`\`\`text
-https://01010101.7f000001.rbndr.us/
-\`\`\`
+1. \`https://01010101.7f000001.rbndr.us/\` returned HTTP 503 \`dns_no_address\`. That name did not provide a usable DNS answer in that attempt.
+2. \`https://01010101.c0a80001.rbndr.us/\` returned HTTP 503 \`upstream_status\` once.
+3. Four sequential probes to \`https://01010101.c0a80001.rbndr.us/\` returned HTTP 400 \`non_public_address\` on every attempt. These responses show the application refused DNS answers classified as non-public before proceeding with a scan.
 
-The staging route returned HTTP 503 with \`dns_no_address\` and message “Product host did not resolve to a usable address.” The selected rebinding hostname did not provide a usable DNS answer during this attempt, so this was **inconclusive**, not a successful rebinding reproduction and not a security pass. A separate DNS-over-HTTPS check of a different \`rbndr.us\` hostname showed a private answer, but that answer was not used in a successful staging fetch and therefore is not proof of what the Worker connected to.
+Request IDs for the four fail-closed responses: \`b16170d5-1a1d-4b7e-83ef-73aac56f4830\`, \`7eb674f0-312b-4ac6-bf9c-0213b8f0354a\`, \`3c184285-de3c-40ec-a319-cbf838929fd2\`, \`d9a6a985-e58a-4086-8178-be4fe531c53e\`.
 
+This demonstrates that **observed private DNS answers are rejected** in the deployed staging runtime. It does not prove the DNS answer changes specifically between pre-validation and the underlying Fetch connection, and there is no private-side canary or platform connection trace showing which IP the Fetch request actually reached. The one \`upstream_status\` response is also not evidence of a private connection. Therefore this remains a useful bounded defense-in-depth result, but the DNS-rebinding race is still **inconclusive / not proven safe**.
+ 
 ## Cloudflare platform boundary
 
 The following official documentation matters:
