@@ -37,6 +37,39 @@ Comparisons below read each remote row’s stored \`supabase_migrations.schema_m
 
 “Comment-normalized” comparisons deliberately do not count as exact matches. SQL comments, statement order, and DDL effects must be reviewed before using that classification. Similarly, matching normalized text does not establish that a remote-only migration is obsolete or safe to omit.
 
+## Full remote-SQL-to-local-source comparison
+
+The 104 current remote history entries were each compared against **all 49 local SQL files**, not only the filename/name-derived candidate. The stored statement count and statement character length were re-queried after the comparison: 52 rows per project, and all statement counts and character lengths still match the original snapshot. This is a consistency check on the captured snapshot, not a schema repair and not an MD5 re-computation.
+
+| Classification | Rows | Interpretation |
+|---|---:|---|
+| \`EXACT_SOURCE_MATCH\` | 50 | Byte-for-byte SQL source match found somewhere in local migrations. Remote version/name still need separate review. |
+| \`WHITESPACE_NORMALIZED_MATCH_REVIEW\` | 12 | Match after normalizing whitespace outside quoted SQL strings; human review remains necessary. |
+| \`COMMENT_NORMALIZED_MATCH_REVIEW\` | 9 | Match after normalizing whitespace and removing SQL comments; review comments and intended source mapping. |
+| \`CONTENT_MISMATCH_REVIEW_REQUIRED\` | 25 | Name/version candidate exists but none of the 49 local files matches exactly or under the two normalization rules. |
+| \`REMOTE_ONLY_SQL_REVIEW_REQUIRED\` | 8 | No local candidate match was found; these cannot be marked obsolete or history-only by inference. |
+| **Total** | **104** | All 52 staging and 52 production history rows accounted for in the comparison output. |
+
+The source-coverage CSV lists every local file with matched staging/production history versions and candidates that need further review. Thirteen local files have no byte-exact match to any remote history statement (some may match only after whitespace/comment normalization):
+
+- \`20260926030000_stage_9_runtime_core.sql\`
+- \`20260926050000_stage_9_runtime_rate_limit_reconciliation.sql\`
+- \`20260928233000_stage_16_atomic_integration_credential_provisioning.sql\`
+- \`20260929000500_stage_16_private_credential_verification_boundary.sql\`
+- \`20260929010000_stage_16_read_only_control_plane.sql\`
+- \`20261003000000_stage_17_remediation.sql\`
+- \`20261003020000_stage_17_final_reconcile.sql\`
+- \`20261004010000_h2_1_runtime_failure_containment.sql\`
+- \`20261004020000_h2_2_recovery_operations.sql\`
+- \`20261004021000_h2_2_runtime_ops_hardening.sql\`
+- \`20261004030000_h2_3_release_reliability_proof.sql\`
+- \`20261011010000_stage_16_moment_key_semantics.sql\`
+- \`20261011020000_h4_1_unsettled_settlement_recovery.sql\`
+
+These status classes are **evidence for review, not a declaration of migration equivalence**. In particular, a normalized match does not authorize \`migration repair\`: effect order, DDL/function behavior, data backfills, remote version identity, duplicate/retry status and dependency ordering all need a reviewed decision.
+
+The review CSV contains one row per remote history record: [migration SQL content review](./2026-10-11-migration-sql-content-review.csv). The complementary inventory shows which local files have exact, whitespace-normalized, comment-normalized, or mismatched history candidates: [local migration source coverage](./2026-10-11-local-migration-source-coverage.csv).
+
 ## Read-only current-catalog comparison
 
 The audit compared objects in \`public\` and \`private\` on both projects. This is a catalog comparison, not proof that migration histories or all schemas/extensions are equivalent.
