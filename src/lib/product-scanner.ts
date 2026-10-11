@@ -281,6 +281,8 @@ type DnsRebindProbeTrace = {
   traceEvents: Array<Record<string, unknown>>;
 };
 
+// Deliberately constrain trace eligibility to the known public test server and loopback target.
+// This does not change scanner policy or enable trace output on production.
 const DNS_REBIND_PROBE_HOST =
   /^s-23b9cea5\.7f000001-([0-9]{6,20})-(fs|rd|rr|ma)-e\.d\.rebind\.it$/i;
 
