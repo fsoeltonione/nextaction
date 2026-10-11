@@ -235,9 +235,9 @@ assert.match(h41, /qualified_click_settlement_recovery/);
 assert.match(h41, /REVOKE ALL ON FUNCTION public\.runtime_operations_tick\(INTEGER, INTEGER, INTEGER\)[\s\S]*FROM PUBLIC, anon, authenticated/);
 assert.match(h41, /GRANT EXECUTE ON FUNCTION public\.runtime_operations_tick\(INTEGER, INTEGER, INTEGER\)[\s\S]*TO service_role/);
 
-// The five authenticated SECURITY DEFINER control-plane RPCs intentionally
-// remain user-callable, so protect their membership boundary with regression
-// assertions: they must derive a user identity and authorize workspace access.
+// Historical source migrations for the five activation RPCs must retain their
+// authentication and workspace-membership guards. H4.2 moves these guarded
+// implementations into private and exposes SECURITY INVOKER adapters only.
 const [activationSecurity, networkMomentSecurity, networkOfferSecurity, controlPlanePrivilegeMigration] = await Promise.all([
   readFile("supabase/migrations/20260928183000_stage_16_v2_workspace_scope_qualification.sql", "utf8"),
   readFile("supabase/migrations/20261004034037_h3_1_network_moment_model.sql", "utf8"),
@@ -267,8 +267,9 @@ for (const [sql, name] of scopedRpcMigrations) {
 }
 
 
-// Later hardening intentionally changes these workspace-scoped functions into
-// SECURITY DEFINER RPCs; keep that mode explicit and covered by membership tests.
+// Historical boundary migration explicitly raised the implementation privilege
+// for atomic writes. The final exposed wrappers are verified as SECURITY INVOKER
+// by the H4.2 migration contract below.
 assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.confirm_product_activation_v2[\s\S]*SECURITY DEFINER/);
 assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.set_workspace_capabilities_v2[\s\S]*SECURITY DEFINER/);
 assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.create_offer_activation_v2[\s\S]*SECURITY DEFINER/);
@@ -279,5 +280,34 @@ assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.create_offe
 assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.confirm_product_activation_v2[\s\S]*SECURITY DEFINER/);
 assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.set_workspace_capabilities_v2[\s\S]*SECURITY DEFINER/);
 assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.create_offer_activation_v2[\s\S]*SECURITY DEFINER/);
+
+
+// H4.2: authenticated activation RPCs keep stable public signatures, while the
+// SECURITY DEFINER implementation lives outside the exposed API schema.
+const h42Path = "supabase/migrations/20261011105000_h4_2_rpc_security_and_index_audit.sql";
+const h42 = await readFile(h42Path, "utf8");
+assert.match(h42, /GRANT USAGE ON SCHEMA private TO authenticated, service_role/);
+const h42RpcHelpers = [
+  ["confirm_product_activation_v2", "_activation_confirm_product_v2_impl", "UUID, TEXT, TEXT, TEXT, TEXT, JSONB"],
+  ["create_network_offer_activation_v1", "_activation_create_network_offer_v1_impl", "UUID, TEXT, TEXT, TEXT, TEXT, TEXT[]"],
+  ["create_offer_activation_v2", "_activation_create_offer_v2_impl", "UUID, TEXT, TEXT, TEXT, TEXT, UUID[]"],
+  ["set_moment_network_mapping_v1", "_activation_set_moment_network_mapping_v1_impl", "UUID, TEXT"],
+  ["set_workspace_capabilities_v2", "_activation_set_workspace_capabilities_v2_impl", "UUID, TEXT[]"],
+];
+for (const [name, helper, args] of h42RpcHelpers) {
+  assert.match(h42, new RegExp(`ALTER FUNCTION public\\.${name}\\([\\s\\S]*?\\)\\s*SET SCHEMA private`), `${name} is moved out of public`);
+  assert.match(h42, new RegExp(`ALTER FUNCTION private\\.${name}\\([\\s\\S]*?\\)\\s*RENAME TO ${helper}`), `${name} gets an internal implementation name`);
+  assert.match(h42, new RegExp(`ALTER FUNCTION private\\.${helper}\\(${args.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\console.log("runtime hardening contract: OK");")}\\)\\s*SET search_path = ''`), `${helper} pins an empty search_path`);
+  const wrapper = securityDefinerFunction(h42, name);
+  assert.match(wrapper, /SECURITY INVOKER/, `${name} public endpoint is invoker-mode`);
+  assert.match(wrapper, new RegExp(`private\\.${helper}`), `${name} delegates to its private implementation`);
+  assert.doesNotMatch(wrapper, /SECURITY DEFINER/, `${name} does not expose a definer wrapper`);
+  assert.match(h42, new RegExp(`REVOKE ALL ON FUNCTION public\\.${name}`));
+  assert.match(h42, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${name}[\\s\\S]*?TO authenticated, service_role`));
+  assert.match(h42, new RegExp(`REVOKE ALL ON FUNCTION private\\.${helper}`));
+  assert.match(h42, new RegExp(`GRANT EXECUTE ON FUNCTION private\\.${helper}[\\s\\S]*?TO authenticated, service_role`));
+}
+assert.match(h42, /DROP INDEX IF EXISTS private\\.moment_occurrences_event_id_idx/);
+assert.match(h42, /partial unique index on \\(event_id\\) WHERE event_id IS NOT NULL/i);
 
 console.log("runtime hardening contract: OK");
