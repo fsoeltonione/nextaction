@@ -297,7 +297,7 @@ const h42RpcHelpers = [
 for (const [name, helper, args] of h42RpcHelpers) {
   assert.match(h42, new RegExp(`ALTER FUNCTION public\\.${name}\\([\\s\\S]*?\\)\\s*SET SCHEMA private`), `${name} is moved out of public`);
   assert.match(h42, new RegExp(`ALTER FUNCTION private\\.${name}\\([\\s\\S]*?\\)\\s*RENAME TO ${helper}`), `${name} gets an internal implementation name`);
-  assert.match(h42, new RegExp(`ALTER FUNCTION private\\.${helper}\\(${args.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\console.log("runtime hardening contract: OK");")}\\)\\s*SET search_path = ''`), `${helper} pins an empty search_path`);
+  assert.match(h42, new RegExp(`ALTER FUNCTION private\\.${helper}\\([^)]*\\)\\s*SET search_path = ''`), `${helper} pins an empty search_path`);
   const wrapper = securityDefinerFunction(h42, name);
   assert.match(wrapper, /SECURITY INVOKER/, `${name} public endpoint is invoker-mode`);
   assert.match(wrapper, new RegExp(`private\\.${helper}`), `${name} delegates to its private implementation`);
@@ -307,7 +307,7 @@ for (const [name, helper, args] of h42RpcHelpers) {
   assert.match(h42, new RegExp(`REVOKE ALL ON FUNCTION private\\.${helper}`));
   assert.match(h42, new RegExp(`GRANT EXECUTE ON FUNCTION private\\.${helper}[\\s\\S]*?TO authenticated, service_role`));
 }
-assert.match(h42, /DROP INDEX IF EXISTS private\\.moment_occurrences_event_id_idx/);
-assert.match(h42, /partial unique index on \\(event_id\\) WHERE event_id IS NOT NULL/i);
+assert.match(h42, /DROP INDEX IF EXISTS private\.moment_occurrences_event_id_idx/);
+assert.match(h42, /partial unique index on \(event_id\) WHERE event_id IS NOT NULL/i);
 
 console.log("runtime hardening contract: OK");
