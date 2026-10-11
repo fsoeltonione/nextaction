@@ -12,6 +12,10 @@ export const PRODUCT_SCANNER_LIMITS = Object.freeze({
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const NO_DATA_DNS_CODES = new Set(["ENODATA", "ENOTFOUND"]);
+const BLOCKED_APP_HOSTNAMES = new Set([
+  "nextaction.fsoeltoni-one.workers.dev",
+  "nextaction-staging.fsoeltoni-one.workers.dev",
+]);
 
 export type ProductScanResult = {
   finalUrl: string;
@@ -74,11 +78,7 @@ function normalizeScannerUrl(input: string | URL): URL {
     );
   }
 
-  const blockedAppHosts = new Set([
-    "nextaction.fsoeltoni-one.workers.dev",
-    "nextaction-staging.fsoeltoni-one.workers.dev",
-  ]);
-  if (blockedAppHosts.has(hostname.toLowerCase().replace(/\\.$/, ""))) {
+  if (BLOCKED_APP_HOSTNAMES.has(hostname.toLowerCase().replace(/\\.$/, ""))) {
     throw new ProductScannerError(
       "self_origin_not_allowed",
       "NextAction cannot analyze its own application endpoint.",
