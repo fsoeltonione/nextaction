@@ -171,18 +171,6 @@ function validatePublicAddresses(
   }
 }
 
-async function resolvePublicAddresses(
-  hostname: string,
-  resolveAddresses: ResolveAddresses,
-): Promise<string[]> {
-  const addresses = await resolveAddresses(hostname);
-  // Fail closed: any private/reserved answer rejects this hostname immediately.
-  // Re-resolving after a blocked answer could let a rebinding domain pass on
-  // a later public answer, making the pre-fetch policy dependent on DNS timing.
-  validatePublicAddresses(addresses, "non_public_address");
-  return addresses;
-}
-
 async function readLimitedBody(
   response: Response,
   maxBytes: number,
@@ -282,6 +270,7 @@ type DnsFamilyResolver = (hostname: string) => Promise<string[]>;
 export type ScannerTraceContext = {
   requestId: string;
   environment: string;
+  traceEvents?: Array<Record<string, unknown>>;
 };
 
 type DnsRebindProbeTrace = {
@@ -289,6 +278,7 @@ type DnsRebindProbeTrace = {
   testId: string;
   strategy: string;
   hostname: string;
+  traceEvents: Array<Record<string, unknown>>;
 };
 
 const DNS_REBIND_PROBE_HOST =
@@ -299,6 +289,7 @@ function createDnsRebindProbeTrace(
   context?: ScannerTraceContext,
 ): DnsRebindProbeTrace | null {
   if (context?.environment.trim().toLowerCase() !== "staging") return null;
+  if (!context.traceEvents) return null;
   const match = hostname.toLowerCase().match(DNS_REBIND_PROBE_HOST);
   if (!match) return null;
   return {
@@ -306,6 +297,7 @@ function createDnsRebindProbeTrace(
     testId: match[1],
     strategy: match[2].toLowerCase(),
     hostname: hostname.toLowerCase(),
+    traceEvents: context.traceEvents,
   };
 }
 
@@ -349,19 +341,18 @@ function logDnsRebindProbe(
   fields: Record<string, unknown>,
 ): void {
   if (!trace) return;
-  console.log(
-    "[nextaction-dns-rebind-probe] " +
-      JSON.stringify({
-        event: "nextaction_dns_rebind_probe",
-        request_id: trace.requestId,
-        test_id: trace.testId,
-        strategy: trace.strategy,
-        hostname: trace.hostname,
-        phase,
-        timestamp: new Date().toISOString(),
-        ...fields,
-      }),
-  );
+  const event: Record<string, unknown> = {
+    event: "nextaction_dns_rebind_probe",
+    request_id: trace.requestId,
+    test_id: trace.testId,
+    strategy: trace.strategy,
+    hostname: trace.hostname,
+    phase,
+    timestamp: new Date().toISOString(),
+    ...fields,
+  };
+  trace.traceEvents.push(event);
+  console.log("[nextaction-dns-rebind-probe] " + JSON.stringify(event));
 }
 
 export async function scanProductUrl(
