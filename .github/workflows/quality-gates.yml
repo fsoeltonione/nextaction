@@ -49,11 +49,6 @@ jobs:
       - name: Test bounded JSON request bodies
         run: npm run test:http-body
 
-      - name: Test product scanner security and DNS probe trace
-        run: npm run test:scanner
-
-      - name: Test staging runtime fetch probe boundary
-        run: npm run test:dns-rebind-runtime-probe
 
       - name: Test runtime resource and required-gate boundaries
         run: npm run test:runtime-resource-contract
@@ -95,95 +90,6 @@ jobs:
 
       - name: Verify release boundary contract
         run: npm run test:release-boundary
-
-  product_scanner_security:
-    name: Product scanner security
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-      - release_boundary_contract
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run product scanner security suite
-        run: npm run test:scanner
-
-  analysis_provider_contract:
-    name: Analysis provider contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run analysis provider response contract tests
-        run: npm run test:analysis-provider
-
-  analysis_output_contract:
-    name: Analysis output contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run analysis output contract tests
-        run: npm run test:analysis-output
-
-  analysis_provider_content_contract:
-    name: Analysis provider content contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run analysis provider content contract tests
-        run: npm run test:analysis-provider-content
 
   stage16_activation_contract:
     name: Stage 16 activation contract
@@ -282,11 +188,7 @@ jobs:
     timeout-minutes: 15
     needs:
       - quality
-      - product_scanner_security
       - runtime_hardening_contract
-      - analysis_provider_contract
-      - analysis_output_contract
-      - analysis_provider_content_contract
       - stage16_activation_contract
     steps:
       - name: Checkout

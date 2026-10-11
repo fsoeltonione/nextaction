@@ -54,9 +54,6 @@ PRODUCTION_NEXT_PUBLIC_SUPABASE_URL
 PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 PRODUCTION_SUPABASE_SECRET_KEY
 
-ANALYSIS_API_KEY
-ANALYSIS_BASE_URL
-ANALYSIS_MODEL
 ```
 
 Required staging smoke variable:
@@ -67,7 +64,7 @@ STAGING_INTEGRATION_TOKEN
 
 The Stage 14 smoke uses the fixed fixture Moment key `stage14_smoke_moment`; it is intentionally not configurable through CircleCI context variables.
 
-Staging smoke also exercises `POST /api/analyze` through the deployed Worker. NextAction uses a provider-neutral analysis configuration contract. The current provider is Groq. Supply the Groq API key through `ANALYSIS_API_KEY`, use `https://api.groq.com/openai/v1` for `ANALYSIS_BASE_URL`, and set `ANALYSIS_MODEL` to a currently supported Groq chat model. The API key is stored as a Worker secret; the base URL and model are injected as Worker variables. The smoke uses `https://example.com` by default; set `STAGING_ANALYZE_SMOKE_URL` only when a different controlled public fixture is required.
+Product URLs are stored as publisher-provided identity/reference data only. The MVP does not crawl publisher websites or call an AI provider to derive product details or Moments. Publishers enter the product name, description, and semantic Moment keys manually; release smoke focuses on the core Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement runtime.
 
 Never commit Supabase secrets, Cloudflare API tokens, or `.env` files.
 
@@ -77,8 +74,6 @@ The release workflow is opt-in through the CircleCI `run_release_gate` pipeline 
 Stage 14 health verification uses a build-time target identity (NEXT_PUBLIC_APP_ENV). The smoke then exercises the real API path separately to prove runtime Supabase credentials and bindings.
 ## Production release verification
 
-The release gate uses a dedicated production runtime smoke after deployment. It exercises the live production Worker for health and product analysis, then runs a service-role-only transactional production runtime contract that creates an isolated publisher/advertiser fixture, executes Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement plus settlement replay, verifies the financial ledger and queue drain, and rolls back the entire database subtransaction before returning.
-
-Production smoke also calls `/api/analyze` against `https://example.com` to verify the deployed scanner/provider path.
+The release gate uses a dedicated production runtime smoke after deployment. It exercises the live production Worker for health, then runs a service-role-only transactional production runtime contract that creates an isolated publisher/advertiser fixture, executes Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement plus settlement replay, verifies the financial ledger and queue drain, and rolls back the entire database subtransaction before returning.
 
 A separate read-only Cloudflare production audit verifies that the active Worker deployment exists, has a valid 100% traffic allocation, and responds from its expected hostname. By default, the release gate checks the deployed production `workers.dev` hostname `nextaction.fsoeltoni-one.workers.dev` using `/api/health`. Set the repository variable `CLOUDFLARE_EXPECTED_HOSTNAME` to a custom hostname to verify its live health endpoint and its Cloudflare Worker Domain mapping.

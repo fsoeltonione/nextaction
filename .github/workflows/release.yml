@@ -40,39 +40,12 @@ jobs:
       - release_source_guard
     uses: ./.github/workflows/quality-gates.yml
 
-  analysis_provider_smoke:
-    name: Analysis provider smoke
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality_gates
-    env:
-      ANALYSIS_API_KEY: ${{ secrets.ANALYSIS_API_KEY }}
-      ANALYSIS_BASE_URL: ${{ secrets.ANALYSIS_BASE_URL }}
-      ANALYSIS_MODEL: ${{ secrets.ANALYSIS_MODEL }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Validate configured analysis provider
-        run: npm run analysis:provider-smoke
-
   deploy_staging:
     name: Deploy staging
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - quality_gates
-      - analysis_provider_smoke
     outputs:
       staging_base_url: ${{ steps.capture_url.outputs.staging_base_url }}
     env:
@@ -83,9 +56,6 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
-      ANALYSIS_API_KEY: ${{ secrets.ANALYSIS_API_KEY }}
-      ANALYSIS_BASE_URL: ${{ secrets.ANALYSIS_BASE_URL }}
-      ANALYSIS_MODEL: ${{ secrets.ANALYSIS_MODEL }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -101,7 +71,7 @@ jobs:
 
       - name: Validate staging secrets
         run: |
-          bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY             ANALYSIS_API_KEY             ANALYSIS_BASE_URL             ANALYSIS_MODEL
+          bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY
 
       - name: Deploy staging
         run: |
@@ -148,9 +118,6 @@ jobs:
 
       - name: Run staging smoke
         run: npm run staging:smoke
-
-      - name: Run staging scanner security smoke
-        run: npm run staging:scanner-security-smoke
 
   h3_1_staging_release_proof:
     name: H3.1 staging release proof
@@ -315,9 +282,6 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PRODUCTION_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       SUPABASE_SECRET_KEY: ${{ secrets.PRODUCTION_SUPABASE_SECRET_KEY }}
-      ANALYSIS_API_KEY: ${{ secrets.ANALYSIS_API_KEY }}
-      ANALYSIS_BASE_URL: ${{ secrets.ANALYSIS_BASE_URL }}
-      ANALYSIS_MODEL: ${{ secrets.ANALYSIS_MODEL }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -333,7 +297,7 @@ jobs:
 
       - name: Validate production secrets
         run: |
-          bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY             ANALYSIS_API_KEY             ANALYSIS_BASE_URL             ANALYSIS_MODEL
+          bash scripts/require-env.sh             CLOUDFLARE_API_TOKEN             CLOUDFLARE_ACCOUNT_ID             NEXT_PUBLIC_SUPABASE_URL             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY             SUPABASE_SECRET_KEY
 
       - name: Deploy production
         run: |
