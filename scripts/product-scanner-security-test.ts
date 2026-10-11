@@ -501,6 +501,7 @@ test("staging DNS rebinding probe trace correlates preflight, fetch cause, and p
           {
             requestId: "req-dns-rebind-test-1",
             environment: "staging",
+            traceEvents: [],
           },
         ),
       (error: unknown) =>
@@ -569,6 +570,7 @@ test("DNS rebinding probe tracing is disabled outside staging", async () => {
           {
             requestId: "req-dns-rebind-test-prod",
             environment: "production",
+            traceEvents: [],
           },
         ),
       (error: unknown) =>
