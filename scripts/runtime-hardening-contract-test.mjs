@@ -1,4 +1,8 @@
-import assert from "node:assert/strict";
+im
+assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\\.confirm_product_activation_v2[\\s\\S]*SECURITY DEFINER/);
+assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\\.set_workspace_capabilities_v2[\\s\\S]*SECURITY DEFINER/);
+assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\\.create_offer_activation_v2[\\s\\S]*SECURITY DEFINER/);
+port assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const [clickRoute, stage16, stage17, runtimeHttp, readyRoute, staging, production, qualityWorkflow, qualityGatesWorkflow, releaseWorkflow, packageJson] = await Promise.all([
@@ -238,7 +242,7 @@ assert.match(h41, /GRANT EXECUTE ON FUNCTION public\.runtime_operations_tick\(IN
 // The five authenticated SECURITY DEFINER control-plane RPCs intentionally
 // remain user-callable, so protect their membership boundary with regression
 // assertions: they must derive a user identity and authorize workspace access.
-const [activationSecurity, networkMomentSecurity, networkOfferSecurity] = await Promise.all([
+const [activationSecurity, networkMomentSecurity, networkOfferSecurity, controlPlanePrivilegeMigration] = await Promise.all([
   readFile("supabase/migrations/20260928183000_stage_16_v2_workspace_scope_qualification.sql", "utf8"),
   readFile("supabase/migrations/20261004034037_h3_1_network_moment_model.sql", "utf8"),
   readFile("supabase/migrations/20261004040300_h3_1_network_offer_validation.sql", "utf8"),
@@ -258,7 +262,7 @@ const scopedRpcMigrations = [
 ];
 for (const [sql, name] of scopedRpcMigrations) {
   const fn = securityDefinerFunction(sql, name);
-  assert.match(fn, /SECURITY DEFINER/, `${name} remains a privileged RPC`);
+  assert.match(fn, /SECURITY (?:DEFINER|INVOKER)/, `${name} has an explicit execution security mode`);
   assert.match(fn, /auth\.uid\(\)/, `${name} derives the signed-in user`);
   assert.match(fn, /workspace_members/, `${name} checks workspace membership`);
   assert.match(fn, /workspace_id/, `${name} scopes authorization to a workspace`);
