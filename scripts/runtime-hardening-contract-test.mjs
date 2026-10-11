@@ -270,4 +270,11 @@ for (const [sql, name] of scopedRpcMigrations) {
   assert.match(fn, /workspace not authorized|workspace selection required/, `${name} rejects unauthorized workspace access`);
 }
 
+
+// Later hardening intentionally changes these workspace-scoped functions into
+// SECURITY DEFINER RPCs; keep that mode explicit and covered by membership tests.
+assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.confirm_product_activation_v2[\s\S]*SECURITY DEFINER/);
+assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.set_workspace_capabilities_v2[\s\S]*SECURITY DEFINER/);
+assert.match(controlPlanePrivilegeMigration, /ALTER FUNCTION public\.create_offer_activation_v2[\s\S]*SECURITY DEFINER/);
+
 console.log("runtime hardening contract: OK");
