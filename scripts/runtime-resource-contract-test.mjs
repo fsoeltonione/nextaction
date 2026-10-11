@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [http, analysis, providerSmoke, click, packageJson, workflow] = await Promise.all([
+const [http, requestBody, analysis, providerSmoke, click, packageJson, workflow] = await Promise.all([
   readFile("src/lib/http.ts", "utf8"),
+  readFile("src/lib/request-body.ts", "utf8"),
   readFile("src/app/api/analyze/route.ts", "utf8"),
   readFile("scripts/analysis-provider-smoke.mjs", "utf8"),
   readFile("src/app/v1/click/[delivery_token]/route.ts", "utf8"),
