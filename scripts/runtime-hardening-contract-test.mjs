@@ -214,4 +214,55 @@ assert.match(releaseWorkflow, /^  release_source_guard:/m);
 assert.match(releaseWorkflow, /quality_gates:[\s\S]*?needs:\n      - release_source_guard/);
 assert.match(releaseWorkflow, /quality_gates:[\s\S]*?uses: \.\/\.github\/workflows\/quality-gates\.yml/);
 
+
+ // H4.1: safely reconcile old Qualified Clicks that were retained when
+// settlement returned no_capacity. The operation must not depend on a live
+// Delivery token, must be bounded, and must stay behind service_role.
+const h41Path = "supabase/migrations/20261011020000_h4_1_unsettled_settlement_recovery.sql";
+const h41 = await readFile(h41Path, "utf8");
+assert.match(h41, /CREATE OR REPLACE FUNCTION private\\.reconcile_unsettled_qualified_clicks/);
+assert.match(h41, /qc\\.qualified_at < v_checked_at - INTERVAL '5 minutes'/);
+assert.match(h41, /NOT EXISTS \\([\\s\\S]*?private\\.settlements[\\s\\S]*?s\\.qualified_click_id = qc\\.id/);
+assert.match(h41, /private\\.runtime_excluded_workspaces/);
+assert.match(h41, /FOR UPDATE OF qc SKIP LOCKED/);
+assert.match(h41, /public\\.runtime_settle_qualified_click\\(v_candidate\\.id\\)/);
+assert.match(h41, /WHEN 'no_capacity'[\\s\\S]*v_no_capacity/);
+assert.match(h41, /WHEN 'financial_unavailable'[\\s\\S]*v_financial_unavailable/);
+assert.match(h41, /REVOKE ALL ON FUNCTION private\\.reconcile_unsettled_qualified_clicks\\(INTEGER\\)[\\s\\S]*FROM PUBLIC, anon, authenticated/);
+assert.match(h41, /GRANT EXECUTE ON FUNCTION private\\.reconcile_unsettled_qualified_clicks\\(INTEGER\\)[\\s\\S]*TO service_role/);
+assert.match(h41, /private\\.reconcile_unsettled_qualified_clicks\\(p_recovery_limit\\)/);
+assert.match(h41, /qualified_click_settlement_recovery/);
+assert.match(h41, /REVOKE ALL ON FUNCTION public\\.runtime_operations_tick\\(INTEGER, INTEGER, INTEGER\\)[\\s\\S]*FROM PUBLIC, anon, authenticated/);
+assert.match(h41, /GRANT EXECUTE ON FUNCTION public\\.runtime_operations_tick\\(INTEGER, INTEGER, INTEGER\\)[\\s\\S]*TO service_role/);
+
+// The five authenticated SECURITY DEFINER control-plane RPCs intentionally
+// remain user-callable, so protect their membership boundary with regression
+// assertions: they must derive a user identity and authorize workspace access.
+const [activationSecurity, networkMomentSecurity, networkOfferSecurity] = await Promise.all([
+  readFile("supabase/migrations/20260929010000_stage_16_read_only_control_plane.sql", "utf8"),
+  readFile("supabase/migrations/20261004034037_h3_1_network_moment_model.sql", "utf8"),
+  readFile("supabase/migrations/20261004040300_h3_1_network_offer_validation.sql", "utf8"),
+]);
+function securityDefinerFunction(sql, name) {
+  const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}(`);
+  assert.notEqual(start, -1, `missing source definition for ${name}`);
+  const next = sql.indexOf("\\nCREATE OR REPLACE FUNCTION public.", start + 1);
+  return sql.slice(start, next === -1 ? sql.length : next);
+}
+const scopedRpcMigrations = [
+  [activationSecurity, "confirm_product_activation_v2"],
+  [activationSecurity, "create_offer_activation_v2"],
+  [activationSecurity, "set_workspace_capabilities_v2"],
+  [networkMomentSecurity, "set_moment_network_mapping_v1"],
+  [networkOfferSecurity, "create_network_offer_activation_v1"],
+];
+for (const [sql, name] of scopedRpcMigrations) {
+  const fn = securityDefinerFunction(sql, name);
+  assert.match(fn, /SECURITY DEFINER/, `${name} remains a privileged RPC`);
+  assert.match(fn, /auth\\.uid\\(\\)/, `${name} derives the signed-in user`);
+  assert.match(fn, /workspace_members/, `${name} checks workspace membership`);
+  assert.match(fn, /workspace_id/, `${name} scopes authorization to a workspace`);
+  assert.match(fn, /workspace not authorized|workspace selection required/, `${name} rejects unauthorized workspace access`);
+}
+
 console.log("runtime hardening contract: OK");
