@@ -262,6 +262,11 @@ assert.match(
 );
 assert.match(
   deploy,
+  /"--var",\s*"NEXT_PUBLIC_RELEASE_SHA:"\s*\+\s*releaseSha/,
+  "Cloudflare deployment must bind the current release SHA into the Worker runtime",
+);
+assert.match(
+  deploy,
   /Production Cloudflare deployment is permitted from master only\./,
 );
 
