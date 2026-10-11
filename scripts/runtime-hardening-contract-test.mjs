@@ -318,4 +318,13 @@ const h43 = await readFile(h43Path, "utf8");
 assert.match(h43, /DROP INDEX IF EXISTS private\.financial_entries_settlement_idx/);
 assert.match(h43, /unique indexes start with settlement_id/i);
 
+
+// H4.4: drop only the unused, non-unique duplicate; keep the partial unique
+// index which the query planner selects for workspace_id equality lookups.
+const h44Path = "supabase/migrations/20261011120000_h4_4_redundant_financial_accounts_index.sql";
+const h44 = await readFile(h44Path, "utf8");
+assert.match(h44, /DROP INDEX IF EXISTS private\.financial_accounts_workspace_type_idx/);
+assert.match(h44, /financial_accounts_workspace_type_uq/);
+assert.doesNotMatch(h44, /DROP INDEX IF EXISTS private\.financial_accounts_workspace_type_uq/);
+
 console.log("runtime hardening contract: OK");
