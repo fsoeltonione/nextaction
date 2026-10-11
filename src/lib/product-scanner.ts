@@ -279,10 +279,96 @@ function isHttpsDowngrade(from: URL, to: URL): boolean {
 export type ResolveAddresses = (hostname: string) => Promise<string[]>;
 type DnsFamilyResolver = (hostname: string) => Promise<string[]>;
 
+export type ScannerTraceContext = {
+  requestId: string;
+  environment: string;
+};
+
+type DnsRebindProbeTrace = {
+  requestId: string;
+  testId: string;
+  strategy: string;
+  hostname: string;
+};
+
+const DNS_REBIND_PROBE_HOST =
+  /^s-23b9cea5\\.7f000001-([0-9]{6,20})-(fs|rd|rr|ma)-e\\.d\\.rebind\\.it$/i;
+
+function createDnsRebindProbeTrace(
+  hostname: string,
+  context?: ScannerTraceContext,
+): DnsRebindProbeTrace | null {
+  if (context?.environment.trim().toLowerCase() !== "staging") return null;
+  const match = hostname.toLowerCase().match(DNS_REBIND_PROBE_HOST);
+  if (!match) return null;
+  return {
+    requestId: context.requestId,
+    testId: match[1],
+    strategy: match[2].toLowerCase(),
+    hostname: hostname.toLowerCase(),
+  };
+}
+
+function describeProbeError(error: unknown): Array<{
+  name: string;
+  message: string;
+  code?: string;
+}> {
+  const chain: Array<{ name: string; message: string; code?: string }> = [];
+  let current: unknown = error;
+  while (current && typeof current === "object" && chain.length < 3) {
+    const record = current as {
+      name?: unknown;
+      message?: unknown;
+      code?: unknown;
+      cause?: unknown;
+    };
+    const item: { name: string; message: string; code?: string } = {
+      name:
+        typeof record.name === "string"
+          ? record.name.slice(0, 80)
+          : "Error",
+      message:
+        typeof record.message === "string"
+          ? record.message.slice(0, 240)
+          : "No error message",
+    };
+    if (typeof record.code === "string") item.code = record.code.slice(0, 80);
+    chain.push(item);
+    current = record.cause;
+  }
+  if (chain.length === 0) {
+    chain.push({ name: "Unknown", message: String(error).slice(0, 240) });
+  }
+  return chain;
+}
+
+function logDnsRebindProbe(
+  trace: DnsRebindProbeTrace | null,
+  phase: string,
+  fields: Record<string, unknown>,
+): void {
+  if (!trace) return;
+  console.log(
+    "[nextaction-dns-rebind-probe] " +
+      JSON.stringify({
+        event: "nextaction_dns_rebind_probe",
+        request_id: trace.requestId,
+        test_id: trace.testId,
+        strategy: trace.strategy,
+        hostname: trace.hostname,
+        phase,
+        timestamp: new Date().toISOString(),
+        ...fields,
+      }),
+  );
+}
+
 export async function scanProductUrl(
   input: string,
   fetchImpl: typeof fetch = fetch,
   resolveAddresses: ResolveAddresses = resolveDnsAddresses,
+  traceContext?: ScannerTraceContext,
 ): Promise<ProductScanResult> {
   let current = normalizeScannerUrl(input);
   const visited = new Set<string>();
@@ -302,10 +388,31 @@ export async function scanProductUrl(
     }
     visited.add(currentValue);
 
-    const resolvedBefore = await resolvePublicAddresses(
+    const probeTrace = createDnsRebindProbeTrace(
       current.hostname,
-      resolveAddresses,
+      traceContext,
     );
+    let resolvedBefore: string[];
+    try {
+      resolvedBefore = await resolveAddresses(current.hostname);
+      logDnsRebindProbe(probeTrace, "preflight_dns", {
+        outcome: "resolved",
+        addresses: resolvedBefore,
+      });
+      validatePublicAddresses(resolvedBefore, "non_public_address");
+      logDnsRebindProbe(probeTrace, "preflight_validation", {
+        outcome: "accepted",
+        addresses: resolvedBefore,
+      });
+    } catch (error) {
+      logDnsRebindProbe(probeTrace, "preflight_validation", {
+        outcome: "rejected",
+        error_code:
+          error instanceof ProductScannerError ? error.code : errorCode(error) ?? "dns_error",
+        cause: describeProbeError(error),
+      });
+      throw error;
+    }
     if (firstResolvedAddresses === null) {
       firstResolvedAddresses = resolvedBefore;
     }
@@ -329,8 +436,55 @@ export async function scanProductUrl(
             "User-Agent": "NextActionProductScanner/1.0",
           },
         });
+        logDnsRebindProbe(probeTrace, "fetch_result", {
+          outcome: "http_response",
+          status: response.status,
+          response_ok: response.ok,
+        });
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
+        const timedOut = error instanceof DOMException && error.name === "AbortError";
+        logDnsRebindProbe(probeTrace, "fetch_result", {
+          outcome: timedOut ? "timeout" : "exception",
+          mapped_error_code: timedOut ? "fetch_timeout" : "fetch_failed",
+          cause: describeProbeError(error),
+        });
+
+        if (probeTrace) {
+          try {
+            const resolvedAfterFailure = await resolveAddresses(current.hostname);
+            logDnsRebindProbe(probeTrace, "postflight_dns", {
+              outcome: "resolved_after_fetch_exception",
+              addresses: resolvedAfterFailure,
+              all_addresses_public: resolvedAfterFailure.every(isPublicIpAddress),
+            });
+            try {
+              validatePublicAddresses(
+                resolvedAfterFailure,
+                "non_public_address_after_fetch",
+              );
+              logDnsRebindProbe(probeTrace, "postflight_validation", {
+                outcome: "accepted",
+                addresses: resolvedAfterFailure,
+              });
+            } catch (validationError) {
+              logDnsRebindProbe(probeTrace, "postflight_validation", {
+                outcome: "rejected",
+                error_code:
+                  validationError instanceof ProductScannerError
+                    ? validationError.code
+                    : "dns_validation_error",
+                cause: describeProbeError(validationError),
+              });
+            }
+          } catch (postflightError) {
+            logDnsRebindProbe(probeTrace, "postflight_dns", {
+              outcome: "resolver_exception_after_fetch_exception",
+              cause: describeProbeError(postflightError),
+            });
+          }
+        }
+
+        if (timedOut) {
           throw new ProductScannerError(
             "fetch_timeout",
             "Product analysis timed out.",
@@ -344,8 +498,39 @@ export async function scanProductUrl(
         );
       }
 
-      const resolvedAfter = await resolveAddresses(current.hostname);
-      validatePublicAddresses(resolvedAfter, "non_public_address_after_fetch");
+      let resolvedAfter: string[];
+      try {
+        resolvedAfter = await resolveAddresses(current.hostname);
+        logDnsRebindProbe(probeTrace, "postflight_dns", {
+          outcome: "resolved_after_http_response",
+          addresses: resolvedAfter,
+          all_addresses_public: resolvedAfter.every(isPublicIpAddress),
+        });
+      } catch (postflightError) {
+        logDnsRebindProbe(probeTrace, "postflight_dns", {
+          outcome: "resolver_exception_after_http_response",
+          cause: describeProbeError(postflightError),
+        });
+        throw postflightError;
+      }
+
+      try {
+        validatePublicAddresses(resolvedAfter, "non_public_address_after_fetch");
+        logDnsRebindProbe(probeTrace, "postflight_validation", {
+          outcome: "accepted",
+          addresses: resolvedAfter,
+        });
+      } catch (validationError) {
+        logDnsRebindProbe(probeTrace, "postflight_validation", {
+          outcome: "rejected",
+          error_code:
+            validationError instanceof ProductScannerError
+              ? validationError.code
+              : "dns_validation_error",
+          cause: describeProbeError(validationError),
+        });
+        throw validationError;
+      }
 
       if (REDIRECT_STATUSES.has(response.status)) {
       const location = response.headers.get("location");
