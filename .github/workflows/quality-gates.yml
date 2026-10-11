@@ -110,6 +110,9 @@ jobs:
       - name: Run product scanner security suite
         run: npm run test:scanner
 
+      - name: Enforce strict-public Cloudflare fetch policy
+        run: npm run test:cloudflare-fetch-policy
+
   analysis_provider_contract:
     name: Analysis provider contract
     runs-on: ubuntu-24.04
