@@ -17,7 +17,7 @@ if (!apiKey || !baseUrl || !model) {
 let endpoint;
 try {
   const base = new URL(baseUrl);
-  if (base.protocol !== "https:" && base.protocol !== "http:") {
+  if (base.protocol !== "https:") {
     throw new Error("unsupported protocol");
   }
   if (!base.pathname.endsWith("/")) base.pathname += "/";

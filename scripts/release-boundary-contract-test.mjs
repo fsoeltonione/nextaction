@@ -98,10 +98,28 @@ assert.match(
 
 assert.match(qualityGatesWorkflow, /^  h3_1_network_moment_contract:/m);
 assert.match(qualityGatesWorkflow, /npm run test:h3-1-network-moment/);
-assert.match(qualityGatesWorkflow, /^  dependency_security_audit:/m);
-assert.match(qualityGatesWorkflow, /npm run test:braces-security-backport/);
-assert.match(qualityGatesWorkflow, /npm audit --audit-level=low/);
-assert.match(qualityGatesWorkflow, /npm audit --omit=dev --audit-level=low/);
+assert.doesNotMatch(
+  qualityGatesWorkflow,
+  /^  dependency_security_audit:/m,
+  "dependency auditing must not depend on an optional status check",
+);
+const requiredQualityJob = jobBlock(qualityGatesWorkflow, "quality");
+for (const requiredCommand of [
+  "npm run test:braces-security-backport",
+  "npm run test:http-body",
+  "npm run test:runtime-resource-contract",
+  "npm run test:migration-filenames",
+  "npm run test:cloudflare-production-audit-contract",
+  "npm audit --audit-level=low",
+  "npm audit --omit=dev --audit-level=low",
+]) {
+  assert.ok(
+    requiredQualityJob.includes(requiredCommand),
+    "required Quality status check must execute " + requiredCommand,
+  );
+}
+assert.match(qualityGatesWorkflow, /uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\.0\.1/);
+assert.match(qualityGatesWorkflow, /uses: actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7\.1\.0/);
 assert.match(qualityGatesWorkflow, /runs-on: ubuntu-24\.04/);
 
 const qualityGateBlock = jobBlock(releaseWorkflow, "quality_gates");

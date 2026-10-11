@@ -90,6 +90,7 @@ function redirectToDestination(requestId: string, destinationUrl: string) {
 
   const response = NextResponse.redirect(destination, 302);
   response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("X-Request-Id", requestId);
   return response;
 }

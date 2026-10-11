@@ -132,7 +132,7 @@ export async function POST(request: Request) {
     let providerEndpoint: URL;
     try {
       const providerBase = new URL(baseUrl);
-      if (providerBase.protocol !== "https:" && providerBase.protocol !== "http:") {
+      if (providerBase.protocol !== "https:") {
         throw new Error("unsupported provider protocol");
       }
       if (!providerBase.pathname.endsWith("/")) {
@@ -175,10 +175,10 @@ export async function POST(request: Request) {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
-    let response: Response;
+    let responseText: string;
 
     try {
-      response = await fetch(providerEndpoint, {
+      const response = await fetch(providerEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -214,8 +214,24 @@ export async function POST(request: Request) {
         }),
         signal: controller.signal,
       });
+
+      if (!response.ok) {
+        console.error("Analysis provider request failed", {
+          requestId,
+          status: response.status,
+        });
+        await response.body?.cancel().catch(() => undefined);
+        throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
+      }
+
+      // The timeout stays active until the provider body is bounded and fully read.
+      responseText = await readLimitedText(response, MAX_PROVIDER_RESPONSE_BYTES);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
+      if (error instanceof HttpError) throw error;
+      if (
+        (error instanceof DOMException && error.name === "AbortError") ||
+        controller.signal.aborted
+      ) {
         throw new HttpError(504, "analysis_timeout", "Product analysis timed out.");
       }
 
@@ -224,15 +240,6 @@ export async function POST(request: Request) {
       clearTimeout(timeout);
     }
 
-    if (!response.ok) {
-      console.error("Analysis provider request failed", {
-        requestId,
-        status: response.status,
-      });
-      throw new HttpError(503, "analysis_unavailable", "Product analysis is temporarily unavailable.");
-    }
-
-    const responseText = await readLimitedText(response, MAX_PROVIDER_RESPONSE_BYTES);
     let providerPayload: unknown;
 
     try {

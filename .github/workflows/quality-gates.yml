@@ -16,10 +16,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -41,34 +41,29 @@ jobs:
       - name: Build
         run: npm run build
 
+      # These controls live in the merge-required Quality check. A separate
+      # optional check could fail without blocking merges under the current ruleset.
+      - name: Test bounded JSON request bodies
+        run: npm run test:http-body
 
-  dependency_security_audit:
-    name: Dependency security (braces backport)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Test runtime resource and required-gate boundaries
+        run: npm run test:runtime-resource-contract
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
+      - name: Test migration filename uniqueness
+        run: npm run test:migration-filenames
 
       - name: Test local braces security backport
         run: npm run test:braces-security-backport
+
+      - name: Audit Cloudflare production-audit contract
+        run: npm run test:cloudflare-production-audit-contract
 
       - name: Audit the complete dependency tree
         run: npm audit --audit-level=low
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=low
+
 
   release_boundary_contract:
     name: Release boundary contract
@@ -78,10 +73,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -101,10 +96,10 @@ jobs:
       - release_boundary_contract
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -123,10 +118,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -145,10 +140,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -167,10 +162,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -189,10 +184,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -214,10 +209,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -236,10 +231,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -258,10 +253,10 @@ jobs:
       - quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -286,10 +281,10 @@ jobs:
       - stage16_activation_contract
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -313,10 +308,10 @@ jobs:
       SUPABASE_SECRET_KEY: ci-placeholder
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
@@ -331,25 +326,3 @@ jobs:
 
       - name: Validate Wrangler configuration
         run: npx --yes wrangler@4.139.0 deploy --dry-run --env staging
-
-  cloudflare_production_audit_contract:
-    name: Cloudflare production audit contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Verify Cloudflare production audit contract
-        run: npm run test:cloudflare-production-audit-contract
