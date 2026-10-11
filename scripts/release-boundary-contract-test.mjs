@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript, anonymousAcceptanceScript] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
     readFile(".github/workflows/quality-gates.yml", "utf8"),
@@ -11,6 +11,7 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
     readFile("scripts/staging-smoke.mjs", "utf8"),
     readFile("scripts/staging-authenticated-acceptance.mjs", "utf8"),
     readFile("scripts/staging-anonymous-proposal-acceptance.mjs", "utf8"),
+    readFile("scripts/verify-effective-cloudflare-config.mjs", "utf8"),
   ]);
 
 assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
@@ -110,6 +111,7 @@ for (const requiredCommand of [
   "npm run test:runtime-resource-contract",
   "npm run test:migration-filenames",
   "npm run test:cloudflare-production-audit-contract",
+  "npm run test:effective-cloudflare-config",
   "npm audit --audit-level=low",
   "npm audit --omit=dev --audit-level=low",
 ]) {
@@ -121,6 +123,22 @@ for (const requiredCommand of [
 assert.match(qualityGatesWorkflow, /uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\.0\.1/);
 assert.match(qualityGatesWorkflow, /uses: actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7\.1\.0/);
 assert.match(qualityGatesWorkflow, /runs-on: ubuntu-24\.04/);
+
+
+const cloudflareBuildJob = jobBlock(qualityGatesWorkflow, "cloudflare_build");
+const cloudflareArtifactBuild = cloudflareBuildJob.indexOf("npm run cloudflare:build");
+const effectiveConfigAudit = cloudflareBuildJob.indexOf(
+  "node scripts/verify-effective-cloudflare-config.mjs staging",
+);
+const cloudflareDryRun = cloudflareBuildJob.indexOf(
+  "wrangler@4.139.0 deploy --dry-run --env staging",
+);
+assert.ok(
+  cloudflareArtifactBuild !== -1 &&
+    effectiveConfigAudit > cloudflareArtifactBuild &&
+    cloudflareDryRun > effectiveConfigAudit,
+  "CI must validate the generated staging Wrangler config after build and before Wrangler dry-run",
+);
 
 const qualityGateBlock = jobBlock(releaseWorkflow, "quality_gates");
 assert.match(
@@ -264,6 +282,25 @@ assert.match(
   deploy,
   /"--var",\s*"NEXT_PUBLIC_RELEASE_SHA:"\s*\+\s*releaseSha/,
   "Cloudflare deployment must bind the current release SHA into the Worker runtime",
+);
+assert.match(
+  effectiveConfigGate,
+  /global_fetch_strictly_public/,
+  "effective runtime config gate must require the public-fetch security flag",
+);
+assert.match(
+  effectiveConfigGate,
+  /network_override_keys_found/,
+  "effective runtime config gate must report unreviewed network override keys",
+);
+const cloudflareBuildInvocation = deploy.indexOf('run(process.execPath, ["scripts/cloudflare-vinext-build.mjs"]);');
+const effectiveConfigGateInvocation = deploy.indexOf('"scripts/verify-effective-cloudflare-config.mjs"');
+const wranglerDeployInvocation = deploy.indexOf('run(npx, [');
+assert.ok(
+  cloudflareBuildInvocation !== -1 &&
+    effectiveConfigGateInvocation > cloudflareBuildInvocation &&
+    wranglerDeployInvocation > effectiveConfigGateInvocation,
+  "effective Cloudflare config validation must run after build and before any Wrangler deployment",
 );
 assert.match(
   deploy,
