@@ -467,3 +467,122 @@ test("scanner detects a real redirect loop", async () => {
     "https://example.com/b",
   ]);
 });
+
+
+test("staging DNS rebinding probe trace correlates preflight, fetch cause, and postflight DNS", async () => {
+  const logLines: string[] = [];
+  const originalLog = console.log;
+  let resolveCalls = 0;
+  let fetchCalls = 0;
+
+  console.log = (message?: unknown) => {
+    logLines.push(String(message));
+  };
+
+  try {
+    await assert.rejects(
+      () =>
+        scanProductUrl(
+          "http://s-23b9cea5.7f000001-681105321-fs-e.d.rebind.it/probe",
+          async () => {
+            fetchCalls += 1;
+            throw new TypeError("fetch failed", {
+              cause: Object.assign(new Error("private destination blocked"), {
+                code: "EHOSTUNREACH",
+              }),
+            });
+          },
+          async () => {
+            resolveCalls += 1;
+            return resolveCalls === 1
+              ? ["35.185.206.165"]
+              : ["127.0.0.1"];
+          },
+          {
+            requestId: "req-dns-rebind-test-1",
+            environment: "staging",
+            traceEvents: [],
+          },
+        ),
+      (error: unknown) =>
+        error instanceof ProductScannerError && error.code === "fetch_failed",
+    );
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.equal(fetchCalls, 1, "fetch must be attempted after the public preflight");
+  assert.equal(resolveCalls, 2, "the scanner must resolve the hostname again after the fetch exception");
+
+  const events = logLines
+    .filter((line) => line.startsWith("[nextaction-dns-rebind-probe] "))
+    .map((line) =>
+      JSON.parse(line.slice("[nextaction-dns-rebind-probe] ".length)) as {
+        request_id: string;
+        test_id: string;
+        hostname: string;
+        phase: string;
+        outcome?: string;
+        addresses?: string[];
+        cause?: Array<{ code?: string; message: string }>;
+      },
+    );
+
+  assert.deepEqual(events.map((event) => event.phase), [
+    "preflight_dns",
+    "preflight_validation",
+    "fetch_result",
+    "postflight_dns",
+    "postflight_validation",
+  ]);
+  assert.ok(
+    events.every((event) => event.request_id === "req-dns-rebind-test-1"),
+    "every phase must share the API request ID",
+  );
+  assert.ok(
+    events.every((event) => event.test_id === "681105321"),
+    "every phase must share the DNS-rebinding test/session ID",
+  );
+  assert.deepEqual(events[0].addresses, ["35.185.206.165"]);
+  assert.equal(events[2].outcome, "exception");
+  assert.ok(
+    events[2].cause?.some((cause) => cause.code === "EHOSTUNREACH"),
+    "fetch errors must retain the safe root-cause code",
+  );
+  assert.deepEqual(events[3].addresses, ["127.0.0.1"]);
+  assert.equal(events[4].outcome, "rejected");
+});
+
+test("DNS rebinding probe tracing is disabled outside staging", async () => {
+  const logLines: string[] = [];
+  const originalLog = console.log;
+  console.log = (message?: unknown) => logLines.push(String(message));
+
+  try {
+    await assert.rejects(
+      () =>
+        scanProductUrl(
+          "http://s-23b9cea5.7f000001-681105322-fs-e.d.rebind.it/probe",
+          async () => {
+            throw new TypeError("fetch failed");
+          },
+          async () => ["35.185.206.165"],
+          {
+            requestId: "req-dns-rebind-test-prod",
+            environment: "production",
+            traceEvents: [],
+          },
+        ),
+      (error: unknown) =>
+        error instanceof ProductScannerError && error.code === "fetch_failed",
+    );
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.equal(
+    logLines.filter((line) => line.startsWith("[nextaction-dns-rebind-probe] ")).length,
+    0,
+    "production must not emit DNS-rebinding diagnostic traces",
+  );
+});

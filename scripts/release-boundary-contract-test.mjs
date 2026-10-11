@@ -108,6 +108,7 @@ const requiredQualityJob = jobBlock(qualityGatesWorkflow, "quality");
 for (const requiredCommand of [
   "npm run test:braces-security-backport",
   "npm run test:http-body",
+  "npm run test:scanner",
   "npm run test:runtime-resource-contract",
   "npm run test:migration-filenames",
   "npm run test:cloudflare-production-audit-contract",

@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import {
   createRequestId,
   HttpError,
@@ -69,6 +70,10 @@ async function readLimitedText(response: Response, maxBytes: number): Promise<st
 
 export async function POST(request: Request) {
   const requestId = createRequestId();
+  const dnsRebindProbeRequested =
+    request.headers.get("x-nextaction-dns-probe") === "issue-104" &&
+    process.env.APP_ENV?.trim().toLowerCase() === "staging";
+  const dnsRebindProbeEvents: Array<Record<string, unknown>> = [];
 
   try {
     const body = await readJsonBody(request);
@@ -149,9 +154,27 @@ export async function POST(request: Request) {
 
     let scan;
     try {
-      scan = await scanProductUrl(normalized.value);
+      scan = await scanProductUrl(normalized.value, fetch, undefined, {
+        requestId,
+        // APP_ENV is a runtime Worker variable, unlike the public build-time label.
+        environment: process.env.APP_ENV?.trim() ?? "",
+        ...(dnsRebindProbeRequested ? { traceEvents: dnsRebindProbeEvents } : {}),
+      });
     } catch (error) {
       if (error instanceof ProductScannerError) {
+        if (dnsRebindProbeRequested && dnsRebindProbeEvents.length > 0) {
+          const response = NextResponse.json(
+            {
+              error: { code: error.code, message: error.message },
+              request_id: requestId,
+              dns_rebind_probe_trace: dnsRebindProbeEvents,
+            },
+            { status: error.status },
+          );
+          response.headers.set("Cache-Control", "no-store");
+          response.headers.set("X-Request-Id", requestId);
+          return response;
+        }
         throw new HttpError(error.status, error.code, error.message);
       }
       throw new HttpError(

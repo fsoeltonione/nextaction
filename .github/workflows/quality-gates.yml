@@ -49,6 +49,9 @@ jobs:
       - name: Test bounded JSON request bodies
         run: npm run test:http-body
 
+      - name: Test product scanner security and DNS probe trace
+        run: npm run test:scanner
+
       - name: Test runtime resource and required-gate boundaries
         run: npm run test:runtime-resource-contract
 
