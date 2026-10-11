@@ -51,6 +51,7 @@ export async function readJsonBody(
   const contentLength = request.headers.get("content-length");
   if (contentLength && Number.isFinite(Number(contentLength))) {
     if (Number(contentLength) > maxBytes) {
+      await request.body?.cancel().catch(() => undefined);
       throw new HttpError(
         413,
         "request_body_too_large",
