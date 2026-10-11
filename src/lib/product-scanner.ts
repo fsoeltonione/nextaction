@@ -292,7 +292,7 @@ type DnsRebindProbeTrace = {
 };
 
 const DNS_REBIND_PROBE_HOST =
-  /^s-23b9cea5\\.7f000001-([0-9]{6,20})-(fs|rd|rr|ma)-e\\.d\\.rebind\\.it$/i;
+  /^s-23b9cea5\.7f000001-([0-9]{6,20})-(fs|rd|rr|ma)-e\.d\.rebind\.it$/i;
 
 function createDnsRebindProbeTrace(
   hostname: string,
