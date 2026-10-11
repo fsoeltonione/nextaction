@@ -113,6 +113,11 @@ try {
     target,
     "--secrets-file",
     secretFile,
+    // Bind the current release identity at Worker runtime as well as build time.
+    // The health endpoint reads process.env in Workers; build-time substitution alone
+    // must not leave a stale dashboard/environment binding reporting an older SHA.
+    "--var",
+    "NEXT_PUBLIC_RELEASE_SHA:" + releaseSha,
     "--var",
     "ANALYSIS_BASE_URL:" + process.env.ANALYSIS_BASE_URL,
     "--var",
