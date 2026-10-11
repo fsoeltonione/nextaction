@@ -11,7 +11,7 @@ const [http, requestBody, analysis, providerSmoke, click, packageJson, workflow]
   readFile(".github/workflows/quality-gates.yml", "utf8"),
 ]);
 
-assert.ok(requestBody.includes("request.body.getReader()"));
+assert.ok(requestBody.includes("stream.getReader()"));
 assert.ok(requestBody.includes("totalBytes + value.byteLength > maxBytes"));
 assert.ok(requestBody.includes("await reader.cancel()"));
 assert.equal(requestBody.includes("const body = await request.text()"), false);
