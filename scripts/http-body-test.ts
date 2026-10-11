@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { HttpError, readJsonBody } from "../src/lib/http.ts";
+import { HttpError, readJsonBody } from "../src/lib/request-body.ts";
 
 test("reads a valid JSON body from a stream without Content-Length", async () => {
   const request = new Request("https://nextaction.test/api", {
