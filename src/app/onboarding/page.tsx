@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { ArrowRight, Check, Copy, Globe, Plus, RefreshCw, ShieldCheck, Target, Trash2, Zap } from "lucide-react";
 import { normalizeProductUrl } from "@/lib/url";
 import { isGenericMomentKey, isMeaningfulMomentKey } from "@/lib/moment-key";
@@ -38,13 +37,6 @@ type ActivationState = {
 function slugifyMoment(label: string): string {
   return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80);
 }
-function normalizeDraftMoment(moment: { key?: string; id?: string; label?: string; description?: string }): MomentDraft {
-  const label = typeof moment.label === "string" ? moment.label.trim() : "";
-  const providedKey = typeof moment.key === "string" ? moment.key.trim() : typeof moment.id === "string" ? moment.id.trim() : "";
-  const key = isGenericMomentKey(providedKey) ? slugifyMoment(label) : providedKey;
-  return { key, label, description: typeof moment.description === "string" ? moment.description : "" };
-}
-
 async function readApiError(response: Response, fallback: string): Promise<string> {
   return response.json().then((body) => {
     if (body && typeof body === "object" && "error" in body && body.error && typeof body.error === "object" && "message" in body.error && typeof body.error.message === "string") return body.error.message;
@@ -81,9 +73,6 @@ function OnboardingContent() {
   const initialFlowUrl = isAddProductMode ? initialQueryUrl : initialQueryUrl || restored.url;
   const initialFlowDraft = isAddProductMode ? null : restored.draft;
   const [urlInput, setUrlInput] = useState(initialFlowUrl);
-  const [hostname, setHostname] = useState(() => {
-    try { return normalizeProductUrl(initialFlowUrl).hostname; } catch { return ""; }
-  });
   const [isValidUrl, setIsValidUrl] = useState(() => {
     try { normalizeProductUrl(initialFlowUrl); return Boolean(initialFlowUrl); } catch { return false; }
   });
@@ -95,7 +84,6 @@ function OnboardingContent() {
   const [integrationToken, setIntegrationToken] = useState<string | null>(null);
   const [offerForm, setOfferForm] = useState({ title: "", description: "", cta_label: "Learn More", destination_url: "", moment_ids: [] as string[] });
   const [loading, setLoading] = useState(true);
-  const [analysisRunning, setAnalysisRunning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshingConnection, setRefreshingConnection] = useState(false);
   const [integrationNotice, setIntegrationNotice] = useState<string | null>(null);
@@ -143,28 +131,30 @@ function OnboardingContent() {
     return nextState;
   }, [applyState]);
 
-  const runAnalysis = useCallback(async (targetUrl: string) => {
-    setAnalysisRunning(true);
+  const beginManualSetup = useCallback((targetUrl: string) => {
     setError(null);
-    savePending(targetUrl, draft);
     try {
-      const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: targetUrl }) });
-      if (!response.ok) throw new Error(await readApiError(response, "Product analysis is temporarily unavailable."));
-      const payload = await response.json();
-      const analysis = payload.analysis;
-      if (!analysis || !Array.isArray(analysis.moments)) throw new Error("The product analysis returned an invalid result.");
-      const nextDraft: ProductDraft = { url: typeof analysis.url === "string" && analysis.url ? analysis.url : targetUrl, name: typeof analysis.name === "string" ? analysis.name : "", description: typeof analysis.description === "string" ? analysis.description : "", moments: analysis.moments.map(normalizeDraftMoment) };
+      const normalized = normalizeProductUrl(targetUrl);
+      const nextDraft: ProductDraft = {
+        url: normalized.value,
+        name: "",
+        description: "",
+        moments: [{ key: "", label: "", description: "" }],
+      };
       setDraft(nextDraft);
-      setUrlInput(nextDraft.url);
+      setUrlInput(normalized.value);
       savePending(nextDraft.url, nextDraft);
-      const nextPath = "/onboarding?url=" + encodeURIComponent(nextDraft.url) + (selectedWorkspaceId ? "&workspace_id=" + encodeURIComponent(selectedWorkspaceId) : "") + (isAddProductMode ? "&mode=add_product" : "");
+      const workspaceForNavigation = selectedWorkspaceId ?? initialWorkspaceId;
+      const nextPath = "/onboarding?url=" + encodeURIComponent(nextDraft.url)
+        + (workspaceForNavigation ? "&workspace_id=" + encodeURIComponent(workspaceForNavigation) : "")
+        + (isAddProductMode ? "&mode=add_product" : "");
       router.replace(nextPath);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Product analysis failed.");
+      setError(err instanceof Error ? err.message : "Unable to prepare product setup.");
       setDraft(null);
       savePending(targetUrl, null);
-    } finally { setAnalysisRunning(false); }
-  }, [draft, isAddProductMode, router, selectedWorkspaceId]);
+    }
+  }, [initialWorkspaceId, isAddProductMode, router, selectedWorkspaceId]);
 
   useEffect(() => {
     let active = true;
@@ -174,8 +164,8 @@ function OnboardingContent() {
   }, [initialWorkspaceId, loadState]);
 
   useEffect(() => {
-    if (loading || !urlInput || draft || analysisRunning || autoAnalysisUrlRef.current === urlInput) return;
-    // Only auto-analyze a URL that was seeded when this onboarding view mounted.
+    if (loading || !urlInput || draft || autoAnalysisUrlRef.current === urlInput) return;
+    // Only auto-prepare a URL that was seeded when this onboarding view mounted.
     // Manual typing from the URL field must wait for the explicit Analyze action.
     if (urlInput !== initialAutoAnalysisUrlRef.current) return;
     if (state?.product?.canonical_url === urlInput) return;
@@ -184,20 +174,18 @@ function OnboardingContent() {
     // Defer the async action until after the current effect completes so React does not
     // treat the effect as synchronously cascading into local state updates.
     const timer = window.setTimeout(() => {
-      void runAnalysis(urlInput);
+      beginManualSetup(urlInput);
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [analysisRunning, draft, loading, runAnalysis, state?.product?.canonical_url, urlInput]);
+  }, [beginManualSetup, draft, loading, state?.product?.canonical_url, urlInput]);
 
   function handleUrlChange(value: string) {
     setUrlInput(value);
     try {
-      const normalized = normalizeProductUrl(value);
-      setHostname(normalized.hostname);
+      normalizeProductUrl(value);
       setIsValidUrl(true);
     } catch {
-      setHostname("");
       setIsValidUrl(false);
     }
   }
@@ -432,8 +420,8 @@ function OnboardingContent() {
         {workspaceOptions.length > 1 && <div className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-4"><label className="block text-sm font-medium text-neutral-300 mb-2">Workspace</label><select value={selectedWorkspaceId ?? ""} onChange={(event) => { const id = event.target.value || null; setSelectedWorkspaceId(id); if (id) void loadState(id); }} className="w-full rounded-xl bg-neutral-950 border border-neutral-700 px-4 py-3 text-white"><option value="">Select a workspace</option>{workspaceOptions.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.id} · {workspace.role}</option>)}</select></div>}
         {error && <div className="mb-6 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div>}
         <div className="mb-8 flex items-center gap-2 text-xs text-neutral-500">{["url", "product_understanding", "intent", "capability_setup", "verification", "ready"].map((step, index) => <div key={step} className={currentStep === step ? "text-white" : ""}>{index + 1}. {step.replaceAll("_", " ")}</div>)}</div>
-        {currentStep === "url" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Globe className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Connect your SaaS</h1></div><p className="mb-6 text-neutral-400">Paste your SaaS URL. NextAction will understand the product before asking you to configure activation.</p><div className="flex gap-3"><div className="relative flex flex-1 items-center">{hostname ? (<Image src={"https://s2.googleusercontent.com/s2/favicons?domain=" + hostname + "&sz=64"} alt="" width={20} height={20} unoptimized className="pointer-events-none absolute left-4 h-5 w-5 rounded-sm" />) : (<Globe className="pointer-events-none absolute left-4 h-5 w-5 text-neutral-500" />)}<input value={urlInput} onChange={(event) => handleUrlChange(event.target.value)} disabled={analysisRunning} placeholder="https://your-saas.com" className={"w-full rounded-2xl border bg-neutral-900 py-4 pl-12 pr-4 text-neutral-100 placeholder:text-neutral-600 outline-none transition-all focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 disabled:opacity-50 " + (urlInput.length > 3 && !isValidUrl ? "border-red-500/70" : "border-neutral-800")} /></div><button disabled={!isValidUrl || analysisRunning} onClick={() => { if (isValidUrl) void runAnalysis(urlInput); }} className="btn">{analysisRunning ? "Analyzing..." : "Analyze"}<ArrowRight className="h-4 w-4" /></button></div>{urlInput.length > 3 && !isValidUrl && <p className="mt-2 text-sm text-red-400">Enter a public HTTP or HTTPS SaaS URL.</p>}</section>}
-        {currentStep === "product_understanding" && draft && <section className="space-y-6"><div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><ShieldCheck className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Confirm product understanding</h1></div><Field label="Product name"><input value={draft.name} onChange={(event) => updateProduct({ name: event.target.value })} className="input" /></Field><Field label="Description"><textarea value={draft.description} onChange={(event) => updateProduct({ description: event.target.value })} className="input min-h-24" /></Field><div className="mt-6 space-y-4">{draft.moments.map((moment, index) => <div key={`${index}-${moment.key}`} className="rounded-2xl border border-neutral-800 p-4"><div className="grid gap-4 md:grid-cols-3"><Field label="Moment key"><input value={moment.key} onChange={(event) => updateMoment(index, { key: event.target.value })} className="input" /></Field><Field label="Label"><input value={moment.label} onChange={(event) => updateMoment(index, { label: event.target.value })} className="input" /></Field><Field label="Description"><input value={moment.description} onChange={(event) => updateMoment(index, { description: event.target.value })} className="input" /></Field></div><button onClick={() => removeMoment(index)} className="mt-3 text-sm text-neutral-400"><Trash2 className="inline h-4 w-4 mr-1" />Remove</button></div>)}</div><div className="mt-6 flex items-center justify-between"><button onClick={addMoment} className="btn-secondary"><Plus className="h-4 w-4" />Add Moment</button><button disabled={saving} onClick={() => void confirmProduct()} className="btn">{saving ? "Saving..." : "Confirm product"}<ArrowRight className="h-4 w-4" /></button></div></div></section>}
+        {currentStep === "url" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Globe className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Connect your SaaS</h1></div><p className="mb-6 text-neutral-400">Paste your SaaS URL. Enter the URL as your product reference, then define the product details and Moments manually. NextAction does not crawl or analyze your site.</p><div className="flex gap-3"><div className="relative flex flex-1 items-center"><Globe className="pointer-events-none absolute left-4 h-5 w-5 text-neutral-500" /><input value={urlInput} onChange={(event) => handleUrlChange(event.target.value)} placeholder="https://your-saas.com" className={"w-full rounded-2xl border bg-neutral-900 py-4 pl-12 pr-4 text-neutral-100 placeholder:text-neutral-600 outline-none transition-all focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 disabled:opacity-50 " + (urlInput.length > 3 && !isValidUrl ? "border-red-500/70" : "border-neutral-800")} /></div><button disabled={!isValidUrl} onClick={() => { if (isValidUrl) beginManualSetup(urlInput); }} className="btn">Continue<ArrowRight className="h-4 w-4" /></button></div>{urlInput.length > 3 && !isValidUrl && <p className="mt-2 text-sm text-red-400">Enter a public HTTP or HTTPS SaaS URL.</p>}</section>}
+        {currentStep === "product_understanding" && draft && <section className="space-y-6"><div className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><ShieldCheck className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Set up your product</h1></div><Field label="Product name"><input value={draft.name} onChange={(event) => updateProduct({ name: event.target.value })} className="input" /></Field><Field label="Description"><textarea value={draft.description} onChange={(event) => updateProduct({ description: event.target.value })} className="input min-h-24" /></Field><div className="mt-6 space-y-4">{draft.moments.map((moment, index) => <div key={`${index}-${moment.key}`} className="rounded-2xl border border-neutral-800 p-4"><div className="grid gap-4 md:grid-cols-3"><Field label="Moment key"><input value={moment.key} onChange={(event) => updateMoment(index, { key: event.target.value })} className="input" /></Field><Field label="Label"><input value={moment.label} onChange={(event) => updateMoment(index, { label: event.target.value })} className="input" /></Field><Field label="Description"><input value={moment.description} onChange={(event) => updateMoment(index, { description: event.target.value })} className="input" /></Field></div><button onClick={() => removeMoment(index)} className="mt-3 text-sm text-neutral-400"><Trash2 className="inline h-4 w-4 mr-1" />Remove</button></div>)}</div><div className="mt-6 flex items-center justify-between"><button onClick={addMoment} className="btn-secondary"><Plus className="h-4 w-4" />Add Moment</button><button disabled={saving} onClick={() => void confirmProduct()} className="btn">{saving ? "Saving..." : "Save product and Moments"}<ArrowRight className="h-4 w-4" /></button></div></div></section>}
         {currentStep === "intent" && <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-8"><div className="mb-6 flex items-center gap-3"><Target className="h-5 w-5" /><h1 className="text-2xl font-semibold text-white">Choose your goal</h1></div><p className="mb-6 text-neutral-400">Choose how this workspace will use NextAction.</p><div className="grid gap-4 md:grid-cols-3">{(["make_money", "reach_customers"] as Capability[]).map((capability) => <button key={capability} onClick={() => setCapabilitySelection((current) => current.includes(capability) ? current.filter((item) => item !== capability) : [...current, capability])} className={capabilitySelection.includes(capability) ? "rounded-2xl border border-white bg-white/10 p-5 text-left" : "rounded-2xl border border-neutral-800 p-5 text-left"}><div className="font-medium text-white">{capability === "make_money" ? "Make money" : "Reach customers"}</div><div className="mt-2 text-sm text-neutral-400">{capability === "make_money" ? "Connect your product so NextAction can recognize moments." : "Prepare starter offers for relevant moments."}</div></button>)}<button onClick={() => setCapabilitySelection((current) => current.length === 2 ? [] : ["make_money", "reach_customers"])} className={capabilitySelection.length === 2 ? "rounded-2xl border border-white bg-white/10 p-5 text-left" : "rounded-2xl border border-neutral-800 p-5 text-left"}><div className="font-medium text-white">Both</div><div className="mt-2 text-sm text-neutral-400">Enable both capabilities.</div></button></div><button disabled={saving || capabilitySelection.length < 1} onClick={() => void saveCapabilities()} className="btn mt-6">Save goal<ArrowRight className="h-4 w-4" /></button></section>}
         {currentStep === "capability_setup" && state && (
           <section className="grid gap-6 md:grid-cols-2">

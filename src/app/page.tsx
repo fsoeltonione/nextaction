@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Globe, Sparkles } from "lucide-react";
 import { normalizeProductUrl } from "@/lib/url";
@@ -9,18 +8,15 @@ import { normalizeProductUrl } from "@/lib/url";
 export default function Home() {
   const router = useRouter();
   const [url, setUrl] = useState("");
-  const [hostname, setHostname] = useState("");
   const [isValidUrl, setIsValidUrl] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
 
   function handleUrlChange(value: string) {
     setUrl(value);
     try {
-      const normalized = normalizeProductUrl(value);
-      setHostname(normalized.hostname);
+      normalizeProductUrl(value);
       setIsValidUrl(true);
     } catch {
-      setHostname("");
       setIsValidUrl(false);
     }
   }
@@ -59,25 +55,14 @@ export default function Home() {
             Put your SaaS moments to work.
           </h1>
           <p className="text-lg md:text-xl text-neutral-400 max-w-2xl mx-auto">
-            Start with your SaaS URL. NextAction understands the product before asking you to sign in.
+            Add your SaaS URL, then define your product details and Moments yourself. No AI analysis or website crawling.
           </p>
         </div>
 
         <div className="w-full max-w-xl mt-12">
           <form onSubmit={handleContinue} className="flex flex-col gap-3">
             <div className="relative flex items-center">
-              {hostname ? (
-                <Image
-                  src={"https://s2.googleusercontent.com/s2/favicons?domain=" + hostname + "&sz=64"}
-                  alt=""
-                  width={20}
-                  height={20}
-                  unoptimized
-                  className="absolute left-4 w-5 h-5 rounded-sm"
-                />
-              ) : (
-                <Globe className="absolute left-4 w-5 h-5 text-neutral-500" />
-              )}
+              <Globe className="absolute left-4 w-5 h-5 text-neutral-500" />
               <input
                 type="text"
                 required
@@ -90,7 +75,7 @@ export default function Home() {
             </div>
             {url.length > 3 && !isValidUrl && <p className="text-left pl-2 text-sm text-red-400">Enter a public HTTP or HTTPS SaaS URL.</p>}
             <button type="submit" disabled={!isValidUrl || isContinuing} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl py-4 font-semibold transition-all disabled:opacity-50">
-              {isContinuing ? "Understanding..." : <>Understand my product <ArrowRight className="w-5 h-5" /></>}
+              {isContinuing ? "Opening setup..." : <>Set up my product <ArrowRight className="w-5 h-5" /></>}
             </button>
             <p className="text-sm text-neutral-500">No sign-in is required to get the Product Understanding proposal.</p>
           </form>
