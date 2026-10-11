@@ -59,16 +59,47 @@ export async function readJsonBody(
     }
   }
 
-  const body = await request.text();
-  const size = new TextEncoder().encode(body).byteLength;
-
-  if (size > maxBytes) {
+  const stream = request.body;
+  if (!stream) {
     throw new HttpError(
-      413,
-      "request_body_too_large",
-      "Request body is too large.",
+      400,
+      "invalid_json",
+      "Request body must be valid JSON.",
     );
   }
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+
+      const value = result.value;
+      if (totalBytes + value.byteLength > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new HttpError(
+          413,
+          "request_body_too_large",
+          "Request body is too large.",
+        );
+      }
+
+      chunks.push(value);
+      totalBytes += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const body = new TextDecoder().decode(bytes);
 
   if (!body.trim()) {
     throw new HttpError(
