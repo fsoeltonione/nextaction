@@ -11,10 +11,11 @@ const [http, requestBody, analysis, providerSmoke, click, packageJson, workflow]
   readFile(".github/workflows/quality-gates.yml", "utf8"),
 ]);
 
-assert.match(http, /request\.body\.getReader\(\)/);
-assert.match(http, /totalBytes\s*\+\s*value\.byteLength\s*>\s*maxBytes/);
-assert.match(http, /await reader\.cancel\(\)/);
-assert.doesNotMatch(http, /const body = await request\.text\(\)/);
+assert.match(requestBody, /request\.body\.getReader\(\)/);
+assert.match(requestBody, /totalBytes\s*\+\s*value\.byteLength\s*>\s*maxBytes/);
+assert.match(requestBody, /await reader\.cancel\(\)/);
+assert.doesNotMatch(requestBody, /const body = await request\.text\(\)/);
+assert.match(http, /export \{ HttpError, MAX_JSON_BODY_BYTES, readJsonBody \} from "\.\/request-body\.ts"/);
 
 const responseRead = analysis.indexOf("responseText = await readLimitedText(response, MAX_PROVIDER_RESPONSE_BYTES)");
 const clearTimeout = analysis.indexOf("clearTimeout(timeout)", responseRead);
