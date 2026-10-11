@@ -149,7 +149,11 @@ export async function POST(request: Request) {
 
     let scan;
     try {
-      scan = await scanProductUrl(normalized.value);
+      scan = await scanProductUrl(normalized.value, fetch, undefined, {
+        requestId,
+        // APP_ENV is a runtime Worker variable, unlike the public build-time label.
+        environment: process.env.APP_ENV?.trim() ?? "",
+      });
     } catch (error) {
       if (error instanceof ProductScannerError) {
         throw new HttpError(error.status, error.code, error.message);
