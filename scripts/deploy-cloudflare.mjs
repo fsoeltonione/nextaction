@@ -88,6 +88,14 @@ console.log(`Cloudflare Vite environment: ${process.env.CLOUDFLARE_ENV}`);
 
 run(process.execPath, ["scripts/cloudflare-vinext-build.mjs"]);
 
+// Treat the generated Wrangler file as the deployment source of truth. Fail before
+// any upload if the effective target config drops the required public-fetch flag
+// or adds an unreviewed network/outbound override.
+run(process.execPath, [
+  "scripts/verify-effective-cloudflare-config.mjs",
+  target,
+]);
+
 const secretDir = mkdtempSync(join(tmpdir(), "nextaction-secrets-"));
 const secretFile = join(secretDir, "secrets.json");
 
