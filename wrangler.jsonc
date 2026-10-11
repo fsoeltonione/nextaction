@@ -5,7 +5,8 @@
   "compatibility_date": "2026-09-25",
   "compatibility_flags": [
     "nodejs_compat",
-    "nodejs_compat_populate_process_env"
+    "nodejs_compat_populate_process_env",
+    "global_fetch_strictly_public"
   ],
   "observability": {
     "enabled": true,
