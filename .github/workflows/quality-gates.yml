@@ -41,6 +41,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Test effective Cloudflare runtime config gate
+        run: npm run test:effective-cloudflare-config
+
       # These controls live in the merge-required Quality check. A separate
       # optional check could fail without blocking merges under the current ruleset.
       - name: Test bounded JSON request bodies
