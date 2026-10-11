@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript, anonymousAcceptanceScript] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
     readFile(".github/workflows/quality-gates.yml", "utf8"),
@@ -11,6 +11,7 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
     readFile("scripts/staging-smoke.mjs", "utf8"),
     readFile("scripts/staging-authenticated-acceptance.mjs", "utf8"),
     readFile("scripts/staging-anonymous-proposal-acceptance.mjs", "utf8"),
+    readFile("scripts/verify-effective-cloudflare-config.mjs", "utf8"),
   ]);
 
 assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
@@ -110,6 +111,7 @@ for (const requiredCommand of [
   "npm run test:runtime-resource-contract",
   "npm run test:migration-filenames",
   "npm run test:cloudflare-production-audit-contract",
+  "npm run test:effective-cloudflare-config",
   "npm audit --audit-level=low",
   "npm audit --omit=dev --audit-level=low",
 ]) {
@@ -262,8 +264,27 @@ assert.match(
 );
 assert.match(
   deploy,
-  /"--var",\s*"NEXT_PUBLIC_RELEASE_SHA:"\s*\+\s*releaseSha/,
+  /"--var",\\s*"NEXT_PUBLIC_RELEASE_SHA:"\\s*\\+\\s*releaseSha/,
   "Cloudflare deployment must bind the current release SHA into the Worker runtime",
+);
+assert.match(
+  effectiveConfigGate,
+  /global_fetch_strictly_public/,
+  "effective runtime config gate must require the public-fetch security flag",
+);
+assert.match(
+  effectiveConfigGate,
+  /network_override_keys_found/,
+  "effective runtime config gate must report unreviewed network override keys",
+);
+const cloudflareBuildInvocation = deploy.indexOf('run(process.execPath, ["scripts/cloudflare-vinext-build.mjs"]);');
+const effectiveConfigGateInvocation = deploy.indexOf('"scripts/verify-effective-cloudflare-config.mjs"');
+const wranglerDeployInvocation = deploy.indexOf('run(npx, [');
+assert.ok(
+  cloudflareBuildInvocation !== -1 &&
+    effectiveConfigGateInvocation > cloudflareBuildInvocation &&
+    wranglerDeployInvocation > effectiveConfigGateInvocation,
+  "effective Cloudflare config validation must run after build and before any Wrangler deployment",
 );
 assert.match(
   deploy,
