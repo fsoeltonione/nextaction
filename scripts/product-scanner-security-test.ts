@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { isPublicIpAddress } from "../src/lib/ip-address.ts";
 import {
   PRODUCT_SCANNER_LIMITS,
@@ -9,6 +10,27 @@ import {
 } from "../src/lib/product-scanner.ts";
 
 const publicAddresses = async () => ["93.184.216.34"];
+test("Cloudflare global fetch is restricted to the public Internet", async () => {
+  const source = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  const config = JSON.parse(source) as {
+    compatibility_flags?: string[];
+    env?: Record<string, { compatibility_flags?: string[] }>;
+  };
+
+  assert.ok(
+    config.compatibility_flags?.includes("global_fetch_strictly_public"),
+    "the deployed Worker must use Cloudflare's global_fetch_strictly_public boundary",
+  );
+
+  for (const environment of ["staging", "production"]) {
+    assert.equal(
+      config.env?.[environment]?.compatibility_flags,
+      undefined,
+      `the ${environment} environment must inherit the top-level public-fetch flag rather than override it`,
+    );
+  }
+});
+
 const noAddresses = async () => {
   const error = new Error("no DNS record") as Error & { code: string };
   error.code = "ENODATA";
