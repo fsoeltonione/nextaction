@@ -12,8 +12,10 @@ export const PRODUCT_SCANNER_LIMITS = Object.freeze({
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const NO_DATA_DNS_CODES = new Set(["ENODATA", "ENOTFOUND"]);
-const NON_PUBLIC_DNS_RETRIES = 2;
-const NON_PUBLIC_DNS_RETRY_DELAY_MS = 75;
+const BLOCKED_APP_HOSTNAMES = new Set([
+  "nextaction.fsoeltoni-one.workers.dev",
+  "nextaction-staging.fsoeltoni-one.workers.dev",
+]);
 
 export type ProductScanResult = {
   finalUrl: string;
@@ -72,6 +74,14 @@ function normalizeScannerUrl(input: string | URL): URL {
     throw new ProductScannerError(
       "blocked_hostname",
       "This product URL is not allowed.",
+      400,
+    );
+  }
+
+  if (BLOCKED_APP_HOSTNAMES.has(hostname.toLowerCase().replace(/\.$/, ""))) {
+    throw new ProductScannerError(
+      "self_origin_not_allowed",
+      "NextAction cannot analyze its own application endpoint.",
       400,
     );
   }
@@ -141,6 +151,13 @@ function validatePublicAddresses(
   addresses: string[],
   code: "non_public_address" | "non_public_address_after_fetch",
 ): void {
+  if (addresses.length === 0) {
+    throw new ProductScannerError(
+      "dns_no_address",
+      "Product host did not resolve to a usable address.",
+    );
+  }
+
   for (const address of addresses) {
     if (!isPublicIpAddress(address)) {
       throw new ProductScannerError(
@@ -154,39 +171,16 @@ function validatePublicAddresses(
   }
 }
 
-async function resolvePublicAddressesWithRetry(
+async function resolvePublicAddresses(
   hostname: string,
   resolveAddresses: ResolveAddresses,
 ): Promise<string[]> {
-  for (let attempt = 0; attempt <= NON_PUBLIC_DNS_RETRIES; attempt += 1) {
-    const addresses = await resolveAddresses(hostname);
-    try {
-      validatePublicAddresses(addresses, "non_public_address");
-      return addresses;
-    } catch (error) {
-      if (
-        !(error instanceof ProductScannerError) ||
-        error.code !== "non_public_address" ||
-        attempt === NON_PUBLIC_DNS_RETRIES
-      ) {
-        throw error;
-      }
-
-      await sleep(NON_PUBLIC_DNS_RETRY_DELAY_MS);
-    }
-  }
-
-  throw new ProductScannerError(
-    "non_public_address",
-    "Product host resolves to a non-public network address.",
-    400,
-  );
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    setTimeout(() => resolve(), ms);
-  });
+  const addresses = await resolveAddresses(hostname);
+  // Fail closed: any private/reserved answer rejects this hostname immediately.
+  // Re-resolving after a blocked answer could let a rebinding domain pass on
+  // a later public answer, making the pre-fetch policy dependent on DNS timing.
+  validatePublicAddresses(addresses, "non_public_address");
+  return addresses;
 }
 
 async function readLimitedBody(
@@ -308,7 +302,7 @@ export async function scanProductUrl(
     }
     visited.add(currentValue);
 
-    const resolvedBefore = await resolvePublicAddressesWithRetry(
+    const resolvedBefore = await resolvePublicAddresses(
       current.hostname,
       resolveAddresses,
     );

@@ -149,6 +149,9 @@ jobs:
       - name: Run staging smoke
         run: npm run staging:smoke
 
+      - name: Run staging scanner security smoke
+        run: npm run staging:scanner-security-smoke
+
   h3_1_staging_release_proof:
     name: H3.1 staging release proof
     runs-on: ubuntu-24.04

@@ -69,33 +69,64 @@ test("DNS resolver classifies no-record and transient failures", async () => {
   );
 });
 
-test("scanner retries a transient non-public DNS answer before fetch", async () => {
+test("scanner fails closed on any non-public DNS answer without retrying", async () => {
   let resolveCalls = 0;
   let fetchCalls = 0;
 
-  const transientResolver = async () => {
+  const alternatingResolver = async () => {
     resolveCalls += 1;
     return resolveCalls === 1 ? ["10.0.0.1"] : ["93.184.216.34"];
   };
 
-  const result = await scanProductUrl(
-    "https://example.com",
-    async () => {
-      fetchCalls += 1;
-      return new Response(
-        '<html><title>Example</title><body>OK</body></html>',
-        {
+  await assert.rejects(
+    () => scanProductUrl(
+      "https://example.com",
+      async () => {
+        fetchCalls += 1;
+        return new Response("<html><title>Must not fetch</title></html>", {
           status: 200,
           headers: { "content-type": "text/html" },
-        },
-      );
-    },
-    transientResolver,
+        });
+      },
+      alternatingResolver,
+    ),
+    (error: unknown) =>
+      error instanceof ProductScannerError &&
+      error.code === "non_public_address",
   );
 
-  assert.equal(result.title, "Example");
-  assert.equal(resolveCalls, 3);
-  assert.equal(fetchCalls, 1);
+  assert.equal(resolveCalls, 1);
+  assert.equal(fetchCalls, 0);
+});
+
+test("scanner blocks NextAction production and staging origins before DNS or fetch", async () => {
+  for (const hostname of [
+    "nextaction.fsoeltoni-one.workers.dev",
+    "nextaction-staging.fsoeltoni-one.workers.dev",
+  ]) {
+    let resolveCalls = 0;
+    let fetchCalls = 0;
+
+    await assert.rejects(
+      () => scanProductUrl(
+        `https://${hostname}/api/health`,
+        async () => {
+          fetchCalls += 1;
+          return new Response("should never fetch");
+        },
+        async () => {
+          resolveCalls += 1;
+          return ["93.184.216.34"];
+        },
+      ),
+      (error: unknown) =>
+        error instanceof ProductScannerError &&
+        error.code === "self_origin_not_allowed",
+    );
+
+    assert.equal(resolveCalls, 0);
+    assert.equal(fetchCalls, 0);
+  }
 });
 
 test("scanner rejects non-public DNS answers before fetch", async () => {
