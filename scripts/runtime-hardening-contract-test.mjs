@@ -239,7 +239,7 @@ assert.match(h41, /GRANT EXECUTE ON FUNCTION public\\.runtime_operations_tick\\(
 // remain user-callable, so protect their membership boundary with regression
 // assertions: they must derive a user identity and authorize workspace access.
 const [activationSecurity, networkMomentSecurity, networkOfferSecurity] = await Promise.all([
-  readFile("supabase/migrations/20260929010000_stage_16_read_only_control_plane.sql", "utf8"),
+  readFile("supabase/migrations/20260928183000_stage_16_v2_workspace_scope_qualification.sql", "utf8"),
   readFile("supabase/migrations/20261004034037_h3_1_network_moment_model.sql", "utf8"),
   readFile("supabase/migrations/20261004040300_h3_1_network_offer_validation.sql", "utf8"),
 ]);
