@@ -14,6 +14,7 @@
     "staging:smoke": "node scripts/staging-smoke.mjs",
     "staging:scanner-security-smoke": "node scripts/staging-scanner-security-smoke.mjs",
     "test:scanner": "node --experimental-strip-types --test scripts/product-scanner-security-test.ts",
+    "test:cloudflare-fetch-policy": "node scripts/cloudflare-fetch-policy-contract-test.mjs",
     "analysis:provider-smoke": "node --experimental-strip-types scripts/analysis-provider-smoke.mjs",
     "test:analysis-provider": "node --experimental-strip-types --test scripts/analysis-provider-response-test.ts",
     "production:smoke": "node scripts/production-smoke.mjs",
