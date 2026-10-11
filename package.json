@@ -28,14 +28,14 @@
     "test:effective-cloudflare-config": "node --test scripts/effective-cloudflare-config-test.mjs",
     "test:runtime-hardening": "node scripts/runtime-hardening-contract-test.mjs",
     "test:h2-3-release-proof": "node scripts/h2-3-release-proof-contract-test.mjs",
-    "production:release-proof": "node scripts/production-release-proof.mjs",
     "test:h3-1-network-moment": "node scripts/h3-1-network-moment-contract-test.mjs",
     "test:h3-1-runtime-smoke": "node scripts/h3-1-runtime-smoke.mjs",
     "h3-1:release-proof": "node scripts/h3-1-release-proof.mjs",
     "test:braces-security-backport": "node scripts/braces-security-backport-test.mjs",
     "test:http-body": "node --experimental-strip-types --test scripts/http-body-test.ts",
     "test:runtime-resource-contract": "node scripts/runtime-resource-contract-test.mjs",
-    "test:migration-filenames": "node scripts/migration-filenames-test.mjs"
+    "test:migration-filenames": "node scripts/migration-filenames-test.mjs",
+    "test:embed-publisher": "node scripts/embed-publisher-contract-test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -53,7 +53,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
     "braces": "file:vendor/braces"
   },
   "type": "module",
