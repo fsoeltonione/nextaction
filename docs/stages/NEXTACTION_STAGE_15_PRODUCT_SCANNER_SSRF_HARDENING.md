@@ -1,3 +1,5 @@
+> **SUPERSEDED PRODUCT DECISION — 2026-10-12:** This document describes a former implementation and is retained for audit history only. Product AI analysis and publisher website crawling were removed from the current MVP direction. The current branch removes the scanner, `/api/analyze`, provider secrets, and scanner-specific release checks. This document is not a current launch acceptance checklist.
+
 # NextAction Stage 15 — DNS-aware Product Scanner / SSRF Hardening
 
 **Status:** FULLY COMPLETED and merged after green quality, scanner-security, Cloudflare-compatibility, and Cloudflare-build gates.

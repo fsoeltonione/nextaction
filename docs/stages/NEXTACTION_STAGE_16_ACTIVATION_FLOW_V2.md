@@ -1,3 +1,5 @@
+> **SUPERSEDING PRODUCT DECISION — 2026-10-12:** This original Stage 16 contract described AI-generated Product Understanding from a URL. That behavior is replaced by manual Product/Moment entry: the URL is reference data only, no crawler or LLM is used, and publishers enter name, description, and Moments themselves. The existing conditional-auth, persistence boundary, workspace-safety, and server-derived-ready invariants remain active. See `docs/decisions/2026-10-12-manual-publisher-moments-no-ai-crawling.md`.
+
 
 # NextAction Stage 16 — Activation Flow v2 Contract
 

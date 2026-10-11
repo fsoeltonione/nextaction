@@ -28,11 +28,10 @@ Used by the NextAction web application.
 
 Authentication:
 - Supabase user session/cookie for authenticated operations
-- anonymous access only for explicitly public onboarding analysis
+- anonymous access only for the landing page and ephemeral manual setup draft; no tenant reads/writes
 
 Primary logical operations:
-- Product Analysis
-- Product Confirmation
+- Manual Product Setup / Product Confirmation
 - Capability Selection
 - Workspace/Product configuration
 - Offer configuration
@@ -125,7 +124,7 @@ Error messages must not contain:
 
 Allowed only for:
 - landing page
-- product-analysis proposal
+- ephemeral manual setup draft (no product fetch or AI analysis)
 
 No tenant data access.
 
@@ -171,63 +170,16 @@ Privileged database access is internal only.
 
 No browser or publisher request may carry a Supabase service-role secret.
 
-## 5. Product Analysis contract
+## 5. Manual Product Setup contract
 
-### Logical endpoint
+There is no `POST /api/analyze` endpoint in the current MVP. Product websites are not crawled or fetched, and an AI provider is not called for product onboarding.
 
-```
-POST /api/analyze
-```
+The onboarding UI uses the supplied URL as a normalized identity/reference field and asks the publisher to enter product name, description, and one or more meaningful Moments. This draft is ephemeral until the authenticated user submits it to the existing product confirmation endpoint.
 
-Purpose:
-Return a proposed Product Understanding from an untrusted user-supplied URL.
+URL validation is syntax/host validation only; it must not trigger DNS resolution, page retrieval, redirects, or remote asset fetching.
 
-This endpoint is a web onboarding API, not a publisher runtime API.
-
-### Request
-
-```json
-{
-  "url": "https://example-saas.com"
-}
-```
-
-The server must normalize and validate the URL before retrieval.
-
-### Response
-
-```json
-{
-  "analysis": {
-    "url": "https://example-saas.com",
-    "name": "Example SaaS",
-    "description": "A concise description.",
-    "moments": [
-      {
-        "key": "invoice_created",
-        "label": "Invoice Created",
-        "description": "An invoice has been created and is ready for follow-up."
-      }
-    ]
-  },
-  "request_id": "..."
-}
-```
-
-The response represents a proposal.
-
-It is not persisted Product truth until the authenticated user confirms it.
-
-### Public failure behavior
-
-Expected categories:
-- invalid URL -> `400`
-- rate limited -> `429`
-- upstream retrieval timeout -> bounded `5xx` or controlled analysis failure
-- provider unavailable -> `503`
-- malformed model output -> `502` or controlled analysis failure
-
-The endpoint must never echo raw upstream error bodies.
+### Persistence boundary
+`POST /api/products/confirm` remains authenticated-only. It persists the URL/reference, publisher-entered product data, and Moment definitions atomically after server-side schema validation. Anonymous confirmation returns HTTP 401 before persistence.
 
 ## 6. Product confirmation contract
 
@@ -238,7 +190,7 @@ POST /api/products/confirm
 ```
 
 Purpose:
-Persist user-confirmed Product Understanding.
+Persist publisher-entered Product and Moment data.
 
 Authentication:
 Authenticated user only.
@@ -676,7 +628,7 @@ The integration credential remains the authorization boundary.
 Rate limits are part of the public runtime contract.
 
 At minimum, controls must exist for:
-- product analysis
+- manual product setup
 - `/v1/track`
 - `/v1/offer`
 - `/v1/click/:delivery_token`
@@ -750,7 +702,7 @@ The release path now includes:
 
 The following remain intentionally unimplemented:
 
-- DNS-aware SSRF controls for a future server-side URL scanner
+- no product URL crawler or analyzer is in the MVP; any future remote-fetch feature requires a separate explicit product/security decision
 - automated production promotion without the explicit CircleCI approval gate
 
 ## 19. Authentication callback contract

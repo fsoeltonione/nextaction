@@ -45,34 +45,31 @@ Capabilities are workspace-level intent:
 Capability selection is part of activation and must be persisted as domain state.
 
 ## 5. Canonical activation flow
-The canonical activation flow is now explicitly defined in two phases so the authentication boundary cannot be misread:
+The current MVP activation flow is explicit and publisher-authored:
 
-**URL -> Product Understanding Proposal -> Conditional Auth -> Confirmed Product -> Intent -> Make Money / Reach Customers / Both -> capability-specific setup -> verification (when required) -> truly ready -> dashboard**
+**URL Reference → Manual Product Setup → Conditional Auth → Confirmed Product → Intent → Make Money / Reach Customers / Both → capability-specific setup → verification (when required) → truly ready → dashboard**
 
 Meaning:
-- URL is the primary entry point.
-- Product Understanding is a proposal and may be generated before authentication.
+- The URL is an identity/reference field only. It is normalized and validated locally but never fetched.
+- The publisher manually enters product name, description, and meaningful Moment keys/labels/descriptions.
+- A blank manual draft may be prepared before authentication, but Product/Moment state is persisted only after authentication and explicit confirmation.
 - Authentication is conditional: an existing session skips login; an anonymous user authenticates only at the persistence boundary.
-- Product/Moment proposals are reviewed and edited before confirmation.
-- Confirmed Product state is persisted only after authentication.
 - Intent is persisted as workspace capability state.
 - Capability-specific setup is required only for selected capabilities.
 - Verification is required when the selected setup has a verification prerequisite.
 - Ready is derived from server state, not from a browser-controlled step flag.
 - Infrastructure concepts remain hidden during activation.
 
-This wording is a Stage 16 clarification of the previously ambiguous arrow sequence. It does not change the Product/domain model or the Event -> Moment -> Decision -> Delivery -> Click -> Qualified Click -> Settlement chain.
+This replaces the former URL → Product Understanding Proposal behavior. The core Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement domain remains unchanged.
 
-## 6. Product understanding
-Given a user-supplied SaaS URL, NextAction should derive:
-- canonical product URL/domain
+## 6. Product setup
+The publisher supplies:
+- canonical product URL/domain as a reference, without crawling or fetching the URL
 - product name
 - concise product description
-- suggested canonical Moments
+- explicitly defined Moments and their labels/descriptions
 
-These are proposals for confirmation/editing, not unquestionable facts.
-
-Moment identifiers must be stable, machine-readable, and semantically meaningful (for example, `invoice_created`), while labels are human-readable.
+Moment identifiers must be stable, machine-readable, and semantically meaningful (for example, `invoice_created`). NextAction may help validate formatting, but does not infer Moments through AI or website analysis.
 
 ## 7. Offer delivery
 Default publisher delivery format is raw JSON so publishers can render natively inside their own UI.
@@ -126,7 +123,7 @@ Schema evolution must become reproducible through committed migrations. A standa
 
 ## 11. Security and trust boundaries
 The system must distinguish:
-- untrusted public URL input
+- untrusted publisher-provided URL/reference data
 - authenticated workspace operations
 - server-authoritative decisioning
 - signed/verified click state
@@ -134,13 +131,13 @@ The system must distinguish:
 
 The server must never trust client-supplied financial amounts, qualification state, publisher earnings, or advertiser spend.
 
-The URL analyzer/scanner must eventually enforce normalization, SSRF resistance, redirect controls, response size/time limits, and abuse/rate controls.
+The MVP does not crawl publisher URLs and does not call an LLM to analyze product websites. URL normalization/validation is an input-validation step, not a network fetch. This removes the product-scanner/DNS-rebinding surface from the current MVP path. Destination URLs remain subject to their own syntax/host validation, and click/settlement logic remains server-authoritative.
 
 ## 12. Prototype baseline findings
 
 ### What the prototype successfully communicates
 - URL-first landing interaction.
-- Product analysis / recognition concept.
+- Historical Product analysis / recognition prototype (not part of current MVP).
 - Moment discovery concept.
 - Make Money / Reach Customers intent concept.
 - Supabase authentication integration.
@@ -195,23 +192,21 @@ Any change to the locked domain chain, capability semantics, activation flow, qu
 Implementation shortcuts must not silently redefine product semantics.
 
 ## 16. Stage 13 runtime amendment
-## 17. Stage 15 scanner amendment
+## 17. Former Stage 15 scanner amendment — superseded
 
-Stage 15 introduces the server-side Product Scanner trust boundary required by the Product and Security Truth. Product URLs remain untrusted input. The scanner performs bounded retrieval only for HTTP/HTTPS public hostnames, with DNS/IP safety checks, redirect validation, resource limits, and abuse controls.
+The former Stage 15 scanner/analyzer implementation is no longer part of the MVP. The product decision dated 2026-10-12 removes product URL crawling, `/api/analyze`, and LLM-based Product Understanding. The URL remains a normalized identity/reference input only.
 
-The scanner does not change the locked Event -> Moment -> Decision -> Delivery -> Click -> Qualified Click -> Settlement domain chain, capability semantics, or MVP economics.
-
-The Cloudflare Workers implementation does not claim connection-level DNS pinning for arbitrary internet hostnames. The residual DNS TOCTOU limitation is explicitly documented in the Stage 15 stage contract.
+Historical scanner requirements and test evidence are retained in the Stage 15 record for audit context; they are not current MVP acceptance criteria. No current publisher onboarding path may fetch a submitted product URL.
 
 ## 18. Stage 16 activation amendment
 
-Stage 16 locks the activation sequencing and recovery rules described in docs/stages/NEXTACTION_STAGE_16_ACTIVATION_FLOW_V2.md.
+Stage 16 remains authoritative for activation sequencing and workspace recovery, but its former AI-generated Product Understanding proposal is superseded by manual product setup.
 
-The authoritative interpretation is:
+The current sequence is:
 
 ~~~
-URL
-→ Product Understanding Proposal
+URL Reference
+→ Manual Product Setup
 → Conditional Auth
 → Confirmed Product
 → Intent
@@ -222,15 +217,9 @@ URL
 → Dashboard
 ~~~
 
-"Conditional Auth" means authentication is not required for the anonymous Product Understanding proposal. It becomes required at the persistence boundary. An already-authenticated user proceeds without a redundant login wall.
+Authentication is not required to prepare an ephemeral manual draft. It is required before Product/Moment persistence. The pending normalized URL and manually entered form state should survive login, refresh, and retry.
 
-Before confirmation, Product Understanding is proposal state only. The pending normalized URL must remain recoverable through authentication, refresh, and retry paths, while the proposal itself does not become Product truth until explicit confirmation.
-
-Stage 16 also locks current-workspace handling: zero accessible workspaces may create the first workspace during first confirmation; one workspace may be auto-selected; multiple workspaces require an explicit server-validated current workspace context. No activation operation may silently choose the first membership once multiple workspaces exist.
-
-The ready state remains server-derived. Client step state is never authoritative.
-
-Stage 16 does not change the locked domain chain, qualification rules, or MVP economics. Final cross-workspace commercial Moment targeting remains a later control-plane concern.
+The publisher chooses semantic Moment keys and labels explicitly. The existing server-derived ready state and multi-workspace protections remain unchanged. This decision does not change the lifecycle chain, qualification rules, or MVP economics.
 
 ## 19. H3.1 Network Moment Model amendment
 

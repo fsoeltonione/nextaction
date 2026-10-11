@@ -68,7 +68,6 @@ flowchart LR
     V --> S[Settlement Transaction]
     S --> DB
 
-    WEB --> LLM[Product Analyzer]
 ```
 
 The diagram is conceptual. Components may be deployed in the same Worker/application initially.
@@ -113,7 +112,6 @@ The domain core contains pure business concepts and rules and must not depend di
 - Supabase client APIs
 - Cloudflare APIs
 - HTTP Request/Response objects
-- LLM SDKs
 
 Core modules should be organized around domain behavior rather than database tables.
 
@@ -154,7 +152,6 @@ Infrastructure adapters provide:
 - narrow Postgres/RPC calls
 - authentication adapter
 - queue adapter
-- LLM provider adapter
 - URL fetching/scanning adapter
 - signed runtime credential verification
 - observability adapter
@@ -273,7 +270,7 @@ publisher
   -> resolve canonical Moment
 ```
 
-`/track` must not synchronously perform expensive LLM work or complex decisioning.
+The runtime does not perform product LLM analysis or URL crawling. `/track` only validates/accepts Events and queues processing; it must not perform complex decisioning synchronously.
 
 The Event envelope should contain a publisher-generated idempotency identifier.
 
@@ -423,28 +420,21 @@ Expected behavior:
 - never trust client-supplied price/qualification values
 - redirect only according to a server-authorized destination
 
-## 21. Product analysis architecture
+## 21. Manual Product Setup architecture (current MVP)
 
-Product analysis happens before authentication in the intended UX.
+Product onboarding does not fetch the submitted URL and does not call an LLM.
 
-Because the URL is untrusted public input, the analysis path must be treated as an abuse/security boundary.
+The browser normalizes/validates the URL as a reference field and collects publisher-authored product name, description, and semantic Moments. These values are an ephemeral draft until an authenticated user confirms them through the product confirmation API.
 
-Architecture requirements:
-- URL normalization
-- HTTP(S)-only policy
-- SSRF protection
-- redirect validation
-- DNS/IP safety checks as appropriate
-- timeout limit
-- response-size limit
-- content-type checks
-- rate limiting / abuse controls
-- bounded LLM input
-- structured output validation
+Required controls:
+- reject malformed/non-HTTP(S) URL references and embedded credentials
+- do not issue server-side or browser-side requests to the submitted product URL
+- do not load third-party favicons as part of onboarding
+- validate Product/Moment payloads and semantic Moment keys
+- require authentication and server-authoritative workspace authorization before persistence
+- keep financial, qualification, and settlement truth server-authoritative
 
-The analyzer returns **proposed product understanding**, not persisted product truth.
-
-Persistence occurs only after the user confirms the result and authentication is available.
+The former URL scanner/analyzer architecture is historical only and is not part of the current MVP.
 
 ## 22. Onboarding state architecture
 
@@ -570,7 +560,7 @@ Request/response schemas:
 
 ### End-to-end
 Critical journeys:
-- URL activation
+- manual product/Moment setup
 - Make Money setup
 - Reach Customers setup
 - publisher event -> moment -> delivery -> click -> settlement
@@ -597,7 +587,7 @@ The CI system must gate merges on at least:
 - critical browser E2E
 - security-sensitive checks
 
-The repository now contains `.circleci/config.yml`, including the Stage 15 `product_scanner_security` gate and the existing Cloudflare compatibility/build and release-gate jobs. The verified Stage 15 `master` baseline had successful CircleCI status checks for `quality`, `product_scanner_security`, `cloudflare_compatibility`, and `cloudflare_build`.
+The active GitHub Actions quality and release gates cover the manual activation contract, Cloudflare compatibility/build, and the core runtime. The former scanner/analyzer checks were removed along with the MVP URL-fetching code.
 
 The earlier “CI state unknown” statement was part of the pre-Stage-14 baseline and is no longer current.
 
@@ -642,7 +632,7 @@ Any future implementation must preserve these invariants:
 3. Financial qualification is server-authoritative.
 4. Settlement is atomic and idempotent.
 5. Runtime traffic does not depend on end-user Supabase Auth.
-6. Public URL analysis is treated as untrusted input.
+6. A product URL is reference data only; the MVP does not fetch it.
 7. Publisher-hosted UX is fail-open.
 8. GitHub migrations are the database source of truth.
 9. Application code remains modular and domain-driven.
@@ -665,15 +655,9 @@ Architecture work is considered complete only when the next implementation phase
 
 If an implementation cannot answer those questions, it is not ready to be built.
 
-## 31. Stage 15 product scanner implementation
+## 31. Former Stage 15 product scanner implementation — superseded
 
-The Product Analysis architecture now has an executable server-side scanner boundary.
-
-The scanner uses Cloudflare Workers-compatible node:dns resolution for A and AAAA validation, followed by controlled Fetch API retrieval with manual redirects, bounded HTML parsing, and explicit resource limits.
-
-The architecture deliberately distinguishes DNS preflight validation from connection-level destination pinning. Standard Worker fetch does not provide a general mechanism to force an arbitrary public hostname to the exact IP returned by a prior DNS query, so the implementation does not claim that guarantee.
-
-Strict IP-pinned egress remains a separate future infrastructure decision if product requirements make that guarantee necessary.
+Stage 15 implemented a bounded URL scanner in an earlier version of NextAction. The 2026-10-12 product decision removes that scanner and its LLM analyzer from the MVP. This section is retained as historical audit context only; none of its crawler-specific runtime, configuration, or CI requirements are current launch requirements.
 
 ## 32. H3.1 Network Moment architecture amendment
 

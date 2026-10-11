@@ -1,6 +1,6 @@
 # NextAction — Roadmap Audit & Official MVP-to-Launch Roadmap
 
-**Status:** Official post-Stage-15 roadmap  
+**Status:** Roadmap with current 2026-10-12 product decision applied  
 **Audit date:** 2026-10-11  
 **Repository:** `fsoeltonione/nextaction`  
 **Roadmap baseline master:** `f9cb8442214e7c840076682c5ec10c2b9536924e`  
@@ -17,6 +17,8 @@ It is intended to prevent two recurring problems:
 
 1. treating an old stage document as if it described current implementation state;
 2. starting a later feature before the security, data, UX, runtime, and operational prerequisites are actually closed.
+
+Current product decision (2026-10-12): drop product AI analysis and website crawling from the MVP. The publisher URL is a reference only. Publishers manually enter product metadata and Moments. The prior Stage 15 scanner is superseded and must not be treated as a current MVP dependency.
 
 This roadmap does **not** change the locked product domain.
 
@@ -96,47 +98,20 @@ Stage 14 is therefore **closed**.
 
 The repository documents and current application source expose several remaining gaps that must shape the roadmap.
 
-#### A. Stage 15 scanner gap is now closed
+#### A. Product analysis/crawling removed from MVP
 
-`src/lib/url.ts` performs URL normalization and rejects obvious blocked host forms.
+The former Stage 15 scanner and `POST /api/analyze` have been removed from the current MVP branch by product decision. There is no product-page retrieval, crawler, or LLM provider requirement in onboarding or release gates. The submitted URL is normalized and stored as publisher-provided reference data only.
 
-`src/lib/external-url.ts` validates HTTP(S) destination syntax and rejects embedded credentials / obvious blocked hosts.
+#### B. Stage 16 activation uses manual Product/Moment setup
 
-`src/app/api/analyze/route.ts` now uses the Stage 15 server-side scanner before sending a bounded page snapshot to the model provider. Provider timeout/response/output validation remains in place.
+The homepage sends the normalized URL to `/onboarding?url=...`, without a login wall. The onboarding page creates an editable blank draft and asks the publisher to enter the product name, description, and semantic Moments manually. No AI/crawler request is made.
 
-Therefore Stage 15 has now closed this trust-boundary gap. The current implementation performs controlled server-side retrieval with the security controls recorded in the Stage 15 contract. The historical pre-Stage-15 finding is retained here only to explain why Stage 15 existed.
-
-The authoritative data/security and architecture documents explicitly require:
-
-- normalization;
-- SSRF resistance;
-- DNS/IP safety checks;
-- redirect validation;
-- timeouts;
-- response-size limits;
-- content-type checks;
-- abuse/rate controls;
-- bounded LLM input;
-- structured output validation.
-
-#### B. Stage 16 URL-first activation is implemented; anonymous browser proof is now part of release acceptance
-
-The live homepage sends a normalized SaaS URL directly to `/onboarding?url=...`, without inserting a login wall. The onboarding page calls the public `/api/analyze` endpoint and renders an editable Product Understanding proposal before persistence.
-
-Saving is a separate boundary:
+Saving remains an authenticated persistence boundary:
 - `GET /api/onboarding/state` remains private and returns HTTP 401 to anonymous users;
 - `POST /api/products/confirm` returns HTTP 401 until a user authenticates;
-- the browser preserves the pending normalized URL in the login query and the OAuth callback preserves approved internal activation context;
-- confirmed Products/Moments, workspace selection, capabilities, integration verification, and starter-offer setup are covered by the authenticated staging acceptance runner.
-
-The remaining acceptance gap was that the anonymous proposal/persistence boundary had only been checked manually while the automated Release Gate exercised the authenticated journey. The Stage 16 change adds a separate headless browser job that:
-1. opens staging as a truly anonymous browser;
-2. verifies the Product Understanding proposal and 3–8 Moments render before login;
-3. confirms the activation state endpoint remains private;
-4. attempts the UI confirmation, requires `POST /api/products/confirm` to return HTTP 401, and checks redirect to login preserves the exact normalized pending URL;
-5. never signs in or creates Product/Moment data.
-
-This job receives only the staging base URL, no Supabase service credentials, and is a required dependency of authenticated staging acceptance and the production approval gate. Stage 16 should be marked closed only after a Release Gate run on the new commit passes both anonymous and authenticated staging acceptance.
+- the browser preserves the normalized URL and manual form draft through login/refresh/retry;
+- confirmed Products/Moments, workspace selection, capabilities, integration verification, and offer setup remain covered by activation acceptance;
+- anonymous staging acceptance verifies the blank manual form and persistence denial, not auto-derived 3–8 Moments.
 
 #### C. Some dashboard behavior is still prototype-shaped
 
@@ -183,7 +158,7 @@ There are **7 remaining milestones** after the completion of Stage 15, leading t
 
 | Stage | Milestone | Primary outcome |
 |---|---|---|
-| **15** | DNS-aware Product Scanner / SSRF Hardening | **COMPLETED** — safe server-side product retrieval boundary |
+| **15 (historical)** | Former DNS-aware Product Scanner / SSRF Hardening | **SUPERSEDED / REMOVED FROM MVP** — no crawler/analyzer dependency |
 | **16** | Activation Flow v2 Completion | Fully URL-first, conditional-auth activation |
 | **17** | Control Plane & Commercial UX Completion | Real publisher/advertiser operating surfaces |
 | **18** | Runtime Reliability, Observability & Performance | Production-grade runtime behavior under load/failure |
@@ -197,7 +172,7 @@ So the roadmap is:
 ```
 Stage 14 ✅
    ↓
-Stage 15 ✅ Scanner / SSRF
+Stage 15 scanner — historical only; removed from MVP
    ↓
 16 Activation v2
    ↓
@@ -216,58 +191,9 @@ Stage 15 ✅ Scanner / SSRF
 
 ---
 
-# 4. Stage 15 — DNS-aware Product Scanner / SSRF Hardening (COMPLETED)
+# 4. Former Stage 15 scanner — superseded by product decision
 
-## Objective
-
-Turn product URL analysis into a controlled, server-side internet retrieval boundary without introducing SSRF, redirect, DNS-rebinding, resource-exhaustion, or unsafe-content failures.
-
-## Scope
-
-- canonical URL normalization;
-- DNS A/AAAA resolution before retrieval;
-- blocking loopback, private, link-local, multicast, reserved, and other disallowed address ranges;
-- IPv4 and IPv6 coverage;
-- redirect handling with a hard limit;
-- re-validation of every redirect target;
-- request timeout;
-- response body byte limit;
-- content-type allowlist;
-- bounded parsing;
-- compression/decompression safeguards;
-- request/rate/abuse controls;
-- safe User-Agent policy;
-- no credential forwarding;
-- no cookies or authorization headers forwarded to arbitrary targets;
-- structured scanner result;
-- explicit error classification;
-- scanner unit/integration security corpus;
-- DNS-rebinding/TOCTOU threat-model decision;
-- deployment-specific implementation for Cloudflare Workers.
-
-## Important implementation constraint
-
-Cloudflare Workers currently expose `node:dns` resolution through DNS-over-HTTPS, and DNS requests count as Worker subrequests. Workers documentation also states that direct fetches to IP-address URLs are not supported. Therefore the scanner design must not claim “DNS pinning” merely because it performs a preliminary DNS lookup. A real TOCTOU-safe design must be proven against the actual Worker egress behavior.
-
-The Stage 15 design gate must explicitly decide whether the implementation can provide true connection pinning on the selected platform or whether arbitrary remote retrieval must go through an isolated egress mechanism.
-
-Worker redirects must also be handled deliberately: Cloudflare documents that `fetch()` with redirect-following can forward headers to a different host, so the scanner should use manual redirect handling rather than blindly following redirects.
-
-## Exit criteria
-
-Stage 15 is complete only when:
-
-- the scanner has a documented threat model;
-- DNS/IP validation covers IPv4 and IPv6;
-- redirect targets are revalidated;
-- resource limits are enforced;
-- disallowed destinations are tested;
-- hostile fixtures are tested;
-- no secret/cookie/header leakage is possible;
-- scanner output is schema-validated;
-- abuse controls are active;
-- the chosen Cloudflare-safe egress strategy is documented and tested;
-- all scanner tests are green in CI.
+Stage 15 previously implemented product URL crawling and SSRF/DNS-rebinding hardening. On 2026-10-12, the MVP direction changed: the scanner, analyzer, model-provider configuration, and scanner-specific release checks are removed from the MVP. This historical stage remains documented for audit, but it is no longer an active launch milestone. The submitted URL is reference data only, and onboarding does not fetch it.
 
 ---
 
@@ -278,8 +204,8 @@ Stage 15 is complete only when:
 Make the live user experience match the locked activation contract:
 
 ~~~
-URL
-→ Product Understanding Proposal
+URL Reference
+→ Manual Product Setup
 → Conditional Auth
 → Confirmed Product
 → Intent
@@ -292,16 +218,16 @@ URL
 
 The flow is explicitly two-phase:
 
-- Proposal phase: URL → Product Understanding Proposal, without requiring authentication.
+- Draft phase: normalize the URL locally and collect publisher-entered product name, description, and Moments without requiring authentication or fetching the site.
 - Persistence/activation phase: conditional authentication → Product confirmation → intent → capability setup → verification → ready.
 
 ## Locked scope
 
 ### URL-first proposal
-- anonymous Product analysis remains permitted;
+- anonymous form drafting remains permitted; no server-side Product analysis endpoint exists;
 - authenticated users may analyze a new URL without being redirected away first;
 - pending normalized URL survives login, auth failure, refresh, and retry;
-- Product analysis never persists Product truth.
+- manual drafting never persists Product truth until the authenticated confirmation boundary.
 
 ### Conditional authentication
 - anonymous users authenticate only at the persistence boundary;
@@ -310,7 +236,7 @@ The flow is explicitly two-phase:
 - OAuth callback remains limited to approved internal paths;
 - authentication failure preserves pending activation context.
 
-### Product Understanding
+### Manual Product Setup
 - Product name/description editable;
 - Moment label/key/description editable;
 - Moment add/remove supported;
@@ -337,11 +263,11 @@ Make Money requires integration issuance/verification.
 Reach Customers may use a starter activation offer, but Stage 16 must not silently define final cross-workspace commercial targeting. Final network targeting belongs to Stage 17.
 
 ### Failure/recovery
-Analysis failure, confirmation failure, capability failure, setup failure, verification failure, session expiry, refresh, deep links, and browser navigation must remain recoverable.
+Confirmation failure, capability failure, setup failure, verification failure, session expiry, refresh, deep links, and browser navigation must remain recoverable. There is no analysis/crawler failure path in the MVP.
 
 ## Contract blockers from the Stage 16 audit
 
-1. pre-auth analysis sequencing;
+1. pre-auth manual draft sequencing;
 2. mutation-to-server-state synchronization;
 3. current workspace context for multi-workspace users;
 4. authenticated URL-first entry;
@@ -352,7 +278,7 @@ Analysis failure, confirmation failure, capability failure, setup failure, verif
 
 ## Exit criteria
 
-A new user can submit a SaaS URL, receive Product Understanding before login when anonymous, authenticate only when saving is required, confirm Product and Moments, select capabilities, complete selected activation setup, reach a server-derived ready state, refresh safely, and open the dashboard.
+A new user can submit a SaaS URL as a reference, enter Product/Moment details before login, authenticate only when saving is required, confirm Product and Moments, select capabilities, complete selected activation setup, reach a server-derived ready state, refresh safely, and open the dashboard.
 
 All Stage 16 contract tests must be green.
 
@@ -480,7 +406,7 @@ Make NextAction operationally usable by humans, not only technically executable.
 
 ### Abuse
 
-- scanner abuse controls;
+
 - runtime request abuse controls;
 - click abuse controls;
 - credential abuse/revocation;
@@ -525,7 +451,7 @@ Provide a formal pre-launch gate across code, database, security, infrastructure
 
 ### Security
 
-- scanner security suite green;
+
 - SSRF/redirect controls green;
 - secret boundaries verified;
 - runtime privileges verified;
@@ -566,7 +492,7 @@ Provide a formal pre-launch gate across code, database, security, infrastructure
 - support contact;
 - incident procedure;
 - rollback procedure;
-- scanner abuse response;
+
 - commercial reconciliation procedure;
 - launch monitoring dashboard.
 
@@ -604,7 +530,7 @@ Expose the real system to a deliberately constrained external cohort before publ
 - click rate;
 - qualification rate;
 - settlement success/replay rate;
-- scanner rejection/error rate;
+
 - runtime latency;
 - abuse incidents.
 
@@ -712,7 +638,7 @@ Roadmap
 **Remaining after Stage 15: 7 milestones.**
 
 ```
-15  DNS-aware Product Scanner / SSRF Hardening ✅ CLOSED
+15  Former URL Scanner / SSRF hardening — SUPERSEDED / REMOVED FROM MVP
 16  Activation Flow v2 Completion
 17  Control Plane & Commercial UX Completion
 18  Runtime Reliability / Observability / Performance
