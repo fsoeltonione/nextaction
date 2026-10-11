@@ -88,8 +88,8 @@ function OnboardingContent() {
   const [refreshingConnection, setRefreshingConnection] = useState(false);
   const [integrationNotice, setIntegrationNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const autoAnalysisUrlRef = useRef<string | null>(null);
-  const initialAutoAnalysisUrlRef = useRef(initialFlowUrl);
+  const autoSetupUrlRef = useRef<string | null>(null);
+  const initialAutoSetupUrlRef = useRef(initialFlowUrl);
   const loadStateRequestRef = useRef(0);
 
   const applyState = useCallback((nextState: ActivationState) => {
@@ -164,13 +164,13 @@ function OnboardingContent() {
   }, [initialWorkspaceId, loadState]);
 
   useEffect(() => {
-    if (loading || !urlInput || draft || autoAnalysisUrlRef.current === urlInput) return;
+    if (loading || !urlInput || draft || autoSetupUrlRef.current === urlInput) return;
     // Only auto-prepare a URL that was seeded when this onboarding view mounted.
     // Manual typing from the URL field must wait for the explicit Analyze action.
-    if (urlInput !== initialAutoAnalysisUrlRef.current) return;
+    if (urlInput !== initialAutoSetupUrlRef.current) return;
     if (state?.product?.canonical_url === urlInput) return;
 
-    autoAnalysisUrlRef.current = urlInput;
+    autoSetupUrlRef.current = urlInput;
     // Defer the async action until after the current effect completes so React does not
     // treat the effect as synchronously cascading into local state updates.
     const timer = window.setTimeout(() => {
@@ -243,7 +243,7 @@ function OnboardingContent() {
         return;
       }
       if (!response.ok) throw new Error(await readApiError(response, "Unable to confirm the product."));
-      autoAnalysisUrlRef.current = draft.url;
+      autoSetupUrlRef.current = draft.url;
       if (isAddProductMode) {
         clearPending();
         setDraft(null);
