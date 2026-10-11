@@ -310,4 +310,12 @@ for (const [name, helper, args] of h42RpcHelpers) {
 assert.match(h42, /DROP INDEX IF EXISTS private\.moment_occurrences_event_id_idx/);
 assert.match(h42, /partial unique index on \(event_id\) WHERE event_id IS NOT NULL/i);
 
+
+ // H4.3: a standalone settlement_id index is redundant because retained
+ // unique indexes begin with settlement_id and preserve FK/query support.
+const h43Path = "supabase/migrations/20261011110000_h4_3_redundant_financial_index.sql";
+const h43 = await readFile(h43Path, "utf8");
+assert.match(h43, /DROP INDEX IF EXISTS private\\.financial_entries_settlement_idx/);
+assert.match(h43, /unique indexes start with settlement_id/i);
+
 console.log("runtime hardening contract: OK");
