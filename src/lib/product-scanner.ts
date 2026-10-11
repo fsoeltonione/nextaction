@@ -78,7 +78,7 @@ function normalizeScannerUrl(input: string | URL): URL {
     );
   }
 
-  if (BLOCKED_APP_HOSTNAMES.has(hostname.toLowerCase().replace(/\\.$/, ""))) {
+  if (BLOCKED_APP_HOSTNAMES.has(hostname.toLowerCase().replace(/\.$/, ""))) {
     throw new ProductScannerError(
       "self_origin_not_allowed",
       "NextAction cannot analyze its own application endpoint.",
