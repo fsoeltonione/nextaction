@@ -27,7 +27,7 @@ test("rejects an oversized streamed body before buffering the remainder", async 
     headers: { "content-type": "application/json" },
     body,
     duplex: "half",
-  });
+  } as RequestInit & { duplex: "half" });
 
   await assert.rejects(
     () => readJsonBody(request, 8),
