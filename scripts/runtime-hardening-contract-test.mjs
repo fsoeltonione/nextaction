@@ -246,7 +246,7 @@ const [activationSecurity, networkMomentSecurity, networkOfferSecurity] = await 
 function securityDefinerFunction(sql, name) {
   const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}(`);
   assert.notEqual(start, -1, `missing source definition for ${name}`);
-  const next = sql.indexOf("\\nCREATE OR REPLACE FUNCTION public.", start + 1);
+  const next = sql.indexOf("\nCREATE OR REPLACE FUNCTION public.", start + 1);
   return sql.slice(start, next === -1 ? sql.length : next);
 }
 const scopedRpcMigrations = [
