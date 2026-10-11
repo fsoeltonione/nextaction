@@ -124,6 +124,22 @@ assert.match(qualityGatesWorkflow, /uses: actions\/checkout@3d3c42e5aac5ba805825
 assert.match(qualityGatesWorkflow, /uses: actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7\.1\.0/);
 assert.match(qualityGatesWorkflow, /runs-on: ubuntu-24\.04/);
 
+
+const cloudflareBuildJob = jobBlock(qualityGatesWorkflow, "cloudflare_build");
+const cloudflareArtifactBuild = cloudflareBuildJob.indexOf("npm run cloudflare:build");
+const effectiveConfigAudit = cloudflareBuildJob.indexOf(
+  "node scripts/verify-effective-cloudflare-config.mjs staging",
+);
+const cloudflareDryRun = cloudflareBuildJob.indexOf(
+  "wrangler@4.139.0 deploy --dry-run --env staging",
+);
+assert.ok(
+  cloudflareArtifactBuild !== -1 &&
+    effectiveConfigAudit > cloudflareArtifactBuild &&
+    cloudflareDryRun > effectiveConfigAudit,
+  "CI must validate the generated staging Wrangler config after build and before Wrangler dry-run",
+);
+
 const qualityGateBlock = jobBlock(releaseWorkflow, "quality_gates");
 assert.match(
   qualityGateBlock,
@@ -264,7 +280,7 @@ assert.match(
 );
 assert.match(
   deploy,
-  /"--var",\\s*"NEXT_PUBLIC_RELEASE_SHA:"\\s*\\+\\s*releaseSha/,
+  /"--var",\s*"NEXT_PUBLIC_RELEASE_SHA:"\s*\+\s*releaseSha/,
   "Cloudflare deployment must bind the current release SHA into the Worker runtime",
 );
 assert.match(
