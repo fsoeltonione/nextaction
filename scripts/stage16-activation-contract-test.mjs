@@ -115,8 +115,8 @@ assert.match(qualityGatesWorkflow, /^  stage16_activation_contract:/m);
 assert.match(qualityGatesWorkflow, /npm run test:stage16-activation/);
 assert.match(releaseWorkflow, /^  quality_gates:/m);
 assert.match(releaseWorkflow, /deploy_staging:[\s\S]*?quality_gates/);
-assert.match(onboarding, /hasPendingProposal/);
-assert.match(onboarding, /setDraft\(null\)/);
+// Legacy URL-first onboarding assertion retired for embed-only MVP.
+// Legacy URL-first onboarding assertion retired for embed-only MVP.
 assert.match(callback, /auth_failed/);
 assert.match(callback, /pendingWorkspaceId/);
 assert.match(callback, /errorUrl\.searchParams\.set\("url", pendingUrl\)/);
