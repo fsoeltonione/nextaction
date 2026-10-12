@@ -95,14 +95,23 @@ export async function GET(request: Request) {
 
     let offerId: string | null = null;
     if (activeMoments.length > 0) {
-      const { data: links } = await retryPostgrestJwtValidation(() =>
+      const { data: links, error: linksError } = await retryPostgrestJwtValidation(() =>
         supabase.from("offer_moments").select("offer_id").in("moment_id", activeMoments.map((moment) => moment.id)),
       );
+      if (linksError) {
+        console.error("Activation offer-moment lookup failed", { requestId, code: linksError.code });
+        return jsonError(requestId, 500, "activation_lookup_failed", "Unable to load activation state.");
+      }
+
       const offerIds = [...new Set((links ?? []).map((link) => link.offer_id))];
       if (offerIds.length > 0) {
-        const { data: offer } = await retryPostgrestJwtValidation(() =>
+        const { data: offer, error: offerError } = await retryPostgrestJwtValidation(() =>
           supabase.from("offers").select("id").in("id", offerIds).eq("workspace_id", workspaceId).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle(),
         );
+        if (offerError) {
+          console.error("Activation offer lookup failed", { requestId, code: offerError.code });
+          return jsonError(requestId, 500, "activation_lookup_failed", "Unable to load activation state.");
+        }
         offerId = offer?.id ?? null;
       }
     }
