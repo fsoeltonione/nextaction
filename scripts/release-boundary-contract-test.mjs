@@ -56,7 +56,6 @@ const releaseJobs = releaseWorkflow.slice(releaseWorkflowJobsStart);
 for (const job of [
   "release_source_guard",
   "quality_gates",
-  "analysis_provider_smoke",
   "deploy_staging",
   "staging_smoke",
   "h3_1_staging_release_proof",
@@ -141,16 +140,17 @@ assert.ok(
   "CI must validate the generated staging Wrangler config after build and before Wrangler dry-run",
 );
 
+assert.doesNotMatch(
+  releaseWorkflow,
+  /analysis_provider_smoke|analysis:provider-smoke|staging:scanner-security-smoke|ANALYSIS_(API_KEY|BASE_URL|MODEL)/,
+  "embed-only Release Gate must not depend on retired AI analysis or scanner smoke paths",
+);
+
 const qualityGateBlock = jobBlock(releaseWorkflow, "quality_gates");
 assert.match(
   qualityGateBlock,
   /needs:[\s\S]*release_source_guard/,
   "quality gates must be blocked by the release source guard",
-);
-assert.match(
-  jobBlock(releaseWorkflow, "analysis_provider_smoke"),
-  /needs:[\s\S]*quality_gates/,
-  "analysis provider smoke must wait for centralized quality gates",
 );
 assert.match(
   jobBlock(releaseWorkflow, "deploy_staging"),
