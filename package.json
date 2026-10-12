@@ -12,7 +12,6 @@
     "cloudflare:build": "node scripts/cloudflare-vinext-build.mjs",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "staging:smoke": "node scripts/staging-smoke.mjs",
-    "staging:scanner-security-smoke": "node scripts/staging-scanner-security-smoke.mjs",
     "test:dns-rebind-runtime-probe": "node --test scripts/dns-rebind-runtime-probe-contract-test.mjs",
     "production:smoke": "node scripts/production-smoke.mjs",
     "cloudflare:production-audit": "node scripts/cloudflare-production-audit.mjs",
