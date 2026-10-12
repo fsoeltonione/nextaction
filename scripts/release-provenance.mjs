@@ -54,6 +54,7 @@ export async function waitForReleaseProvenance({
         environment: body?.environment ?? null,
         release_sha: body?.release_sha ?? null,
       };
+      if (firstObservation === null) firstObservation = lastObservation;
 
       if (
         response.status === 200 &&
