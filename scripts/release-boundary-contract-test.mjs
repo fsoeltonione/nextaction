@@ -229,7 +229,7 @@ assert.match(anonymousStagingAcceptance, /needs:[\s\S]*deploy_staging/);
 assert.match(anonymousStagingAcceptance, /needs:[\s\S]*staging_smoke/);
 assert.match(anonymousStagingAcceptance, /STAGING_BASE_URL:/);
 assert.doesNotMatch(anonymousStagingAcceptance, /STAGING_SUPABASE_SECRET_KEY|STAGING_NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
-assert.match(anonymousStagingAcceptance, /node scripts\/staging-anonymous-proposal-acceptance\.mjs/);
+assert.match(anonymousStagingAcceptance, /node scripts\/staging-anonymous-activation-acceptance\.mjs/);
 
 const stagingAcceptance = jobBlock(releaseWorkflow, "authenticated_staging_acceptance");
 assert.match(stagingAcceptance, /needs:[\s\S]*anonymous_staging_activation_acceptance/);
