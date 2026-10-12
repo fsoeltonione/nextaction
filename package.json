@@ -18,6 +18,7 @@
     "test:cloudflare-production-audit-contract": "node scripts/cloudflare-production-audit-contract-test.mjs",
     "test:stage16-activation": "node scripts/stage16-activation-contract-test.mjs",
     "test:moment-key": "node --experimental-strip-types --test scripts/moment-key-validation-test.ts",
+    "test:supabase-transient-retry": "node --experimental-strip-types --test scripts/supabase-transient-retry-test.ts",
     "test:release-boundary": "node scripts/release-boundary-contract-test.mjs",
     "test:effective-cloudflare-config": "node --test scripts/effective-cloudflare-config-test.mjs",
     "test:runtime-hardening": "node scripts/runtime-hardening-contract-test.mjs",
