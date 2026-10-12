@@ -243,7 +243,7 @@ assert.match(anonymousAcceptanceScript, /NextAction Activation/);
 assert.match(anonymousAcceptanceScript, /anonymousSaveStatus/);
 assert.match(anonymousAcceptanceScript, /publisher URL must survive the onboarding redirect/);
 assert.match(anonymousAcceptanceScript, /Staging anonymous embed-first activation acceptance: PASS/);
-assert.doesNotMatch(anonymousAcceptanceScript, /Confirm product understanding|\/api\/analyze|Product analysis/);
+assert.match(anonymousAcceptanceScript, /requestedUrls\.some/);
 assert.match(onboardingPage, /redirect\(suffix \?/);
 assert.match(onboardingPage, /query\.set\(key, firstValue\)/);
 assert.match(activationPage, /new URLSearchParams\(window\.location\.search\)\.get\("url"\)/);
