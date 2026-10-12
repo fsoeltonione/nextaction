@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   replay:
-    name: Disposable clean-replay probe
+    name: Disposable replay compatibility probe
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -68,6 +68,15 @@ jobs:
             supabase/migrations/20260926030100_stage_12_qualified_click_runtime.sql
           mv supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql \
             supabase/migrations/20260926040100_stage_13_atomic_settlement_runtime.sql
+
+          # The first canonical-source probe (run 38285691183) demonstrated that
+          # stage_9_runtime_core fails to parse because pg_catalog.extract(...) is
+          # not valid special-syntax qualification. For this continuation only,
+          # replace that one TEMPORARY COPY with the existing staging compatibility
+          # sidecar, so replay can uncover any downstream blockers. The canonical
+          # migration under $GITHUB_WORKSPACE is left untouched.
+          cp "$GITHUB_WORKSPACE/supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql" \
+            supabase/migrations/20260926030000_stage_9_runtime_core.sql
 
           python3 - <<'PY'
           from pathlib import Path
@@ -148,10 +157,10 @@ jobs:
           echo "supabase start exit: ${START_EXIT_CODE:-not-run}"
           echo "supabase db reset exit: ${RESET_EXIT_CODE:-not-run}"
           if [[ "${START_EXIT_CODE:-999}" != "0" || "${RESET_EXIT_CODE:-999}" != "0" ]]; then
-            echo "::error::The migration chain did not replay cleanly on the disposable local database. Review the logs artifact; no hosted Supabase database was targeted."
+            echo "::error::The compatibility replay did not reach a clean reset. This pass substitutes the existing Stage 9 staging-sidecar SQL only in the temporary runner copy; it does not certify the canonical migration source. Review the logs artifact; no hosted Supabase database was targeted."
             exit 1
           fi
-          echo "Migration chain replayed cleanly on the disposable local database."
+          echo "Replay completed using the test-only Stage 9 staging-sidecar override. This does not certify that the canonical migration source is clean."
 
       - name: Stop isolated local Supabase stack
         if: always()
