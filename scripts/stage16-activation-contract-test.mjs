@@ -99,7 +99,7 @@ assert.match(callback, /const pendingMode = safeNextUrl\.searchParams\.get\("mod
 assert.match(callback, /pendingMode === "add_product"/);
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
-assert.match(onboarding, /capabilitySelection\.length === 2 \? "rounded-2xl border border-white bg-white\/10 p-5 text-left" : "rounded-2xl border border-neutral-800 p-5 text-left"/);
+// Legacy onboarding capability UI assertion retired with the URL-first flow.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 assert.match(callback, /pendingUrl/);
 assert.match(login, /pendingWorkspaceId/);
