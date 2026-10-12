@@ -36,6 +36,7 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, q
 ]);
 
 assert.doesNotMatch(home, /\/onboarding\?url=/);
+assert.match(home, /Set up publisher/);
 assert.match(home, /\/activate/);
 assert.doesNotMatch(home, /signInWithOAuth|router\.push\(["']\/login\?url=/);
 assert.match(anonymousAcceptanceScript, /api\/onboarding\/state/);
