@@ -208,7 +208,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run anonymous URL-first proposal acceptance
+      - name: Run anonymous embed-first activation acceptance
         run: node scripts/staging-anonymous-activation-acceptance.mjs
 
   authenticated_staging_acceptance:
