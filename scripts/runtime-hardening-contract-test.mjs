@@ -294,7 +294,7 @@ const h42RpcHelpers = [
   ["set_moment_network_mapping_v1", "_activation_set_moment_network_mapping_v1_impl", "UUID, TEXT"],
   ["set_workspace_capabilities_v2", "_activation_set_workspace_capabilities_v2_impl", "UUID, TEXT[]"],
 ];
-for (const [name, helper, args] of h42RpcHelpers) {
+for (const [name, helper] of h42RpcHelpers) {
   assert.match(h42, new RegExp(`ALTER FUNCTION public\\.${name}\\([\\s\\S]*?\\)\\s*SET SCHEMA private`), `${name} is moved out of public`);
   assert.match(h42, new RegExp(`ALTER FUNCTION private\\.${name}\\([\\s\\S]*?\\)\\s*RENAME TO ${helper}`), `${name} gets an internal implementation name`);
   assert.match(h42, new RegExp(`ALTER FUNCTION private\\.${helper}\\([^)]*\\)\\s*SET search_path = ''`), `${helper} pins an empty search_path`);
