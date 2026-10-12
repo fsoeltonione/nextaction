@@ -25,17 +25,29 @@ test("legacy AI analysis route is disabled", async () => {
   assert.doesNotMatch(route, /ANALYSIS_API_KEY/);
 });
 
-test("activation page does not call the legacy analysis endpoint", async () => {
+test("activation page avoids the legacy analysis endpoint and configures publisher only", async () => {
   const page = await read("src/app/activate/page.tsx");
   assert.doesNotMatch(page, /\/api\/analyze/);
   assert.match(page, /show_ads\("invoice_created"\)/);
+  assert.doesNotMatch(page, /\/api\/offers\/create/);
+  assert.doesNotMatch(page, /reach_customers/);
 });
 
-test("public offer endpoint never accepts an arbitrary destination", async () => {
+test("public offer endpoint records a server-side Moment event before decision", async () => {
   const route = await read("src/app/v1/public-offer/route.ts");
   assert.match(route, /publisher_key/);
   assert.match(route, /moment_key/);
   assert.doesNotMatch(route, /body\.url/);
   assert.doesNotMatch(route, /fetch\(.*body\.url/);
+  assert.match(route, /runtime_accept_event/);
+  assert.match(route, /runtime_process_event/);
   assert.match(route, /runtime_create_decision_delivery/);
+  assert.match(route, /\/v1\/click\//);
+});
+
+test("package manifest preserves required release and TypeScript scripts", async () => {
+  const packageJson = JSON.parse(await read("package.json"));
+  assert.equal(packageJson.scripts["production:release-proof"], "node scripts/production-release-proof.mjs");
+  assert.equal(packageJson.devDependencies.typescript, "^5");
+  assert.equal(packageJson.scripts["test:embed-publisher"], "node scripts/embed-publisher-contract-test.mjs");
 });
