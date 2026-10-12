@@ -180,8 +180,8 @@ jobs:
       - name: Run H3.1 staging runtime smoke
         run: npm run test:h3-1-runtime-smoke
 
-  anonymous_staging_proposal_acceptance:
-    name: Anonymous URL-first proposal acceptance
+  anonymous_staging_activation_acceptance:
+    name: Anonymous embed-first activation acceptance
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     needs:
@@ -209,7 +209,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run anonymous URL-first proposal acceptance
-        run: node scripts/staging-anonymous-proposal-acceptance.mjs
+        run: node scripts/staging-anonymous-activation-acceptance.mjs
 
   authenticated_staging_acceptance:
     name: Authenticated staging acceptance
@@ -218,7 +218,7 @@ jobs:
     needs:
       - deploy_staging
       - h3_1_staging_runtime_smoke
-      - anonymous_staging_proposal_acceptance
+      - anonymous_staging_activation_acceptance
     env:
       STAGING_BASE_URL: ${{ needs.deploy_staging.outputs.staging_base_url }}
       STAGING_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
@@ -256,7 +256,7 @@ jobs:
       - staging_smoke
       - h3_1_staging_release_proof
       - h3_1_staging_runtime_smoke
-      - anonymous_staging_proposal_acceptance
+      - anonymous_staging_activation_acceptance
       - authenticated_staging_acceptance
     environment: production
     steps:

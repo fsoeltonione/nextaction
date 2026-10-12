@@ -102,6 +102,7 @@ async function main() {
 
   try {
     const suffix = randomBytes(6).toString("hex");
+    const appName = `Automated staging publisher ${suffix}`;
     const email = `staging-acceptance-${Date.now()}-${suffix}@example.com`;
     const password = randomBytes(32).toString("base64url") + "Aa9!";
 
@@ -138,99 +139,118 @@ async function main() {
       waitUntil: "domcontentloaded",
       timeout: 30_000,
     });
-
-    await page.getByRole("heading", { name: "Confirm product understanding" }).waitFor({
-      state: "visible",
-      timeout: 75_000,
-    });
-
-    const productName = (await page.getByLabel("Product name").inputValue()).trim();
-    const momentCount = await page.getByLabel("Moment key").count();
-    assertResponse(productName.length > 0, "Product analysis did not return a product name.");
-    assertResponse(momentCount >= 3 && momentCount <= 8, "Product analysis returned an unexpected Moment count.");
-
-    await page.getByRole("button", { name: "Confirm product" }).click();
-    await page.getByRole("heading", { name: "Choose your goal" }).waitFor({ state: "visible" });
-
-    // Verify the confirmed product and Moments survive a fresh browser navigation.
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: "Choose your goal" }).waitFor({ state: "visible" });
-
-    await page.getByRole("button", { name: /Both/ }).click();
-    await page.getByRole("button", { name: "Save goal" }).click();
-    await page.getByRole("heading", { name: "Make Money" }).waitFor({ state: "visible" });
-    await page.getByRole("heading", { name: "Reach Customers" }).waitFor({ state: "visible" });
-
-    await page.getByRole("button", { name: "Create connection" }).click();
-    await page.waitForFunction(() =>
-      [...document.querySelectorAll("div")].some((element) =>
-        /^na_live_[A-Za-z0-9_-]+$/.test((element.textContent ?? "").trim()),
-      ),
-    );
-
-    // The credential stays in memory only: never print it, capture a screenshot,
-    // write it to an artifact, or commit it.
-    const integrationToken = await page.evaluate(() => {
-      const tokenNode = [...document.querySelectorAll("div")].find((element) =>
-        /^na_live_[A-Za-z0-9_-]+$/.test((element.textContent ?? "").trim()),
-      );
-      return tokenNode?.textContent?.trim() ?? "";
-    });
-    assertResponse(integrationToken.startsWith("na_live_"), "The staging integration credential was not issued.");
-
-    await page.getByPlaceholder("Offer title").fill("Automated staging acceptance offer");
-    await page.getByPlaceholder("Offer description").fill("Temporary offer used only by the automated staging acceptance workflow.");
-    await page.getByPlaceholder("https://...").fill("https://example.com");
-    await page.locator('input[type="checkbox"]').first().check();
-    await page.getByRole("button", { name: "Create starter offer" }).click();
-    await page.getByRole("heading", { name: "Verify your server connection" }).waitFor({ state: "visible" });
-
-    const verifyResponse = await fetch(`${baseUrl}/v1/connection/verify`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${integrationToken}` },
-    });
-    const verifyPayload = await verifyResponse.json().catch(() => ({}));
+    await page.waitForURL((url) => url.pathname === "/activate", { timeout: 15_000 });
+    assertResponse(new URL(page.url()).origin === baseUrl, "Activation navigation left the staging origin.");
     assertResponse(
-      verifyResponse.ok && verifyPayload.verified === true,
-      "The temporary staging integration did not verify successfully.",
+      new URL(page.url()).searchParams.get("url") === productUrl,
+      "The onboarding redirect did not preserve the pending publisher URL.",
     );
 
-    await page.getByRole("button", { name: /Refresh connection status/ }).click();
-    await page.getByRole("heading", { name: "You are ready" }).waitFor({ state: "visible" });
+    await page.getByRole("heading", { name: "NextAction Activation" }).waitFor({ state: "visible" });
+    const urlInput = page.getByPlaceholder("https://invoice-app.com");
+    await urlInput.waitFor({ state: "visible" });
+    assertResponse(
+      (await urlInput.inputValue()) === productUrl,
+      "The pending publisher URL was not prefilled as metadata.",
+    );
 
-    // Confirm activation state persists after a full reload.
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: "You are ready" }).waitFor({ state: "visible" });
+    const initialStateResponse = await page.evaluate(async () => {
+      const response = await fetch("/api/onboarding/state", { cache: "no-store" });
+      return { status: response.status, body: await response.json().catch(() => ({})) };
+    });
+    assertResponse(initialStateResponse.status === 200, "Authenticated activation state did not load.");
+    assertResponse(
+      Array.isArray(initialStateResponse.body?.state?.workspaces),
+      "Authenticated activation state did not return the workspace list.",
+    );
 
-    await page.getByRole("button", { name: "Open dashboard" }).click();
-    await page.waitForURL((url) => url.pathname === "/dashboard", { timeout: 30_000 });
-    assertResponse(new URL(page.url()).origin === baseUrl, "Dashboard navigation left the staging origin.");
+    await page.getByPlaceholder("Nama aplikasi").fill(appName);
+    await page.getByPlaceholder("Deskripsi singkat").fill("Temporary publisher created only for staging acceptance.");
+    await page.getByPlaceholder("invoice_created").fill("invoice_created");
+    await page.getByPlaceholder("Invoice Created").fill("Invoice Created");
+    await page.getByPlaceholder("Optional description").fill("After an invoice has been created.");
+    await page.getByRole("button", { name: "Simpan Publisher" }).click();
 
-    console.log("Staging authenticated acceptance: PASS");
-    console.log("Verified: URL analysis, product/Moment persistence, both capabilities, integration verification, starter offer, Ready state, and dashboard navigation.");
+    await page.getByText(
+      "Publisher dan Moment tersimpan. Lanjutkan untuk membuat publisher key.",
+      { exact: true },
+    ).waitFor({ state: "visible", timeout: 60_000 });
+
+    const savedStateResponse = await page.evaluate(async () => {
+      const response = await fetch("/api/onboarding/state", { cache: "no-store" });
+      return { status: response.status, body: await response.json().catch(() => ({})) };
+    });
+    assertResponse(savedStateResponse.status === 200, "Saved activation state could not be reloaded.");
+    const savedState = savedStateResponse.body?.state;
+    assertResponse(savedState?.product?.name === appName, "The manually entered publisher name did not persist.");
+    assertResponse(
+      new URL(savedState.product.canonical_url).hostname === "linear.app",
+      "The publisher URL was not retained as metadata.",
+    );
+    assertResponse(
+      Array.isArray(savedState.product.moments) &&
+        savedState.product.moments.some((moment) => moment.moment_key === "invoice_created"),
+      "The publisher-defined Moment did not persist.",
+    );
+    assertResponse(
+      Array.isArray(savedState.capabilities) && savedState.capabilities.includes("make_money"),
+      "The Make Money capability was not saved for the publisher.",
+    );
+    const effectiveWorkspaceId = savedState?.workspace?.id;
+    assertResponse(
+      typeof effectiveWorkspaceId === "string" && effectiveWorkspaceId.length > 0,
+      "Activation did not resolve a workspace after saving the first publisher.",
+    );
+
+    await page.getByRole("button", { name: "Buat Publisher Key" }).click();
+    await page.getByRole("heading", { name: "3. Panggil iklan di action yang tepat" }).waitFor({
+      state: "visible",
+      timeout: 30_000,
+    });
+
+    const preBlocks = (await page.locator("pre").allTextContents()).map((value) => value.trim());
+    const publisherKey = preBlocks[0] ?? "";
+    assertResponse(publisherKey.length > 0, "The public publisher identifier was not displayed.");
+    assertResponse(
+      preBlocks.some((value) => value.includes(`data-publisher-key="${publisherKey}"`) && value.includes("/nextaction.js")),
+      "The generated embed script does not contain the displayed publisher identifier.",
+    );
+    assertResponse(
+      preBlocks.some((value) => value.includes('show_ads("invoice_created")')),
+      "The embed example does not trigger the publisher-defined Moment.",
+    );
+    assertResponse(
+      (await page.locator("main").innerText()).includes("Tanpa crawling. Tanpa AI."),
+      "Activation no longer reflects the embed-only MVP contract.",
+    );
+
+    console.log("Staging authenticated embed-first activation acceptance: PASS");
+    console.log("Verified: pending URL metadata, authenticated state, first-time workspace resolution, product/Moment persistence, public publisher key, and the zero-SDK embed snippet.");
   } finally {
     if (browser) await browser.close().catch(() => undefined);
 
     if (testUserId) {
-      // Remove the temporary workspace first so dependent staging rows cascade,
-      // then delete the auth user. Cleanup failure fails the job for visibility.
-      const { data: workspaces, error: workspaceLookupError } = await admin
-        .from("workspaces")
-        .select("id")
+      // Delete all workspaces reachable from the temporary user before deleting
+      // the auth user so related activation rows can cascade cleanly.
+      const { data: memberships, error: membershipLookupError } = await admin
+        .from("workspace_members")
+        .select("workspace_id")
         .eq("user_id", testUserId);
 
-      if (workspaceLookupError) {
-        console.error("Acceptance cleanup could not enumerate the temporary workspace.");
+      if (membershipLookupError) {
+        console.error("Acceptance cleanup could not enumerate the temporary user's workspaces.");
         cleanupFailed = true;
-      } else if ((workspaces ?? []).length > 0) {
-        const workspaceIds = workspaces.map((workspace) => workspace.id);
-        const { error: workspaceDeleteError } = await admin
-          .from("workspaces")
-          .delete()
-          .in("id", workspaceIds);
-        if (workspaceDeleteError) {
-          console.error("Acceptance cleanup could not delete the temporary workspace.");
-          cleanupFailed = true;
+      } else {
+        const workspaceIds = [...new Set((memberships ?? []).map((row) => row.workspace_id))];
+        if (workspaceIds.length > 0) {
+          const { error: workspaceDeleteError } = await admin
+            .from("workspaces")
+            .delete()
+            .in("id", workspaceIds);
+          if (workspaceDeleteError) {
+            console.error("Acceptance cleanup could not delete the temporary workspace.");
+            cleanupFailed = true;
+          }
         }
       }
 
