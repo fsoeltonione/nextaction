@@ -317,6 +317,17 @@ assert.match(
 );
 
 assert.match(
+  stagingSmoke,
+  /waitForReleaseProvenance\\(/,
+  "staging smoke must wait for the exact deployed release identity before running business checks",
+);
+assert.match(
+  stagingSmoke,
+  /first_observation/,
+  "a delayed staging release must record the first observed runtime identity for diagnosis",
+);
+
+assert.match(
   deploy,
   /target === "production"[\s\S]*?GITHUB_ACTIONS === "true"/,
 );
