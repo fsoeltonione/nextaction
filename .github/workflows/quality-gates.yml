@@ -110,6 +110,8 @@ jobs:
         run: npm run test:stage16-activation
       - name: Test semantic Moment key boundary
         run: npm run test:moment-key
+      - name: Test bounded PostgREST JWT retry
+        run: npm run test:supabase-transient-retry
 
   runtime_hardening_contract:
     name: Runtime hardening contract
