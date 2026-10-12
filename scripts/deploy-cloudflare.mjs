@@ -93,6 +93,35 @@ run(process.execPath, [
   target,
 ]);
 
+// Capture recent deployment history before staging publish to distinguish API
+// history/status problems from build or bundle failures. This is diagnostic only:
+// a read-only listing failure must not block the separately gated deployment.
+if (target === "staging") {
+  console.log("Capturing recent staging deployment history before publish (diagnostic only)...");
+  const diagnostic = spawnSync(
+    npx,
+    [
+      "--yes",
+      "wrangler@4.149.0",
+      "deployments",
+      "list",
+      "--env",
+      "staging",
+      "--json",
+    ],
+    {
+      env: process.env,
+      stdio: "inherit",
+      timeout: 30_000,
+    },
+  );
+  if (diagnostic.error || diagnostic.status !== 0) {
+    console.warn(
+      "[deploy-diagnostic] Staging deployment history unavailable; continuing with deployment attempt.",
+    );
+  }
+}
+
 const secretDir = mkdtempSync(join(tmpdir(), "nextaction-secrets-"));
 const secretFile = join(secretDir, "secrets.json");
 
@@ -111,7 +140,7 @@ writeFileSync(
 try {
   run(npx, [
     "--yes",
-    "wrangler@4.139.0",
+    "wrangler@4.149.0",
     "deploy",
     "--env",
     target,
