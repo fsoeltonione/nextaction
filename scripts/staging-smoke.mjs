@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
+import { waitForReleaseProvenance } from "./release-provenance.mjs";
 
 const baseUrl = process.env.STAGING_BASE_URL;
 const integrationToken = process.env.STAGING_INTEGRATION_TOKEN;
@@ -36,13 +37,48 @@ async function request(path, options = {}) {
   });
 }
 
-const health = await request("/api/health");
-if (health.status !== 200) {
-  console.error(`Health check failed: HTTP ${health.status}`);
-  process.exit(1);
+let healthBody;
+
+if (expectedReleaseSha) {
+  if (!/^[0-9a-f]{40}$/i.test(expectedReleaseSha)) {
+    console.error("STAGING_EXPECTED_RELEASE_SHA must be a valid 40-character Git SHA.");
+    process.exit(2);
+  }
+
+  try {
+    const provenance = await waitForReleaseProvenance({
+      expectedReleaseSha,
+      expectedEnvironment,
+      requestHealth: () => request("/api/health"),
+    });
+    healthBody = provenance.body;
+    if (provenance.attempts > 1) {
+      console.warn(
+        "[release-provenance] Runtime had not converged on the requested revision immediately after deployment; exact release identity became healthy after bounded polling.",
+      );
+      console.warn(
+        JSON.stringify({
+          expected_release_sha: expectedReleaseSha,
+          attempts: provenance.attempts,
+          first_observation: provenance.firstObservation,
+        }, null, 2),
+      );
+    }
+    console.log(`${expectedEnvironment} release provenance check: OK`);
+  } catch (error) {
+    console.error("Release provenance check failed.");
+    console.error(error instanceof Error ? error.message : "Unknown release provenance error.");
+    process.exit(1);
+  }
+} else {
+  const health = await request("/api/health");
+  if (health.status !== 200) {
+    console.error(`Health check failed: HTTP ${health.status}`);
+    process.exit(1);
+  }
+  healthBody = await health.json();
 }
 
-const healthBody = await health.json();
 if (
   healthBody?.status !== "ok" ||
   healthBody?.service !== "nextaction" ||
@@ -60,19 +96,6 @@ if (
     ),
   );
   process.exit(1);
-}
-
-if (expectedReleaseSha) {
-  if (!/^[0-9a-f]{40}$/i.test(expectedReleaseSha)) {
-    console.error("STAGING_EXPECTED_RELEASE_SHA must be a valid 40-character Git SHA.");
-    process.exit(2);
-  }
-  if (healthBody?.release_sha !== expectedReleaseSha) {
-    console.error("Runtime release SHA does not match the CI source revision.");
-    console.error(JSON.stringify({ expected_release_sha: expectedReleaseSha, actual_release_sha: healthBody?.release_sha }, null, 2));
-    process.exit(1);
-  }
-  console.log(`${expectedEnvironment} release provenance check: OK`);
 }
 
 console.log(`${expectedEnvironment} health check: OK`);
