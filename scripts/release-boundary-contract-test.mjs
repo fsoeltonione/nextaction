@@ -299,7 +299,11 @@ assert.doesNotMatch(
   /ANALYSIS_(?:API_KEY|BASE_URL|MODEL)/,
   "embed-only deployment must not require or inject retired AI provider configuration",
 );
-const requiredDeploymentEnv = deploy.match(/const required = \\[([\\s\\S]*?)\\];/)?.[1] ?? "";
+const requiredStart = deploy.indexOf("const required = [");
+const requiredEnd = deploy.indexOf("];", requiredStart);
+const requiredDeploymentEnv = requiredStart === -1 || requiredEnd === -1
+  ? ""
+  : deploy.slice(requiredStart, requiredEnd + 2);
 for (const requiredVariable of [
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_ACCOUNT_ID",
