@@ -1,0 +1,50 @@
+name: Disposable Migration Replay
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/disposable-migration-replay.yml'
+      - 'scripts/migration-filenames-test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: Replay all migrations from zero
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Initialize disposable Supabase project
+        run: |
+          rm -rf .ci/supabase-replay
+          mkdir -p .ci/supabase-replay
+          supabase init --workdir .ci/supabase-replay
+          rm -rf .ci/supabase-replay/supabase/migrations
+          cp -R supabase/migrations .ci/supabase-replay/supabase/migrations
+          rm -f .ci/supabase-replay/supabase/seed.sql
+      - name: Start disposable Supabase
+        working-directory: .ci/supabase-replay
+        run: supabase start -x studio,imgproxy,mailpit,vector,logflare
+      - name: Replay every repository migration from zero
+        working-directory: .ci/supabase-replay
+        run: supabase db reset --local --no-seed
+      - name: Verify local migration history
+        working-directory: .ci/supabase-replay
+        run: |
+          supabase migration list --local
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l)" -gt 0
+      - name: Stop disposable Supabase
+        if: always()
+        working-directory: .ci/supabase-replay
+        run: supabase stop --no-backup
