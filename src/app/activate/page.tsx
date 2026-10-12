@@ -88,6 +88,11 @@ export default function ActivatePage() {
 
     async function initialize() {
       try {
+        // /onboarding may carry a URL-first entry point, but the URL is metadata
+        // only. Prefill it in the publisher form without fetching that URL.
+        const pendingUrl = new URLSearchParams(window.location.search).get("url");
+        if (pendingUrl) setUrl(pendingUrl);
+
         const payload = await api("/api/onboarding/state");
         if (cancelled) return;
         applyActivationState(payload.state as ActivationState, {
@@ -113,7 +118,15 @@ export default function ActivatePage() {
   }
 
   async function saveProduct() {
-    if (!selectedWorkspace || !url.trim() || !name.trim() || moments.length === 0) {
+    if (!state) {
+      setMessage("Tunggu status aktivasi selesai dimuat, lalu coba lagi.");
+      return;
+    }
+    if (!selectedWorkspace && (state.workspaces?.length ?? 0) > 0) {
+      setMessage("Pilih workspace sebelum menyimpan publisher.");
+      return;
+    }
+    if (!url.trim() || !name.trim() || moments.length === 0) {
       setMessage("Isi URL aplikasi, nama aplikasi, dan minimal satu Moment.");
       return;
     }
@@ -126,7 +139,7 @@ export default function ActivatePage() {
     setBusy(true);
     setMessage("");
     try {
-      await api("/api/products/confirm", {
+      const confirmation = await api("/api/products/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -137,12 +150,21 @@ export default function ActivatePage() {
           moments,
         }),
       });
+      // A first-time user may have no workspace yet. The confirmation RPC
+      // creates the initial workspace and returns its ID; subsequent writes
+      // must use that resolved ID instead of the empty pre-save selection.
+      const effectiveWorkspaceId =
+        selectedWorkspace || confirmation?.product?.workspace_id;
+      if (typeof effectiveWorkspaceId !== "string" || !effectiveWorkspaceId) {
+        throw new Error("Publisher saved without a workspace ID.");
+      }
+      setWorkspaceId(effectiveWorkspaceId);
       await api("/api/workspaces/capabilities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace_id: selectedWorkspace, capabilities: ["make_money"] }),
+        body: JSON.stringify({ workspace_id: effectiveWorkspaceId, capabilities: ["make_money"] }),
       });
-      await load(selectedWorkspace);
+      await load(effectiveWorkspaceId);
       setMessage("Publisher dan Moment tersimpan. Lanjutkan untuk membuat publisher key.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Gagal menyimpan publisher.");
