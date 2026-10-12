@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/tests/**'
       - 'supabase/staging/STAGE14_BOOTSTRAP.sql'
       - '.github/workflows/disposable-migration-replay.yml'
       - 'scripts/migration-filenames-test.mjs'
@@ -39,9 +40,12 @@ jobs:
           # project or database credentials are configured by this workflow.
           test -f supabase/staging/STAGE14_BOOTSTRAP.sql
           REPLAY_WORKDIR="$RUNNER_TEMP/nextaction-migration-replay"
-          mkdir -p "$REPLAY_WORKDIR/supabase/migrations" "$REPLAY_WORKDIR/supabase/staging"
-          cp supabase/migrations/*.sql "$REPLAY_WORKDIR/supabase/migrations/"
-          cp supabase/staging/STAGE14_BOOTSTRAP.sql "$REPLAY_WORKDIR/supabase/staging/"
+          mkdir -p "$REPLAY_WORKDIR/supabase/migrations" "$REPLAY_WORKDIR/supabase/staging" "$REPLAY_WORKDIR/supabase/tests"
+          cp "$GITHUB_WORKSPACE"/supabase/migrations/*.sql "$REPLAY_WORKDIR/supabase/migrations/"
+          cp "$GITHUB_WORKSPACE"/supabase/staging/STAGE14_BOOTSTRAP.sql "$REPLAY_WORKDIR/supabase/staging/"
+          cp "$GITHUB_WORKSPACE"/supabase/tests/*.sql "$REPLAY_WORKDIR/supabase/tests/"
+          SOURCE_MIGRATION_COUNT="$(find "$GITHUB_WORKSPACE/supabase/migrations" -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d '[:space:]')"
+          printf 'SOURCE_MIGRATION_COUNT=%s\n' "$SOURCE_MIGRATION_COUNT" >> "$GITHUB_ENV"
           cd "$REPLAY_WORKDIR"
           supabase init --force
 
@@ -62,6 +66,7 @@ jobs:
           # the staging sidecar. This is the regression test for the SQL fix.
           python3 - <<'PY'
           from pathlib import Path
+          import os
           import re
           root = Path("supabase/migrations")
           files = sorted(root.glob("*.sql"))
@@ -74,12 +79,39 @@ jobs:
           duplicates = {version: names for version, names in versions.items() if len(names) > 1}
           if duplicates:
               raise SystemExit(f"Duplicate versions remain in disposable copy: {duplicates}")
-          if len(files) != 50:
-              raise SystemExit(f"Expected 49 source migrations plus one disposable baseline; found {len(files)}")
+          expected_count = int(os.environ["SOURCE_MIGRATION_COUNT"]) + 1
+          if len(files) != expected_count:
+              raise SystemExit(f"Expected {expected_count} files (all {expected_count - 1} source migrations plus one disposable baseline); found {len(files)}")
+
+          expected_order = [
+              "20260925000000_ci_legacy_prototype_baseline.sql",
+              "20260925205217_stage_6_production_foundation.sql",
+              "20260926030000_stage_9_runtime_core.sql",
+              "20260926030100_stage_12_qualified_click_runtime.sql",
+              "20260926040000_stage_9_hardening.sql",
+              "20260926040100_stage_13_atomic_settlement_runtime.sql",
+              "20260926040500_stage_13_settlement_index_cleanup.sql",
+              "20260926044000_stage_9_runtime_surface_cleanup.sql",
+              "20260926050000_stage_9_runtime_rate_limit_reconciliation.sql",
+              "20261003020000_stage_17_final_reconcile.sql",
+              "20261011020000_h4_1_unsettled_settlement_recovery.sql",
+              "20261011105000_h4_2_rpc_security_and_index_audit.sql",
+              "20261011110000_h4_3_redundant_financial_index.sql",
+              "20261011120000_h4_4_redundant_financial_accounts_index.sql",
+          ]
+          names = [path.name for path in files]
+          missing = [name for name in expected_order if name not in names]
+          if missing:
+              raise SystemExit(f"Missing critical migrations in disposable chain: {missing}")
+          positions = [names.index(name) for name in expected_order]
+          if positions != sorted(positions):
+              raise SystemExit(f"Critical migration dependency order is invalid: {dict(zip(expected_order, positions))}")
+
           canonical = Path("supabase/migrations/20260926030000_stage_9_runtime_core.sql").read_text()
           if "pg_catalog.extract(" in canonical or "pg_catalog.trim(" in canonical:
               raise SystemExit("Canonical Stage 9 migration still has invalid qualified special syntax")
           print(f"Prepared {len(files)} SQL files; canonical Stage 9 source retained.")
+          print("Critical migration dependency order verified.")
           print("Baseline and timestamp adjustments are disposable-test-only.")
           PY
           printf 'REPLAY_WORKDIR=%s\n' "$REPLAY_WORKDIR" >> "$GITHUB_ENV"
@@ -94,13 +126,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          supabase migration list --local
-          expected=50
-          applied="$(supabase migration list --local | grep -cE '^[[:space:]]*[0-9]{14}[[:space:]]*\|' || true)"
-          if [[ "$applied" -lt "$expected" ]]; then
-            echo "::error::Expected at least $expected migration ledger rows (including disposable baseline), found $applied"
+          migration_output="$(supabase migration list --local)"
+          printf '%s\n' "$migration_output"
+          expected=$((SOURCE_MIGRATION_COUNT + 1))
+          applied="$(printf '%s\n' "$migration_output" | grep -cE '^[[:space:]]*`?[0-9]{14}`?[[:space:]]*\|' || true)"
+          if [[ "$applied" -ne "$expected" ]]; then
+            echo "::error::Expected exactly $expected applied migration ledger rows (source migrations plus disposable baseline), found $applied"
             exit 1
           fi
+          echo "Verified all $applied canonical source migrations plus the disposable legacy baseline."
+      - name: Verify runtime RPC contracts
+        working-directory: ${{ runner.temp }}/nextaction-migration-replay
+        run: supabase test db --local
       - name: Stop disposable Supabase
         if: always()
         working-directory: ${{ runner.temp }}/nextaction-migration-replay
