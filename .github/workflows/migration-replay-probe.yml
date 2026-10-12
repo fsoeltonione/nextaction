@@ -1,0 +1,164 @@
+name: Migration Replay Probe
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/migration-replay-probe.yml"
+      - "supabase/migrations/**"
+      - "supabase/staging/STAGE14_BOOTSTRAP.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-replay-probe-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    name: Disposable clean-replay probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+
+      - name: Prepare an isolated copy of the legacy migration baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Everything below lives under RUNNER_TEMP. No repo files or remote DBs
+          # are modified by the replay probe.
+          test -f supabase/staging/STAGE14_BOOTSTRAP.sql
+          REPLAY_WORKDIR="$RUNNER_TEMP/nextaction-migration-replay"
+          mkdir -p "$REPLAY_WORKDIR/supabase/migrations" "$REPLAY_WORKDIR/supabase/staging"
+          cp supabase/migrations/*.sql "$REPLAY_WORKDIR/supabase/migrations/"
+          cp supabase/staging/STAGE14_BOOTSTRAP.sql "$REPLAY_WORKDIR/supabase/staging/"
+
+          cd "$REPLAY_WORKDIR"
+          supabase init --force
+
+          # The migration chain starts from the legacy prototype schema. This
+          # test-only baseline is copied from the explicitly staging-only
+          # bootstrap so the first production migration has its prerequisite
+          # tables. It is never committed as a production migration.
+          cp supabase/staging/STAGE14_BOOTSTRAP.sql \
+            supabase/migrations/20260925000000_ci_legacy_prototype_baseline.sql
+
+          # Resolve only the two historical collisions in this disposable copy,
+          # ordering the Stage 9 prerequisites before Stage 12/13 dependants.
+          # These provisional test-only versions do NOT authorize a permanent
+          # rename or a remote migration-history repair.
+          mv supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql \
+            supabase/migrations/20260926030100_stage_12_qualified_click_runtime.sql
+          mv supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql \
+            supabase/migrations/20260926040100_stage_13_atomic_settlement_runtime.sql
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path("supabase/migrations")
+          files = sorted(root.glob("*.sql"))
+          versions = {}
+          for path in files:
+              match = re.match(r"^(\d{14})_.+\.sql$", path.name)
+              if not match:
+                  raise SystemExit(f"Invalid test migration filename: {path.name}")
+              versions.setdefault(match.group(1), []).append(path.name)
+          duplicates = {version: names for version, names in versions.items() if len(names) > 1}
+          if duplicates:
+              raise SystemExit(f"Test copy still has duplicate migration versions: {duplicates}")
+          if len(files) != 50:
+              raise SystemExit(f"Expected 49 repo migrations plus one test-only baseline; found {len(files)}")
+          print(f"Prepared {len(files)} SQL files with unique versions in disposable workspace.")
+          print("The two legacy timestamp changes exist only under RUNNER_TEMP.")
+          PY
+
+          printf 'REPLAY_WORKDIR=%s\n' "$REPLAY_WORKDIR" >> "$GITHUB_ENV"
+
+      - name: Verify Supabase CLI and disposable workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          test -f "$REPLAY_WORKDIR/supabase/config.toml"
+          test "$(find "$REPLAY_WORKDIR/supabase/migrations" -maxdepth 1 -name '*.sql' | wc -l)" -eq 50
+
+      - name: Start isolated local Supabase stack
+        id: start
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          cd "$REPLAY_WORKDIR"
+          supabase start 2>&1 | tee "$RUNNER_TEMP/supabase-start.log"
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "Local Supabase start exit code: $code"
+          exit 0
+
+      - name: Explicitly reset the isolated database from migrations
+        id: reset
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          cd "$REPLAY_WORKDIR"
+          supabase db reset --local 2>&1 | tee "$RUNNER_TEMP/supabase-reset.log"
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "Local database reset exit code: $code"
+          exit 0
+
+      - name: Upload replay diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: migration-replay-probe-logs
+          path: |
+            ${{ runner.temp }}/supabase-start.log
+            ${{ runner.temp }}/supabase-reset.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce replay result
+        if: always()
+        env:
+          START_EXIT_CODE: ${{ steps.start.outputs.exit_code }}
+          RESET_EXIT_CODE: ${{ steps.reset.outputs.exit_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "supabase start exit: ${START_EXIT_CODE:-not-run}"
+          echo "supabase db reset exit: ${RESET_EXIT_CODE:-not-run}"
+          if [[ "${START_EXIT_CODE:-999}" != "0" || "${RESET_EXIT_CODE:-999}" != "0" ]]; then
+            echo "::error::The migration chain did not replay cleanly on the disposable local database. Review the logs artifact; no hosted Supabase database was targeted."
+            exit 1
+          fi
+          echo "Migration chain replayed cleanly on the disposable local database."
+
+      - name: Stop isolated local Supabase stack
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [[ -n "${REPLAY_WORKDIR:-}" && -d "$REPLAY_WORKDIR" ]]; then
+            cd "$REPLAY_WORKDIR"
+            supabase stop --no-backup
+          fi
