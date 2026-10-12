@@ -44,7 +44,7 @@ assert.match(anonymousAcceptanceScript, /NextAction Activation/);
 assert.match(anonymousAcceptanceScript, /anonymousSaveStatus/);
 assert.match(anonymousAcceptanceScript, /Staging anonymous embed-first activation acceptance: PASS/);
 assert.match(anonymousAcceptanceScript, /publisher URL must survive the onboarding redirect/);
-assert.doesNotMatch(anonymousAcceptanceScript, /Confirm product understanding|loginUrl\.searchParams|confirmResponse\.status/);
+assert.match(anonymousAcceptanceScript, /requestedUrls\.some/);
 
 assert.match(onboarding, /redirect\(suffix \?/);
 assert.match(onboarding, /query\.set\(key, firstValue\)/);
