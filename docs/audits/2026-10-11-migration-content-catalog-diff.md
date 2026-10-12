@@ -205,3 +205,29 @@ The parser error is in the source SQL, not in Supabase account configuration or 
 - Before choosing a permanent source correction, compare the broken file to the matching stored Stage 9 SQL across both projects and to the existing staging sidecar. Then use a reviewed canonical-source change, rerun the disposable replay to its next blocker/success, compare schema signatures, and only afterward continue the staging `migration list` / `db push --dry-run` gate.
 
 No hosted database mutation, `db push`, migration repair, or deployment occurred in this probe.
+
+
+## Disposable compatibility replay follow-up — 2026-10-12
+
+A second isolated GitHub Actions pass completed successfully: [run 38286329231](https://github.com/fsoeltonione/nextaction/actions/runs/38286329231); diagnostic logs artifact: [migration-replay-probe-logs](https://github.com/fsoeltonione/nextaction/actions/runs/38286329231/artifacts/11764220597). This pass used the same temporary legacy baseline and temporary timestamp normalization described above, but replaced the Stage 9 runtime-core migration **only within the runner's temporary copy** with the existing `supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql` compatibility sidecar. In that disposable copy, `supabase start` and `supabase db reset --local` both completed successfully, and the complete test-only migration sequence replayed.
+
+This follow-up helps separate two questions:
+
+1. **SQL execution with the existing staging-compatible Stage 9 implementation:** passed in a newly initialized local Supabase database with a temporary baseline and test-only versions.
+2. **Replay of the exact canonical repository SQL with current canonical versions:** still fails. [Run 38285691183](https://github.com/fsoeltonione/nextaction/actions/runs/38285691183) stopped at `20260926030000_stage_9_runtime_core.sql`, where `pg_catalog.extract(epoch FROM pg_catalog.clock_timestamp())` causes `SQLSTATE 42601` at `FROM`. The sidecar substitution in the second pass is diagnostic evidence, not permission to replace or rename the canonical source automatically.
+
+### What this proves—and does not prove
+
+- It confirms the free, local-runner approach is viable; no paid Supabase branch is needed for clean replay diagnosis.
+- It confirms a likely concrete source blocker in the canonical Stage 9 runtime-core migration and that the existing compatibility sidecar gets the disposable chain past that blocker.
+- It does **not** prove the hosted staging or production migration ledgers are synchronized, that every local migration is mapped to the right remote SQL, or that the replayed local schema is equivalent to either hosted catalog.
+- It does **not** authorize migration repair, remote `db push`, or production changes. No hosted database was addressed by either probe.
+
+### Remaining safe validation sequence
+
+1. Compare the canonical Stage 9 source, both hosted stored-history SQL variants, the current staging/production function definitions, and the staging sidecar; select a canonical correction only after that mapping is reviewed.
+2. Rerun the exact-source clean reset after an approved source fix and then generate a schema signature/object-level comparison against staging.
+3. Finish the row-by-row migration history manifest and verify staging `migration list` plus `db push --dry-run` without applying changes.
+4. Prepare a distinct, evidence-backed production plan and obtain separate approval before any production ledger or schema mutation.
+
+The replay probe PR [#132](https://github.com/fsoeltonione/nextaction/pull/132) remains draft and unmerged. Its temporary timestamp adjustments and Stage 9 sidecar override are strictly test harness behavior, not repository migration edits. No hosted database mutation, `db push`, migration repair, or deployment occurred.
