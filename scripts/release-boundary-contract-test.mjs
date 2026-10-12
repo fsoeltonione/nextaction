@@ -318,7 +318,7 @@ assert.match(
 
 assert.match(
   stagingSmoke,
-  /waitForReleaseProvenance\\(/,
+  /waitForReleaseProvenance\(/,
   "staging smoke must wait for the exact deployed release identity before running business checks",
 );
 assert.match(
