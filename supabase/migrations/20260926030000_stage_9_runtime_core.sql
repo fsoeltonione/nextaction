@@ -111,7 +111,7 @@ BEGIN
   v_window_start :=
     pg_catalog.to_timestamp(
       pg_catalog.floor(
-        pg_catalog.extract(epoch FROM pg_catalog.clock_timestamp()) / p_window_seconds
+        extract(epoch FROM pg_catalog.clock_timestamp()) / p_window_seconds
       ) * p_window_seconds
     );
   v_window_end := v_window_start + pg_catalog.make_interval(secs => p_window_seconds);
@@ -136,7 +136,7 @@ BEGIN
       GREATEST(
         1,
         pg_catalog.ceil(
-          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+          extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
         )::INTEGER
       ),
       1;
@@ -157,7 +157,7 @@ BEGIN
       GREATEST(
         1,
         pg_catalog.ceil(
-          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+          extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
         )::INTEGER
       ),
       1;
@@ -172,7 +172,7 @@ BEGIN
       GREATEST(
         1,
         pg_catalog.ceil(
-          pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+          extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
         )::INTEGER
       ),
       v_count;
@@ -193,7 +193,7 @@ BEGIN
     GREATEST(
       1,
       pg_catalog.ceil(
-        pg_catalog.extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
+        extract(epoch FROM (v_window_end - pg_catalog.clock_timestamp()))
       )::INTEGER
     ),
     v_count;
@@ -498,7 +498,7 @@ BEGIN
     RETURN;
   END IF;
 
-  v_moment_key := pg_catalog.trim(
+  v_moment_key := trim(
     both '_' FROM pg_catalog.lower(
       pg_catalog.regexp_replace(
         v_event.event_type,
