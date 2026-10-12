@@ -20,11 +20,37 @@ type ActivationState = {
   setup: { make_money: { exists: boolean; verified: boolean; integration_id: string | null } };
 };
 
+class ActivationApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ActivationApiError";
+  }
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, init);
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error?.message ?? "Request failed.");
+  if (!response.ok) {
+    throw new ActivationApiError(body?.error?.message ?? "Request failed.", response.status);
+  }
   return body;
+}
+
+// Activation state is a read-only request. Retry transient server/network
+// failures, but never retry authorization or input errors and never retry writes.
+async function apiWithTransientReadRetry(path: string, maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await api(path, { cache: "no-store" });
+    } catch (error) {
+      const retryable = error instanceof ActivationApiError
+        ? error.status === 408 || error.status === 429 || error.status >= 500
+        : error instanceof TypeError;
+      if (!retryable || attempt === maxAttempts) throw error;
+      await new Promise<void>((resolve) => setTimeout(resolve, 250 * attempt));
+    }
+  }
+  throw new Error("Unreachable activation state retry state.");
 }
 
 function applyActivationState(next: ActivationState, setters: {
@@ -63,6 +89,7 @@ export default function ActivatePage() {
   const [publisherKey, setPublisherKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stateLoading, setStateLoading] = useState(true);
 
   const selectedWorkspace = useMemo(
     () => workspaceId || state?.workspace?.id || "",
@@ -71,7 +98,7 @@ export default function ActivatePage() {
 
   async function load(id?: string) {
     const query = id ? "?workspace_id=" + encodeURIComponent(id) : "";
-    const payload = await api("/api/onboarding/state" + query);
+    const payload = await apiWithTransientReadRetry("/api/onboarding/state" + query);
     applyActivationState(payload.state as ActivationState, {
       setState,
       setWorkspaceId,
@@ -93,7 +120,7 @@ export default function ActivatePage() {
         const pendingUrl = new URLSearchParams(window.location.search).get("url");
         if (pendingUrl) setUrl(pendingUrl);
 
-        const payload = await api("/api/onboarding/state");
+        const payload = await apiWithTransientReadRetry("/api/onboarding/state");
         if (cancelled) return;
         applyActivationState(payload.state as ActivationState, {
           setState,
@@ -106,12 +133,26 @@ export default function ActivatePage() {
         });
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : "Gagal memuat aktivasi.");
+      } finally {
+        if (!cancelled) setStateLoading(false);
       }
     }
 
     void initialize();
     return () => { cancelled = true; };
   }, []);
+
+  async function retryActivationState() {
+    setStateLoading(true);
+    setMessage("");
+    try {
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gagal memuat aktivasi.");
+    } finally {
+      setStateLoading(false);
+    }
+  }
 
   function updateMoment(index: number, patch: Partial<Moment>) {
     setMoments((current) => current.map((moment, i) => i === index ? { ...moment, ...patch } : moment));
@@ -205,6 +246,12 @@ export default function ActivatePage() {
         <p style={{ color: "#a1a1aa", marginBottom: 28 }}>
           Tanpa SDK. Tanpa crawling. Tanpa AI. Publisher menentukan sendiri Moment tempat iklan muncul.
         </p>
+        {stateLoading && <p role="status" aria-live="polite" style={{ color: "#a1a1aa" }}>Memuat status aktivasi…</p>}
+        {!state && !stateLoading && (
+          <button type="button" disabled={busy} onClick={() => void retryActivationState()} style={buttonStyle}>
+            Coba muat ulang status aktivasi
+          </button>
+        )}
 
         {state && (state.workspaces?.length ?? 0) > 1 && (
           <select
@@ -232,7 +279,7 @@ export default function ActivatePage() {
             </div>
           ))}
           <button type="button" onClick={() => setMoments((current) => [...current, { key: "", label: "", description: "" }])} style={buttonStyle}>+ Moment</button>
-          <button type="button" disabled={busy} onClick={() => void saveProduct()} style={{ ...buttonStyle, marginLeft: 8 }}>Simpan Publisher</button>
+          <button type="button" disabled={busy || stateLoading || !state} onClick={() => void saveProduct()} style={{ ...buttonStyle, marginLeft: 8 }}>Simpan Publisher</button>
         </section>
 
         {state?.product && (

@@ -88,6 +88,24 @@ async function buildAuthCookies(session) {
   });
 }
 
+async function fetchActivationStateWithRetry(page, maxAttempts = 3) {
+  let lastResponse = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    lastResponse = await page.evaluate(async () => {
+      const response = await fetch("/api/onboarding/state", { cache: "no-store" });
+      return { status: response.status, body: await response.json().catch(() => ({})) };
+    });
+    if (lastResponse.status === 200) return lastResponse;
+
+    const retryable = lastResponse.status === 408 || lastResponse.status === 429 || lastResponse.status >= 500;
+    if (!retryable || attempt === maxAttempts) break;
+    await page.waitForTimeout(150 * attempt);
+  }
+
+  return lastResponse;
+}
+
 async function main() {
   const admin = createClient(supabaseUrl, secretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
@@ -134,6 +152,19 @@ async function main() {
     await context.addCookies(cookies);
     const page = await context.newPage();
     page.setDefaultTimeout(30_000);
+    const failedApiResponses = [];
+    const pageErrors = [];
+    const consoleErrors = [];
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (url.origin === baseUrl && url.pathname.startsWith("/api/") && response.status() >= 400) {
+        failedApiResponses.push(`${response.request().method()} ${response.status()} ${url.pathname}`);
+      }
+    });
+    page.on("pageerror", (error) => pageErrors.push(error.message.slice(0, 300)));
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text().slice(0, 300));
+    });
 
     await page.goto(`${baseUrl}/onboarding?url=${encodeURIComponent(productUrl)}`, {
       waitUntil: "domcontentloaded",
@@ -154,11 +185,29 @@ async function main() {
       "The pending publisher URL was not prefilled as metadata.",
     );
 
-    const initialStateResponse = await page.evaluate(async () => {
-      const response = await fetch("/api/onboarding/state", { cache: "no-store" });
-      return { status: response.status, body: await response.json().catch(() => ({})) };
-    });
-    assertResponse(initialStateResponse.status === 200, "Authenticated activation state did not load.");
+    try {
+      await page.waitForFunction(
+        () => {
+          const saveButton = [...document.querySelectorAll("button")].find(
+            (button) => button.textContent?.trim() === "Simpan Publisher",
+          );
+          return saveButton instanceof HTMLButtonElement && !saveButton.disabled;
+        },
+        undefined,
+        { timeout: 20_000 },
+      );
+    } catch {
+      const visibleUi = (await page.locator("main").innerText()).slice(-800);
+      const apiDiagnostic = failedApiResponses.slice(-8).join("; ") || "none";
+      const pageDiagnostic = pageErrors.slice(-3).join(" | ") || "none";
+      const consoleDiagnostic = consoleErrors.slice(-3).join(" | ") || "none";
+      throw new Error(
+        `Activation UI did not become ready. Visible UI: ${visibleUi}. Failed API responses: ${apiDiagnostic}. Page errors: ${pageDiagnostic}. Console errors: ${consoleDiagnostic}.`,
+      );
+    }
+
+    const initialStateResponse = await fetchActivationStateWithRetry(page);
+    assertResponse(initialStateResponse?.status === 200, `Authenticated activation state did not load after bounded retries (HTTP ${initialStateResponse?.status ?? "no response"}).`);
     assertResponse(
       Array.isArray(initialStateResponse.body?.state?.workspaces),
       "Authenticated activation state did not return the workspace list.",
@@ -171,16 +220,23 @@ async function main() {
     await page.getByPlaceholder("Optional description").fill("After an invoice has been created.");
     await page.getByRole("button", { name: "Simpan Publisher" }).click();
 
-    await page.getByText(
-      "Publisher dan Moment tersimpan. Lanjutkan untuk membuat publisher key.",
-      { exact: true },
-    ).waitFor({ state: "visible", timeout: 60_000 });
+    try {
+      await page.getByText(
+        "Publisher dan Moment tersimpan. Lanjutkan untuk membuat publisher key.",
+        { exact: true },
+      ).waitFor({ state: "visible", timeout: 30_000 });
+    } catch {
+      const visibleUi = (await page.locator("main").innerText()).slice(-1000);
+      const apiDiagnostic = failedApiResponses.slice(-10).join("; ") || "none";
+      const pageDiagnostic = pageErrors.slice(-3).join(" | ") || "none";
+      const consoleDiagnostic = consoleErrors.slice(-3).join(" | ") || "none";
+      throw new Error(
+        `Publisher save did not reach the success state. Visible UI: ${visibleUi}. Failed API responses: ${apiDiagnostic}. Page errors: ${pageDiagnostic}. Console errors: ${consoleDiagnostic}.`,
+      );
+    }
 
-    const savedStateResponse = await page.evaluate(async () => {
-      const response = await fetch("/api/onboarding/state", { cache: "no-store" });
-      return { status: response.status, body: await response.json().catch(() => ({})) };
-    });
-    assertResponse(savedStateResponse.status === 200, "Saved activation state could not be reloaded.");
+    const savedStateResponse = await fetchActivationStateWithRetry(page);
+    assertResponse(savedStateResponse?.status === 200, `Saved activation state could not be reloaded after bounded retries (HTTP ${savedStateResponse?.status ?? "no response"}).`);
     const savedState = savedStateResponse.body?.state;
     assertResponse(savedState?.product?.name === appName, "The manually entered publisher name did not persist.");
     assertResponse(
