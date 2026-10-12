@@ -128,13 +128,37 @@ jobs:
           set -euo pipefail
           migration_output="$(supabase migration list --local)"
           printf '%s\n' "$migration_output"
-          expected=$((SOURCE_MIGRATION_COUNT + 1))
-          applied="$(printf '%s\n' "$migration_output" | grep -cE '^[[:space:]]*`?[0-9]{14}`?[[:space:]]*\|' || true)"
-          if [[ "$applied" -ne "$expected" ]]; then
-            echo "::error::Expected exactly $expected applied migration ledger rows (source migrations plus disposable baseline), found $applied"
-            exit 1
-          fi
-          echo "Verified all $applied canonical source migrations plus the disposable legacy baseline."
+          printf '%s\n' "$migration_output" > "$RUNNER_TEMP/nextaction-migration-list.txt"
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          output = Path(os.environ["RUNNER_TEMP"], "nextaction-migration-list.txt").read_text()
+          versions = []
+          for line in output.splitlines():
+              columns = line.split("|")
+              if len(columns) < 3:
+                  continue
+              local = re.search(r"\d{14}", columns[0])
+              remote = re.search(r"\d{14}", columns[1])
+              if not local and not remote:
+                  continue
+              if not local or not remote:
+                  raise SystemExit(f"Migration history mismatch: only one side is populated: {line}")
+              if local.group(0) != remote.group(0):
+                  raise SystemExit(f"Migration history mismatch: local={local.group(0)} remote={remote.group(0)}")
+              versions.append(local.group(0))
+
+          expected_count = int(os.environ["SOURCE_MIGRATION_COUNT"]) + 1
+          if len(versions) != expected_count:
+              raise SystemExit(f"Expected {expected_count} applied migrations including the disposable baseline; found {len(versions)}")
+          if len(set(versions)) != len(versions):
+              raise SystemExit("Applied migration history contains duplicate versions")
+          if versions != sorted(versions):
+              raise SystemExit("Applied migration history is not in timestamp order")
+          print(f"Verified {len(versions)} migrations: local files and applied history match in timestamp order.")
+          PY
       - name: Verify runtime RPC contracts
         working-directory: ${{ runner.temp }}/nextaction-migration-replay
         run: supabase test db --local
