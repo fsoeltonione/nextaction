@@ -144,22 +144,22 @@ assert.ok(
 
 assert.match(
   cloudflareBuildScript,
-  /"wrangler@4\\.149\\.0"/,
+  /"wrangler@4\.149\.0"/,
   "Cloudflare build must use the pinned Wrangler CLI version",
 );
 assert.match(
   deploy,
-  /"wrangler@4\\.149\\.0",/,
+  /"wrangler@4\.149\.0",/,
   "Cloudflare deployment must use the same pinned Wrangler CLI version",
 );
 assert.match(
   deploy,
-  /Capturing recent staging deployment history before publish \\(diagnostic only\\)/,
+  /Capturing recent staging deployment history before publish \(diagnostic only\)/,
   "staging deployment must capture recent deployment history before publishing",
 );
 assert.match(
   deploy,
-  /timeout:\\s*30_000/,
+  /timeout:\s*30_000/,
   "the diagnostic history request must have a bounded timeout",
 );
 assert.match(
