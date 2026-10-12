@@ -1,5 +1,5 @@
-const DEFAULT_TIMEOUT_MS = 90_000;
-const DEFAULT_INTERVAL_MS = 1_000;
+const DEFAULT_TIMEOUT_MS = 180_000;
+const DEFAULT_INTERVAL_MS = 3_000;
 
 const defaultSleep = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -34,6 +34,7 @@ export async function waitForReleaseProvenance({
   const deadline = now() + timeoutMs;
   let attempts = 0;
   let lastObservation = null;
+  let firstObservation = null;
 
   while (true) {
     attempts += 1;
@@ -61,12 +62,13 @@ export async function waitForReleaseProvenance({
         body?.environment === expectedEnvironment &&
         body?.release_sha === expectedReleaseSha
       ) {
-        return { body, attempts };
+        return { body, attempts, firstObservation };
       }
     } catch (error) {
       lastObservation = {
         request_error: error instanceof Error ? error.message : "Unknown health request error.",
       };
+      if (firstObservation === null) firstObservation = lastObservation;
     }
 
     const remainingMs = deadline - now();
