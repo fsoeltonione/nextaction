@@ -1,0 +1,107 @@
+name: Disposable Migration Replay
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/staging/STAGE14_BOOTSTRAP.sql'
+      - '.github/workflows/disposable-migration-replay.yml'
+      - 'scripts/migration-filenames-test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: disposable-migration-replay-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    name: Replay canonical migrations from zero
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+      - name: Prepare disposable replay workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # All normalization is confined to RUNNER_TEMP. No hosted Supabase
+          # project or database credentials are configured by this workflow.
+          test -f supabase/staging/STAGE14_BOOTSTRAP.sql
+          REPLAY_WORKDIR="$RUNNER_TEMP/nextaction-migration-replay"
+          mkdir -p "$REPLAY_WORKDIR/supabase/migrations" "$REPLAY_WORKDIR/supabase/staging"
+          cp supabase/migrations/*.sql "$REPLAY_WORKDIR/supabase/migrations/"
+          cp supabase/staging/STAGE14_BOOTSTRAP.sql "$REPLAY_WORKDIR/supabase/staging/"
+          cd "$REPLAY_WORKDIR"
+          supabase init --force
+
+          # Several early migrations depend on legacy prototype tables. Seed
+          # only this disposable DB with the existing staging-only baseline.
+          cp supabase/staging/STAGE14_BOOTSTRAP.sql \
+            supabase/migrations/20260925000000_ci_legacy_prototype_baseline.sql
+
+          # Historical production/staging ledger versions do not match source
+          # timestamps. These filename fixes apply ONLY to this temporary copy
+          # and are not proposed as remote migration-history repairs.
+          mv supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql \
+            supabase/migrations/20260926030100_stage_12_qualified_click_runtime.sql
+          mv supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql \
+            supabase/migrations/20260926040100_stage_13_atomic_settlement_runtime.sql
+
+          # Deliberately use the canonical Stage 9 source without substituting
+          # the staging sidecar. This is the regression test for the SQL fix.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path("supabase/migrations")
+          files = sorted(root.glob("*.sql"))
+          versions = {}
+          for path in files:
+              match = re.match(r"^(\d{14})_.+\.sql$", path.name)
+              if not match:
+                  raise SystemExit(f"Invalid migration filename: {path.name}")
+              versions.setdefault(match.group(1), []).append(path.name)
+          duplicates = {version: names for version, names in versions.items() if len(names) > 1}
+          if duplicates:
+              raise SystemExit(f"Duplicate versions remain in disposable copy: {duplicates}")
+          if len(files) != 50:
+              raise SystemExit(f"Expected 49 source migrations plus one disposable baseline; found {len(files)}")
+          canonical = Path("supabase/migrations/20260926030000_stage_9_runtime_core.sql").read_text()
+          if "pg_catalog.extract(" in canonical or "pg_catalog.trim(" in canonical:
+              raise SystemExit("Canonical Stage 9 migration still has invalid qualified special syntax")
+          print(f"Prepared {len(files)} SQL files; canonical Stage 9 source retained.")
+          print("Baseline and timestamp adjustments are disposable-test-only.")
+          PY
+          printf 'REPLAY_WORKDIR=%s\n' "$REPLAY_WORKDIR" >> "$GITHUB_ENV"
+      - name: Start disposable Supabase
+        working-directory: ${{ runner.temp }}/nextaction-migration-replay
+        run: supabase start -x studio,imgproxy,mailpit,vector,logflare
+      - name: Replay canonical migrations from empty database
+        working-directory: ${{ runner.temp }}/nextaction-migration-replay
+        run: supabase db reset --local --no-seed
+      - name: Verify applied migration history
+        working-directory: ${{ runner.temp }}/nextaction-migration-replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration list --local
+          expected=50
+          applied="$(supabase migration list --local | grep -cE '^[[:space:]]*[0-9]{14}[[:space:]]*\|' || true)"
+          if [[ "$applied" -lt "$expected" ]]; then
+            echo "::error::Expected at least $expected migration ledger rows (including disposable baseline), found $applied"
+            exit 1
+          fi
+      - name: Stop disposable Supabase
+        if: always()
+        working-directory: ${{ runner.temp }}/nextaction-migration-replay
+        run: supabase stop --no-backup
