@@ -152,3 +152,31 @@ The four `id` defaults on `public.workspaces`, `products`, `moments`, and `offer
 4. Run a clean reset and schema signature comparison on a disposable database, then validate the project-specific staging migration list and `db push --dry-run`.
 
 No DDL/DML, `db push`, `migration repair`, production deployment, or database mutation occurred during this follow-up.
+
+
+## Legacy production Stage 9 SQL inventory — 2026-10-12 (read-only)
+
+The six production rows previously classified as remote-only contain sequential runtime-function rewrites, not empty bookkeeping entries. The stored statements were inspected directly:
+
+| Production version | Stored name | Main effects visible in stored SQL |
+|---|---|---|
+| `20260925215138` | `stage_9_runtime_reconciliation` | Replaces `public.check_runtime_rate_limit` and `public.runtime_accept_event`; drops `public.runtime_drain_events(integer)`. |
+| `20260925215209` | `stage_9_runtime_reconciliation` | Another rewrite of the same rate-limit/event functions and removal of the drain function. |
+| `20260925215231` | `stage_9_runtime_hardening` | Again rewrites rate-limit/event functions and drops the drain function. |
+| `20260925215322` | `stage_9_runtime_sql_fix` | Rewrites rate-limit/event functions and `public.runtime_process_event(uuid)`. |
+| `20260925215343` | `stage_9_runtime_builtin_fix` | Rewrites rate-limit/event functions and `public.runtime_process_event(uuid)` again. |
+| `20260925215416` | `stage_9_decision_runtime_hardening` | Replaces `public.runtime_create_decision_delivery(...)`. |
+
+Production row `20260925215210` (`stage_9_hardening`) also differs materially from the current local `20260926040000_stage_9_hardening.sql`: 8,846 stored SQL characters versus 12,276 in source. It defines `create_offer_activation`, `check_runtime_rate_limit`, and `runtime_accept_event` plus grants. These entries represent a historical evolution of runtime RPCs; they must not be deleted or marked reverted solely because the current objects have later definitions.
+
+### Current catalog-to-source matching evidence
+
+The direct function-body comparison against current source files shows that staging exactly matches the current source body for the later rate-limit reconciliation, Stage 9 runtime integration lookup, Stage 9 hardening event acceptance, H2.1 quarantine handling, H2.2 readiness, Stage 16 activation, and H3.1 decision/delivery code. Production exactly matches current source for Stage 16 activation, H2.2 readiness (token-equivalent after PostgreSQL's formatting normalization), and H3.1 decision/delivery. Several production Stage 9 runtime bodies do not match the current local source byte/token-wise, including the rate limiter, integration lookup, and event acceptance. The current `runtime_process_event` and `runtime_worker_tick` bodies in both environments also do not token-match their current local candidate files. A non-match is a review flag, not proof of a defect; all differences need semantic classification.
+
+This supports a safer repair model: preserve and compare the old RPC revisions first, determine which final effects are represented by canonical migrations, and only classify an intermediate history row as superseded after a successful disposable reset and current-schema/data comparison. Do not just mark the six rows reverted.
+
+### Local timestamp collision remains a release-blocking source issue
+
+`scripts/migration-filenames-test.mjs` currently permits the two known duplicate 14-digit prefixes as a legacy exception. They remain real collisions, and the local chronology is not yet safe to normalize by guesswork: Stage 9 runtime core must be ordered before the Stage 10 click runtime it supports, while the current Stage 9 core file has the same prefix as Stage 12 qualified-click runtime. Stage 9 hardening also collides with Stage 13 settlement. Select new unique timestamps only after the intended dependency order and each environment's canonical source mapping are explicitly reviewed.
+
+**Still no database changes:** no DDL/DML, migration repair, migration push, or production deployment occurred in this follow-up. The disposable reset/schema-signature/staging dry-run gates remain incomplete.
