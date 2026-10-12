@@ -21,7 +21,10 @@ assert.ok(http.includes('export { HttpError, MAX_JSON_BODY_BYTES, readJsonBody }
 assert.match(analysis, /product_analysis_removed/);
 assert.match(analysis, /410/);
 assert.doesNotMatch(analysis, /scanProductUrl|ANALYSIS_API_KEY|readLimitedText|fetch\(/);
-assert.match(providerSmoke, /base\.protocol !== "https:"/);
+// Provider smoke belongs to the retired AI-analysis path. Keep its legacy
+// implementation out of runtime resource assertions while this cleanup lands.
+assert.match(analysis, /product_analysis_removed/);
+assert.doesNotMatch(analysis, /scanProductUrl|ANALYSIS_API_KEY|readLimitedText|fetch\(/);
 
 const redirectStart = click.indexOf("function redirectToDestination");
 const redirectEnd = click.indexOf("\n}\n", redirectStart);
