@@ -293,6 +293,29 @@ assert.match(
   /"--var",\s*"NEXT_PUBLIC_RELEASE_SHA:"\s*\+\s*releaseSha/,
   "Cloudflare deployment must bind the current release SHA into the Worker runtime",
 );
+
+assert.doesNotMatch(
+  deploy,
+  /ANALYSIS_(?:API_KEY|BASE_URL|MODEL)/,
+  "embed-only deployment must not require or inject retired AI provider configuration",
+);
+const requiredStart = deploy.indexOf("const required = [");
+const requiredEnd = deploy.indexOf("];", requiredStart);
+const requiredDeploymentEnv = requiredStart === -1 || requiredEnd === -1
+  ? ""
+  : deploy.slice(requiredStart, requiredEnd + 2);
+for (const requiredVariable of [
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SECRET_KEY",
+]) {
+  assert.ok(
+    requiredDeploymentEnv.includes(JSON.stringify(requiredVariable)),
+    "Cloudflare deployment must still require " + requiredVariable,
+  );
+}
 assert.match(
   effectiveConfigGate,
   /global_fetch_strictly_public/,

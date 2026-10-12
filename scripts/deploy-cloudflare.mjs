@@ -34,9 +34,6 @@ const required = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SECRET_KEY",
-  "ANALYSIS_API_KEY",
-  "ANALYSIS_BASE_URL",
-  "ANALYSIS_MODEL",
 ];
 
 const missing = required.filter((name) => !process.env[name]);
@@ -104,7 +101,6 @@ writeFileSync(
   JSON.stringify(
     {
       SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
-      ANALYSIS_API_KEY: process.env.ANALYSIS_API_KEY,
     },
     null,
     2,
@@ -126,10 +122,6 @@ try {
     // must not leave a stale dashboard/environment binding reporting an older SHA.
     "--var",
     "NEXT_PUBLIC_RELEASE_SHA:" + releaseSha,
-    "--var",
-    "ANALYSIS_BASE_URL:" + process.env.ANALYSIS_BASE_URL,
-    "--var",
-    "ANALYSIS_MODEL:" + process.env.ANALYSIS_MODEL,
   ]);
 } catch (error) {
   console.error(
