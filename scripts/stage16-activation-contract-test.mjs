@@ -35,7 +35,7 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, q
   read("supabase/migrations/20261011010000_stage_16_moment_key_semantics.sql"),
 ]);
 
-assert.match(home, /\/onboarding\?url=/);
+assert.doesNotMatch(home, /\/onboarding\?url=/);\nassert.match(home, /\/activate/);
 assert.doesNotMatch(home, /signInWithOAuth|router\.push\(["']\/login\?url=/);
 assert.match(anonymousAcceptanceScript, /api\/onboarding\/state/);
 assert.match(anonymousAcceptanceScript, /Confirm product understanding/);
@@ -44,7 +44,7 @@ assert.match(anonymousAcceptanceScript, /assert\.equal\([\s\S]*?confirmResponse\
 assert.match(anonymousAcceptanceScript, /loginUrl\.searchParams\.get\("url"\)/);
 assert.match(anonymousAcceptanceScript, /Staging anonymous URL-first proposal acceptance: PASS/);
 
-assert.match(onboarding, /\/api\/analyze/);assert.match(onboarding, /import \{ normalizeProductUrl \} from "@\/lib\/url";/);
+assert.match(onboarding, /redirect\("\/activate"\)/);
 assert.match(onboarding, /const \[hostname, setHostname\] = useState\(\(\) =>/);
 assert.match(onboarding, /const \[isValidUrl, setIsValidUrl\] = useState\(\(\) =>/);
 assert.match(onboarding, /function handleUrlChange\(value: string\)/);
