@@ -184,7 +184,7 @@ export default function ActivatePage() {
           Tanpa SDK. Tanpa crawling. Tanpa AI. Publisher menentukan sendiri Moment tempat iklan muncul.
         </p>
 
-        {state?.workspaces?.length > 1 && (
+        {(state?.workspaces?.length ?? 0) > 1 && state && (
           <select
             value={selectedWorkspace}
             onChange={(e) => { setWorkspaceId(e.target.value); void load(e.target.value).catch((error) => setMessage(error.message)); }}
