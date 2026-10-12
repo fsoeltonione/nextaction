@@ -111,3 +111,44 @@ The results show that many entries are exact matches, but the remaining history 
 6. Validate a project-specific staging plan first. Production history changes require an explicit reviewed manifest, backup, and separate authorization.
 
 **Never run \`supabase db push\` or \`supabase migration repair\` against production before these gates pass.** A migration-history repair changes what the migration system believes ran; it does not execute the missing SQL or reconcile actual schema state.
+
+
+## Live catalog follow-up — 2026-10-12 (read-only)
+
+**Source revision inspected:** `8737736fbe7b051f96a9e3be4a35f7ab68bbae5d` on `master`.  
+**Live projects re-queried:** staging `njjybpswxalxjhqjlvqa`; production `khoygjyikxkdwonygzyh`. Both projects reported `ACTIVE_HEALTHY`. Only SELECT/catalog queries were run.
+
+### Current-history consistency
+
+Both live projects still report 52 migration-history rows. The per-row statement counts/lengths match the previous audit snapshot. This confirms that the captured history has not changed; it does **not** validate the repair mapping.
+
+A critical example remains: production version `20260925205217`, named `stage_6_production_foundation`, stores only a comment saying the foundation was previously applied through the SQL execution path followed by `SELECT 1;` (144 characters total). The current local `20260925205217_stage_6_production_foundation.sql` is 29,549 characters. This remote row is a **history marker**, not evidence that the full local SQL is what the migration runner executed. The actual effect must be established from current schema/data and the original execution evidence; do not mark it as an exact source match.
+
+### Live routine catalog comparison
+
+A fresh catalog query returned 41 functions in each project. Seven function definition fingerprints differ. Token comparison (ignoring layout/case while preserving literal strings) further separates likely behavioral drift from formatting differences:
+
+| Function | Staging vs production result | Disposition |
+|---|---|---|
+| `public.check_runtime_rate_limit(text,text,integer,integer)` | Staging inserts `pg_catalog.btrim(p_scope)` as the bucket scope; production inserts raw `p_scope`. Both validate trimmed length. | **Behavioral drift candidate.** Calls containing surrounding whitespace can map to different rate-limit buckets in production and staging. Review the caller contract and canonical scope rule before repairing. |
+| `private.runtime_quarantine_message(...)` | Staging explicitly inserts `last_seen_at` and uses `EXCLUDED.last_seen_at` on conflict; production relies on the column default on insert and sets `last_seen_at = timezone('utc', now())` on conflict. The current column default is the same UTC `now()` expression in both projects. | Likely intended to be equivalent under the observed default, but retain as **manual semantic review** until the complete insert/update semantics are checked. |
+| `public.runtime_accept_event(...)` | Staging uses `jsonb_typeof` / `btrim`; production uses `pg_catalog.jsonb_typeof` / `trim`. Both functions currently have an empty `search_path`. | Likely equivalent built-in calls, but confirm before classifying as equivalent; do not treat matching names alone as evidence. |
+| `public.resolve_runtime_integration(text)` | Difference is an alias/qualification style for `public.workspace_capabilities`; both functions have an empty `search_path`. | Appears formatting/qualification-only; record after review. |
+| `public.runtime_worker_tick(integer,integer)` | Staging declares an extra `v_now` local variable; production does not. | No behavior change apparent from this difference alone. |
+| `public.confirm_product_activation(...)` | Token-identical after whitespace/case normalization. | Formatting-only difference. |
+| `public.runtime_readiness()` | Token-identical after whitespace/case normalization. | Formatting-only difference. |
+
+For all seven functions, the live catalog reports matching security attributes between environments: `SECURITY DEFINER`, matching per-function `search_path` configuration, and execution denied to `anon` and `authenticated` while granted to `service_role`. This is useful parity evidence, but it does not resolve the body differences above.
+
+The four `id` defaults on `public.workspaces`, `products`, `moments`, and `offers` still differ textually: staging uses `extensions.gen_random_uuid()`, production uses `gen_random_uuid()`. Types and nullability match; classify this as an outstanding expression-equivalence check, not automatically as either a defect or harmless drift.
+
+### Gate decision
+
+**Manifest remains NOT VALIDATED; no repair is authorized.** The next safe validation items are:
+
+1. Review the full SQL/token diff and call sites for the rate-limit scope drift; check whether any existing persisted bucket scopes or data backfills would be affected.
+2. Establish the actual effects of production's Stage 6 history marker and classify all six production-only Stage 9 reconciliation records from their stored SQL and current effects.
+3. Finish the remaining per-row semantic classifications and exact object-definition comparison. Equal object counts are insufficient.
+4. Run a clean reset and schema signature comparison on a disposable database, then validate the project-specific staging migration list and `db push --dry-run`.
+
+No DDL/DML, `db push`, `migration repair`, production deployment, or database mutation occurred during this follow-up.
