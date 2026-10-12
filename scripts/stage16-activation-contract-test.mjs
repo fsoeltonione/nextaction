@@ -31,7 +31,7 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, q
   read("src/lib/stage16-database.types.ts"),
   read("scripts/cloudflare-vinext-build.mjs"),
   read("scripts/cloudflare-vinext-check.mjs"),
-  read("scripts/staging-anonymous-proposal-acceptance.mjs"),
+  read("scripts/staging-anonymous-activation-acceptance.mjs"),
   read("supabase/migrations/20261011010000_stage_16_moment_key_semantics.sql"),
 ]);
 
@@ -40,13 +40,14 @@ assert.match(home, /Set up publisher/);
 assert.match(home, /\/activate/);
 assert.doesNotMatch(home, /signInWithOAuth|router\.push\(["']\/login\?url=/);
 assert.match(anonymousAcceptanceScript, /api\/onboarding\/state/);
-assert.match(anonymousAcceptanceScript, /Confirm product understanding/);
-assert.match(anonymousAcceptanceScript, /confirmResponse\.status\(\)/);
-assert.match(anonymousAcceptanceScript, /assert\.equal\([\s\S]*?confirmResponse\.status\(\),[\s\S]*?401/);
-assert.match(anonymousAcceptanceScript, /loginUrl\.searchParams\.get\("url"\)/);
-assert.match(anonymousAcceptanceScript, /Staging anonymous URL-first proposal acceptance: PASS/);
+assert.match(anonymousAcceptanceScript, /NextAction Activation/);
+assert.match(anonymousAcceptanceScript, /anonymousSaveStatus/);
+assert.match(anonymousAcceptanceScript, /Staging anonymous embed-first activation acceptance: PASS/);
+assert.match(anonymousAcceptanceScript, /publisher URL must survive the onboarding redirect/);
+assert.doesNotMatch(anonymousAcceptanceScript, /Confirm product understanding|loginUrl\.searchParams|confirmResponse\.status/);
 
-assert.match(onboarding, /redirect\("\/activate"\)/);
+assert.match(onboarding, /redirect\(suffix \?/);
+assert.match(onboarding, /query\.set\(key, firstValue\)/);
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
