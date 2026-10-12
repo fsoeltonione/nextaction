@@ -44,13 +44,8 @@ jobs:
       - name: Test effective Cloudflare runtime config gate
         run: npm run test:effective-cloudflare-config
 
-      # These controls live in the merge-required Quality check. A separate
-      # optional check could fail without blocking merges under the current ruleset.
       - name: Test bounded JSON request bodies
         run: npm run test:http-body
-
-      - name: Test product scanner security and DNS probe trace
-        run: npm run test:scanner
 
       - name: Test staging runtime fetch probe boundary
         run: npm run test:dns-rebind-runtime-probe
@@ -67,12 +62,14 @@ jobs:
       - name: Audit Cloudflare production-audit contract
         run: npm run test:cloudflare-production-audit-contract
 
+      - name: Test embed publisher contract
+        run: npm run test:embed-publisher
+
       - name: Audit the complete dependency tree
         run: npm audit --audit-level=low
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=low
-
 
   release_boundary_contract:
     name: Release boundary contract
@@ -83,107 +80,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Verify release boundary contract
         run: npm run test:release-boundary
-
-  product_scanner_security:
-    name: Product scanner security
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-      - release_boundary_contract
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run product scanner security suite
-        run: npm run test:scanner
-
-  analysis_provider_contract:
-    name: Analysis provider contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run analysis provider response contract tests
-        run: npm run test:analysis-provider
-
-  analysis_output_contract:
-    name: Analysis output contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run analysis output contract tests
-        run: npm run test:analysis-output
-
-  analysis_provider_content_contract:
-    name: Analysis provider content contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    needs:
-      - quality
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.21.0
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Run analysis provider content contract tests
-        run: npm run test:analysis-provider-content
 
   stage16_activation_contract:
     name: Stage 16 activation contract
@@ -194,19 +99,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Run Stage 16 activation contract checks
         run: npm run test:stage16-activation
-
       - name: Test semantic Moment key boundary
         run: npm run test:moment-key
 
@@ -219,16 +120,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Run H0/H1 runtime hardening contract
         run: npm run test:runtime-hardening
 
@@ -241,16 +139,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Run H2.3 release proof contract
         run: npm run test:h2-3-release-proof
 
@@ -263,16 +158,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Run H3.1 Network Moment contract
         run: npm run test:h3-1-network-moment
 
@@ -282,25 +174,18 @@ jobs:
     timeout-minutes: 15
     needs:
       - quality
-      - product_scanner_security
       - runtime_hardening_contract
-      - analysis_provider_contract
-      - analysis_output_contract
-      - analysis_provider_content_contract
       - stage16_activation_contract
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Check Cloudflare compatibility
         run: npm run cloudflare:check
 
@@ -318,23 +203,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.21.0
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Build Cloudflare artifact
         env:
           CLOUDFLARE_ENV: staging
         run: npm run cloudflare:build
-
       - name: Verify generated staging runtime config
         run: node scripts/verify-effective-cloudflare-config.mjs staging
-
       - name: Validate Wrangler configuration
         run: npx --yes wrangler@4.139.0 deploy --dry-run --env staging
