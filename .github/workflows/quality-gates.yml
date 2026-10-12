@@ -217,4 +217,4 @@ jobs:
       - name: Verify generated staging runtime config
         run: node scripts/verify-effective-cloudflare-config.mjs staging
       - name: Validate Wrangler configuration
-        run: npx --yes wrangler@4.139.0 deploy --dry-run --env staging
+        run: npx --yes wrangler@4.149.0 deploy --dry-run --env staging
