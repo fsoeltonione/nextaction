@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, productionSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
     readFile(".github/workflows/quality-gates.yml", "utf8"),
@@ -9,6 +9,7 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
     readFile("scripts/require-env.sh", "utf8"),
     readFile("scripts/require-file.sh", "utf8"),
     readFile("scripts/staging-smoke.mjs", "utf8"),
+    readFile("scripts/production-smoke.mjs", "utf8"),
     readFile("scripts/staging-authenticated-acceptance.mjs", "utf8"),
     readFile("scripts/staging-anonymous-proposal-acceptance.mjs", "utf8"),
     readFile("scripts/verify-effective-cloudflare-config.mjs", "utf8"),
@@ -257,6 +258,12 @@ assert.doesNotMatch(
   stagingSmoke,
   /\/api\/analyze|STAGING_ANALYZE_SMOKE_URL|Product analysis.*scanner live-path smoke/,
   "staging business smoke must not depend on the retired product-analysis endpoint",
+);
+
+assert.doesNotMatch(
+  productionSmoke,
+  /\/api\/analyze|PRODUCTION_ANALYZE_SMOKE_URL|Production analysis scanner live-path smoke/,
+  "production business smoke must not depend on the retired product-analysis endpoint",
 );
 assert.match(
   stagingSmoke,
