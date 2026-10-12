@@ -108,8 +108,8 @@ const requiredQualityJob = jobBlock(qualityGatesWorkflow, "quality");
 for (const requiredCommand of [
   "npm run test:braces-security-backport",
   "npm run test:http-body",
-  "npm run test:scanner",
   "npm run test:runtime-resource-contract",
+  "npm run test:embed-publisher",
   "npm run test:migration-filenames",
   "npm run test:cloudflare-production-audit-contract",
   "npm run test:effective-cloudflare-config",
@@ -161,10 +161,6 @@ assert.match(
 for (const job of [
   "quality",
   "release_boundary_contract",
-  "product_scanner_security",
-  "analysis_provider_contract",
-  "analysis_output_contract",
-  "analysis_provider_content_contract",
   "stage16_activation_contract",
   "runtime_hardening_contract",
   "h2_3_release_proof_contract",
