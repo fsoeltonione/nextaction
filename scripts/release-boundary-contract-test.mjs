@@ -252,6 +252,12 @@ assert.match(
   /production_smoke_fixture_verify/,
   "staging smoke must wait for async Event -> Moment processing",
 );
+
+assert.doesNotMatch(
+  stagingSmoke,
+  /\/api\/analyze|STAGING_ANALYZE_SMOKE_URL|Product analysis.*scanner live-path smoke/,
+  "staging business smoke must not depend on the retired product-analysis endpoint",
+);
 assert.match(
   stagingSmoke,
   /EVENT_PROCESSING_TIMEOUT_MS = 90_000/,
