@@ -52,7 +52,31 @@ export default function ActivatePage() {
     }
   }
 
-  useEffect(() => { void load().catch((error) => setMessage(error.message)); }, []);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initialize() {
+      try {
+        const payload = await api("/api/onboarding/state");
+        if (cancelled) return;
+        const next = payload.state as ActivationState;
+        setState(next);
+        if (next.workspace?.id) setWorkspaceId(next.workspace.id);
+        if (next.product) {
+          setName(next.product.name);
+          setDescription(next.product.description ?? "");
+          setUrl(next.product.canonical_url);
+          setMoments(next.product.moments.map((m) => ({ key: m.moment_key, label: m.label, description: m.description ?? "" })));
+          if (next.setup.make_money.integration_id) setPublisherKey(next.setup.make_money.integration_id);
+        }
+      } catch (error) {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : "Gagal memuat aktivasi.");
+      }
+    }
+
+    void initialize();
+    return () => { cancelled = true; };
+  }, []);
 
   function updateMoment(index: number, patch: Partial<Moment>) {
     setMoments((current) => current.map((moment, i) => i === index ? { ...moment, ...patch } : moment));
