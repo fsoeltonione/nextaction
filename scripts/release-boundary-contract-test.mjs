@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, productionSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate, cloudflareBuildScript] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, productionSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate, cloudflareBuildScript, onboardingPage, activationPage] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
     readFile(".github/workflows/quality-gates.yml", "utf8"),
@@ -11,9 +11,11 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
     readFile("scripts/staging-smoke.mjs", "utf8"),
     readFile("scripts/production-smoke.mjs", "utf8"),
     readFile("scripts/staging-authenticated-acceptance.mjs", "utf8"),
-    readFile("scripts/staging-anonymous-proposal-acceptance.mjs", "utf8"),
+    readFile("scripts/staging-anonymous-activation-acceptance.mjs", "utf8"),
     readFile("scripts/verify-effective-cloudflare-config.mjs", "utf8"),
     readFile("scripts/cloudflare-vinext-build.mjs", "utf8"),
+    readFile("src/app/onboarding/page.tsx", "utf8"),
+    readFile("src/app/activate/page.tsx", "utf8"),
   ]);
 
 assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
@@ -62,7 +64,7 @@ for (const job of [
   "staging_smoke",
   "h3_1_staging_release_proof",
   "h3_1_staging_runtime_smoke",
-  "anonymous_staging_proposal_acceptance",
+  "anonymous_staging_activation_acceptance",
   "authenticated_staging_acceptance",
   "hold_production",
   "deploy_production",
@@ -222,7 +224,7 @@ assert.match(
   /NEXTACTION_RELEASE_SHA:\s*\$\{\{\s*github\.sha\s*\}\}/,
 );
 
-const anonymousStagingAcceptance = jobBlock(releaseWorkflow, "anonymous_staging_proposal_acceptance");
+const anonymousStagingAcceptance = jobBlock(releaseWorkflow, "anonymous_staging_activation_acceptance");
 assert.match(anonymousStagingAcceptance, /needs:[\s\S]*deploy_staging/);
 assert.match(anonymousStagingAcceptance, /needs:[\s\S]*staging_smoke/);
 assert.match(anonymousStagingAcceptance, /STAGING_BASE_URL:/);
@@ -230,17 +232,26 @@ assert.doesNotMatch(anonymousStagingAcceptance, /STAGING_SUPABASE_SECRET_KEY|STA
 assert.match(anonymousStagingAcceptance, /node scripts\/staging-anonymous-proposal-acceptance\.mjs/);
 
 const stagingAcceptance = jobBlock(releaseWorkflow, "authenticated_staging_acceptance");
-assert.match(stagingAcceptance, /needs:[\s\S]*anonymous_staging_proposal_acceptance/);
+assert.match(stagingAcceptance, /needs:[\s\S]*anonymous_staging_activation_acceptance/);
 assert.match(stagingAcceptance, /needs:[\s\S]*deploy_staging/);
 assert.match(stagingAcceptance, /needs:[\s\S]*h3_1_staging_runtime_smoke/);
 assert.match(stagingAcceptance, /STAGING_SUPABASE_SECRET_KEY/);
 assert.match(stagingAcceptance, /playwright@1\.64\.0/);
 assert.match(stagingAcceptance, /node scripts\/staging-authenticated-acceptance\.mjs/);
 assert.match(anonymousAcceptanceScript, /api\/onboarding\/state/);
-assert.match(anonymousAcceptanceScript, /Confirm product understanding/);
-assert.match(anonymousAcceptanceScript, /confirmResponse\.status\(\)/);
-assert.match(anonymousAcceptanceScript, /loginUrl\.searchParams\.get\("url"\)/);
-assert.match(anonymousAcceptanceScript, /Staging anonymous URL-first proposal acceptance: PASS/);
+assert.match(anonymousAcceptanceScript, /NextAction Activation/);
+assert.match(anonymousAcceptanceScript, /anonymousSaveStatus/);
+assert.match(anonymousAcceptanceScript, /publisher URL must survive the onboarding redirect/);
+assert.match(anonymousAcceptanceScript, /Staging anonymous embed-first activation acceptance: PASS/);
+assert.doesNotMatch(anonymousAcceptanceScript, /Confirm product understanding|\/api\/analyze|Product analysis/);
+assert.match(onboardingPage, /redirect\(suffix \?/);
+assert.match(onboardingPage, /query\.set\(key, firstValue\)/);
+assert.match(activationPage, /new URLSearchParams\(window\.location\.search\)\.get\("url"\)/);
+assert.match(activationPage, /confirmation\?\.product\?\.workspace_id/);
+assert.match(stagingAcceptanceScript, /Simpan Publisher/);
+assert.match(stagingAcceptanceScript, /Buat Publisher Key/);
+assert.match(stagingAcceptanceScript, /show_ads\("invoice_created"\)/);
+assert.doesNotMatch(stagingAcceptanceScript, /Confirm product understanding|\/v1\/connection\/verify|Choose your goal|You are ready/);
 const cookieResultBlock = stagingAcceptanceScript.slice(
   stagingAcceptanceScript.indexOf("const result = {"),
   stagingAcceptanceScript.indexOf("return result;", stagingAcceptanceScript.indexOf("const result = {")),
@@ -254,12 +265,14 @@ assert.doesNotMatch(
 
 assert.match(stagingAcceptanceScript, /auth\.admin\.createUser/);
 assert.match(stagingAcceptanceScript, /auth\.admin\.deleteUser/);
-assert.match(stagingAcceptanceScript, /\/v1\/connection\/verify/);
-assert.match(stagingAcceptanceScript, /You are ready/);
+assert.match(stagingAcceptanceScript, /from\("workspace_members"\)/);
+assert.match(stagingAcceptanceScript, /Simpan Publisher/);
+assert.match(stagingAcceptanceScript, /Buat Publisher Key/);
+assert.match(stagingAcceptanceScript, /Staging authenticated embed-first activation acceptance: PASS/);
 assert.doesNotMatch(
   stagingAcceptanceScript,
-  /console\.log\([^\n]*integrationToken/,
-  "the staging acceptance runner must never log integration credentials",
+  /console\.log\([^\n]*password|console\.log\([^\n]*secretKey/,
+  "the staging acceptance runner must never log temporary credentials",
 );
 
 const holdProduction = jobBlock(releaseWorkflow, "hold_production");
