@@ -17,11 +17,10 @@ assert.ok(requestBody.includes("await reader.cancel()"));
 assert.equal(requestBody.includes("const body = await request.text()"), false);
 assert.ok(http.includes('export { HttpError, MAX_JSON_BODY_BYTES, readJsonBody } from "./request-body.ts";'));
 
-const responseRead = analysis.indexOf("responseText = await readLimitedText(response, MAX_PROVIDER_RESPONSE_BYTES)");
-const clearTimeout = analysis.indexOf("clearTimeout(timeout)", responseRead);
-assert.ok(responseRead > -1, "analysis route must explicitly read the provider response body");
-assert.ok(clearTimeout > responseRead, "provider timeout must cover response body consumption");
-assert.match(analysis, /providerBase\.protocol !== "https:"/);
+// Product analysis was retired when the MVP moved to explicit publisher Moments.
+assert.match(analysis, /product_analysis_removed/);
+assert.match(analysis, /410/);
+assert.doesNotMatch(analysis, /scanProductUrl|ANALYSIS_API_KEY|readLimitedText|fetch\(/);
 assert.match(providerSmoke, /base\.protocol !== "https:"/);
 
 const redirectStart = click.indexOf("function redirectToDestination");
