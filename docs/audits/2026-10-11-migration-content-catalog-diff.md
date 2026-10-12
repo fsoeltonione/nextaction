@@ -180,3 +180,28 @@ This supports a safer repair model: preserve and compare the old RPC revisions f
 `scripts/migration-filenames-test.mjs` currently permits the two known duplicate 14-digit prefixes as a legacy exception. They remain real collisions, and the local chronology is not yet safe to normalize by guesswork: Stage 9 runtime core must be ordered before the Stage 10 click runtime it supports, while the current Stage 9 core file has the same prefix as Stage 12 qualified-click runtime. Stage 9 hardening also collides with Stage 13 settlement. Select new unique timestamps only after the intended dependency order and each environment's canonical source mapping are explicitly reviewed.
 
 **Still no database changes:** no DDL/DML, migration repair, migration push, or production deployment occurred in this follow-up. The disposable reset/schema-signature/staging dry-run gates remain incomplete.
+
+
+## Disposable clean-replay probe — 2026-10-12
+
+A disposable replay was attempted in GitHub Actions using the public-repository hosted runner; the run did not use any hosted Supabase URL, access token, database password, linked project ref, or deploy secret. The probe and logs are available at [PR #132](https://github.com/fsoeltonione/nextaction/pull/132) and [workflow run 38285691183](https://github.com/fsoeltonione/nextaction/actions/runs/38285691183). The draft PR is diagnostic only and is not merged.
+
+To get past the known filename collision during this experiment only, the runner copied the 49 migration SQL files to `RUNNER_TEMP`, copied `supabase/staging/STAGE14_BOOTSTRAP.sql` into the temporary copy as `20260925000000_ci_legacy_prototype_baseline.sql`, and assigned provisional unique timestamps to the Stage 12 and Stage 13 colliding files. No repository migration filename was changed by the test, and the provisional timestamps are not a recommendation for permanent renames.
+
+The local Supabase stack started and began replaying from that temporary baseline. The baseline and ten repository migrations preceding Stage 9 runtime core were accepted by the disposable database. Replay then stopped at the original source file `supabase/migrations/20260926030000_stage_9_runtime_core.sql`, statement 13, while defining `public.check_runtime_rate_limit`:
+
+```text
+ERROR: syntax error at or near "FROM" (SQLSTATE 42601)
+pg_catalog.extract(epoch FROM pg_catalog.clock_timestamp()) / p_window_seconds
+```
+
+The parser error is in the source SQL, not in Supabase account configuration or a hosted database. The existing staging-only sidecar `supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql` uses the unqualified special-syntax form `extract(epoch FROM pg_catalog.clock_timestamp())`, corroborating the likely correction needed for a replayable source. The probe's subsequent `supabase db reset --local` attempt reported that the local stack was no longer running because the failed startup had stopped its containers; that is secondary to the source SQL syntax failure.
+
+### Interpretation and gate
+
+- **Clean replay is not currently proven.** Even after test-only migration-version normalization and a temporary legacy schema baseline, source SQL stops the chain before later migrations can be tested.
+- This run does not establish that the hosted staging/production functions are wrong; the remote catalog may reflect separately applied corrected SQL, and that must be reconciled from the stored ledgers and effects.
+- Do not fix this by modifying the hosted databases, running `db push`, or repairing any migration history.
+- Before choosing a permanent source correction, compare the broken file to the matching stored Stage 9 SQL across both projects and to the existing staging sidecar. Then use a reviewed canonical-source change, rerun the disposable replay to its next blocker/success, compare schema signatures, and only afterward continue the staging `migration list` / `db push --dry-run` gate.
+
+No hosted database mutation, `db push`, migration repair, or deployment occurred in this probe.
