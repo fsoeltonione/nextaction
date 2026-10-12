@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, productionSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate] =
+const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, stagingSmoke, productionSmoke, stagingAcceptanceScript, anonymousAcceptanceScript, effectiveConfigGate, cloudflareBuildScript] =
   await Promise.all([
     readFile(".github/workflows/release.yml", "utf8"),
     readFile(".github/workflows/quality-gates.yml", "utf8"),
@@ -13,6 +13,7 @@ const [releaseWorkflow, qualityGatesWorkflow, deploy, requireEnv, requireFile, s
     readFile("scripts/staging-authenticated-acceptance.mjs", "utf8"),
     readFile("scripts/staging-anonymous-proposal-acceptance.mjs", "utf8"),
     readFile("scripts/verify-effective-cloudflare-config.mjs", "utf8"),
+    readFile("scripts/cloudflare-vinext-build.mjs", "utf8"),
   ]);
 
 assert.match(releaseWorkflow, /^on:\n  workflow_dispatch:/m);
@@ -132,13 +133,39 @@ const effectiveConfigAudit = cloudflareBuildJob.indexOf(
   "node scripts/verify-effective-cloudflare-config.mjs staging",
 );
 const cloudflareDryRun = cloudflareBuildJob.indexOf(
-  "wrangler@4.139.0 deploy --dry-run --env staging",
+  "wrangler@4.149.0 deploy --dry-run --env staging",
 );
 assert.ok(
   cloudflareArtifactBuild !== -1 &&
     effectiveConfigAudit > cloudflareArtifactBuild &&
     cloudflareDryRun > effectiveConfigAudit,
   "CI must validate the generated staging Wrangler config after build and before Wrangler dry-run",
+);
+
+assert.match(
+  cloudflareBuildScript,
+  /"wrangler@4\.149\.0"/,
+  "Cloudflare build must use the pinned Wrangler CLI version",
+);
+assert.match(
+  deploy,
+  /"wrangler@4\.149\.0",/,
+  "Cloudflare deployment must use the same pinned Wrangler CLI version",
+);
+assert.match(
+  deploy,
+  /Capturing recent staging deployment history before publish \(diagnostic only\)/,
+  "staging deployment must capture recent deployment history before publishing",
+);
+assert.match(
+  deploy,
+  /timeout:\s*30_000/,
+  "the diagnostic history request must have a bounded timeout",
+);
+assert.match(
+  deploy,
+  /Staging deployment history unavailable; continuing with deployment attempt/,
+  "diagnostic failure must not block the independently gated staging deployment",
 );
 
 assert.doesNotMatch(

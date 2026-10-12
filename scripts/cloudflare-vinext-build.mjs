@@ -9,7 +9,7 @@ const packages = [
   "@vitejs/plugin-rsc@0.5.35",
   "react-server-dom-webpack@19.2.8",
   "@cloudflare/vite-plugin@1.54.11",
-  "wrangler@4.139.0",
+  "wrangler@4.149.0",
   "typescript-eslint@8.70.1",
 ];
 
