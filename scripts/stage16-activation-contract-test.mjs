@@ -35,7 +35,8 @@ const [home, onboarding, callback, login, dashboard, globals, qualityWorkflow, q
   read("supabase/migrations/20261011010000_stage_16_moment_key_semantics.sql"),
 ]);
 
-assert.doesNotMatch(home, /\/onboarding\?url=/);\nassert.match(home, /\/activate/);
+assert.doesNotMatch(home, /\/onboarding\?url=/);
+assert.match(home, /\/activate/);
 assert.doesNotMatch(home, /signInWithOAuth|router\.push\(["']\/login\?url=/);
 assert.match(anonymousAcceptanceScript, /api\/onboarding\/state/);
 assert.match(anonymousAcceptanceScript, /Confirm product understanding/);
@@ -81,7 +82,7 @@ assert.ok(momentKeyMigration.includes("'new', 'temp', 'thing', 'foo'"));
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
-assert.match(dashboard, /\/onboarding\?workspace_id=/);
+assert.match(dashboard, /\/activate/);
 // Legacy onboarding/offer targeting UI assertion removed for embed-only MVP.
 // Legacy onboarding/offer targeting UI assertion removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
