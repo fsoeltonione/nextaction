@@ -46,6 +46,7 @@ jobs:
           cp "$GITHUB_WORKSPACE"/supabase/tests/*.sql "$REPLAY_WORKDIR/supabase/tests/"
           SOURCE_MIGRATION_COUNT="$(find "$GITHUB_WORKSPACE/supabase/migrations" -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d '[:space:]')"
           printf 'SOURCE_MIGRATION_COUNT=%s\n' "$SOURCE_MIGRATION_COUNT" >> "$GITHUB_ENV"
+          export SOURCE_MIGRATION_COUNT
           cd "$REPLAY_WORKDIR"
           supabase init --force
 
