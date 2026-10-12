@@ -99,6 +99,7 @@ jobs:
               "20261011105000_h4_2_rpc_security_and_index_audit.sql",
               "20261011110000_h4_3_redundant_financial_index.sql",
               "20261011120000_h4_4_redundant_financial_accounts_index.sql",
+              "20261013010000_rate_limit_scope_normalization.sql",
           ]
           names = [path.name for path in files]
           missing = [name for name in expected_order if name not in names]
