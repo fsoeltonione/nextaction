@@ -48,7 +48,7 @@ assert.doesNotMatch(
 );
 assert.match(deploy, /valid 40-character release SHA/);
 assert.match(staging, /STAGING_EXPECTED_RELEASE_SHA/);
-assert.match(staging, /healthBody\?\.release_sha !== expectedReleaseSha/);
+assert.match(staging, /waitForReleaseProvenance/);
 assert.match(production, /PRODUCTION_EXPECTED_RELEASE_SHA/);
 assert.match(production, /healthBody\?\.release_sha !== expectedReleaseSha/);
 

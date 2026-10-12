@@ -53,6 +53,9 @@ jobs:
       - name: Test runtime resource and required-gate boundaries
         run: npm run test:runtime-resource-contract
 
+      - name: Test bounded release provenance polling
+        run: npm run test:release-provenance
+
       - name: Test migration filename uniqueness
         run: npm run test:migration-filenames
 
