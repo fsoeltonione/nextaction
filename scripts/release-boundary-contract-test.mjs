@@ -246,7 +246,9 @@ assert.match(anonymousAcceptanceScript, /Staging anonymous embed-first activatio
 assert.match(anonymousAcceptanceScript, /requestedUrls\.some/);
 assert.match(onboardingPage, /redirect\(suffix \?/);
 assert.match(onboardingPage, /query\.set\(key, firstValue\)/);
-assert.match(activationPage, /new URLSearchParams\(window\.location\.search\)\.get\("url"\)/);
+assert.match(activationPage, /searchParams\.get\("url"\)/);
+assert.match(activationPage, /searchParams\.get\("workspace_id"\)/);
+assert.match(activationPage, /apiWithTransientReadRetry\(statePath\)/);
 assert.match(activationPage, /confirmation\?\.product\?\.workspace_id/);
 assert.match(stagingAcceptanceScript, /Simpan Publisher/);
 assert.match(stagingAcceptanceScript, /Buat Publisher Key/);
