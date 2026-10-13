@@ -1,0 +1,80 @@
+name: Staging Migration Dry-Run (Read-Only)
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/migration-filenames-test.mjs"
+      - ".github/workflows/disposable-migration-replay.yml"
+      - ".github/workflows/staging-migration-dry-run.yml"
+      - "docs/operations/staging-production-migration-manifest-2026-10-14.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-migration-dry-run:
+    name: Staging history list and no-write dry-run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+
+      - name: Validate staging connection target without printing credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${STAGING_DATABASE_URL:-}" ]]; then
+            echo "::error::Missing STAGING_DATABASE_URL secret; no database command was executed."
+            exit 1
+          fi
+          node <<'NODE'
+          const raw = process.env.STAGING_DATABASE_URL;
+          let url;
+          try {
+            url = new URL(raw);
+          } catch {
+            throw new Error("STAGING_DATABASE_URL is not a valid PostgreSQL URL; value was not printed.");
+          }
+          if (!["postgres:", "postgresql:"].includes(url.protocol)) {
+            throw new Error("Staging connection must use postgres:// or postgresql://.");
+          }
+          if (url.hostname !== "db.njjybpswxalxjhqjlvqa.supabase.co") {
+            throw new Error("Refusing to connect: STAGING_DATABASE_URL host is not the configured staging project host.");
+          }
+          if (!url.username || !url.password || !url.pathname || url.pathname === "/") {
+            throw new Error("Staging connection URL is missing required database credentials/path; value was not printed.");
+          }
+          console.log("Staging host identity validated. Connection URL is not displayed.");
+          NODE
+
+      - name: List staging migration history (read only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration list --db-url "$STAGING_DATABASE_URL"
+
+      - name: Preview migration changes with dry-run only
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db push --dry-run --db-url "$STAGING_DATABASE_URL"
+
+      - name: Require explicit synchronized response
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "The previous step must explicitly report that the remote database is up to date."
+          echo "If the CLI preview lists or proposes migrations, the staging-sync gate remains blocked."
+          # This workflow deliberately has no 'supabase db push' without --dry-run,
+          # no migration repair, and no SQL writes to supabase_migrations.
