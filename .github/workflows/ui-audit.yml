@@ -1,0 +1,76 @@
+name: UI Audit
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "src/app/**"
+      - "src/components/**"
+      - "src/utils/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/ui-audit.cjs"
+      - ".github/workflows/ui-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui-audit:
+    name: Browser UI and accessibility audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_ui_audit_placeholder000000000000000000000000000000000000
+      SUPABASE_SECRET_KEY: sb_secret_ci_ui_audit_placeholder000000000000000000000000000000000000
+      UI_AUDIT_BASE_URL: http://127.0.0.1:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Install pinned UI audit tooling
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.64.0 @axe-core/playwright@4.13.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start the built application
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/nextaction-ui-audit-server.log 2>&1 &
+          echo $! > /tmp/nextaction-ui-audit-server.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
+              echo "UI audit server is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/nextaction-ui-audit-server.log
+          exit 1
+
+      - name: Audit mobile and desktop UI
+        run: node scripts/ui-audit.cjs
+
+      - name: Upload UI audit report and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ui-audit-artifacts
+          path: artifacts/ui-audit/
+          if-no-files-found: warn
+          retention-days: 14
