@@ -56,6 +56,7 @@ async function main() {
           unnamedControls: [],
           consoleErrors: [],
           pageErrors: [],
+          expectedAuthResponses: [],
           failedSameOriginResponses: [],
           axeViolations: [],
           screenshot: null,
@@ -66,6 +67,17 @@ async function main() {
         });
         page.on("pageerror", (error) => caseResult.pageErrors.push(error.message));
         page.on("response", (response) => {
+          if (
+            route.name === "activation" &&
+            response.status() === 401 &&
+            new URL(response.url()).pathname === "/api/onboarding/state"
+          ) {
+            caseResult.expectedAuthResponses.push({
+              status: response.status(),
+              url: response.url(),
+              reason: "Unauthenticated activation state is expected to be auth-gated.",
+            });
+          }
           if (
             sameOrigin(response.url()) &&
             (response.status() === 404 || response.status() >= 500)
@@ -212,6 +224,16 @@ async function main() {
             }
           }
 
+          const expectedUnauthorizedConsoleMessage =
+            /Failed to load resource: the server responded with a status of 401 \\(Unauthorized\\)/i;
+          caseResult.consoleErrors = caseResult.consoleErrors.filter(
+            (message) =>
+              !(
+                route.name === "activation" &&
+                caseResult.expectedAuthResponses.length > 0 &&
+                expectedUnauthorizedConsoleMessage.test(message)
+              ),
+          );
           if (caseResult.consoleErrors.length) {
             report.failures.push(
               `${viewport.name} ${route.name}: browser console error(s): ${caseResult.consoleErrors.join(" | ")}`,
