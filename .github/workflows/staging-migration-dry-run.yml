@@ -49,13 +49,21 @@ jobs:
           if (!["postgres:", "postgresql:"].includes(url.protocol)) {
             throw new Error("Staging connection must use postgres:// or postgresql://.");
           }
-          if (url.hostname !== "db.njjybpswxalxjhqjlvqa.supabase.co") {
-            throw new Error("Refusing to connect: STAGING_DATABASE_URL host is not the configured staging project host.");
+          // GitHub Actions runners are IPv4-only; Supabase direct DB endpoints are IPv6-only
+          // on the Free plan. Require the project's IPv4-compatible Supavisor Session Pooler.
+          if (!url.hostname.endsWith(".pooler.supabase.com")) {
+            throw new Error("Refusing to connect: use the Supabase Session Pooler host from the staging project's Connect dialog.");
           }
-          if (!url.username || !url.password || !url.pathname || url.pathname === "/") {
-            throw new Error("Staging connection URL is missing required database credentials/path; value was not printed.");
+          if (url.port !== "5432") {
+            throw new Error("Refusing to connect: staging must use Session Pooler port 5432, not transaction mode.");
           }
-          console.log("Staging host identity validated. Connection URL is not displayed.");
+          if (url.username !== "postgres.njjybpswxalxjhqjlvqa") {
+            throw new Error("Refusing to connect: pooler username does not identify the configured staging project.");
+          }
+          if (url.pathname !== "/postgres" || !url.password) {
+            throw new Error("Staging Session Pooler URL must include database /postgres and credentials; value was not printed.");
+          }
+          console.log("Staging project identity and Session Pooler target validated. Connection URL is not displayed.");
           NODE
 
       - name: List staging migration history (read only)
