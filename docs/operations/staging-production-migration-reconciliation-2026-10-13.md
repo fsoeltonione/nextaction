@@ -2,7 +2,7 @@
 
 ## Scope and safety
 
-This note records a read-only comparison of Supabase project `njjybpswxalxjhqjlvqa` (staging) and `khoygjyikxkdwonygzyh` (production), against `master` as observed on 2026-10-13. No hosted database was changed and no migration history row was edited.
+This note records the initial read-only comparison of Supabase project `njjybpswxalxjhqjlvqa` (staging) and `khoygjyikxkdwonygzyh` (production), against `master` as observed on 2026-10-13. Subsequent approved rollout is recorded below and in [the current migration-lineage ledger](./staging-production-migration-lineage-ledger-2026-10-13.md). No existing migration history row was manually edited.
 
 Both databases reported 52 migration-history entries. The repository manifest had 49 canonical migration files. A history row with a changed version/name must not be treated as equivalent solely because counts match; current database state and the later migrations that supersede earlier effects must also be checked.
 
@@ -47,4 +47,4 @@ The disposable migration replay must apply the new migration after the existing 
 2. an unpadded call increments that same scope to count two; and
 3. only one row exists for the equivalent scope representations.
 
-Hosted staging/production deployment is intentionally out of scope for this PR. After the PR and disposable tests pass, re-check the two live function bodies and their grants. Then stage the new migration through the approved migration process only after the broader migration manifest/history reconciliation is reviewed. Do not use manual `schema_migrations` edits to make the ledgers look equal.
+Follow-up after the read-only audit: the migration manifest was reviewed and the forward-only `20261013010000_rate_limit_scope_normalization.sql` was applied to staging and production via the official Supabase migration API. The platform recorded `20261013135832 / rate_limit_scope_normalization` in staging and `20261013141041 / rate_limit_scope_normalization` in production; both statements arrays have SQL length 2378 and MD5 `aab903f4a6318cf37defee52419e7488`. Both live limiter bodies now have MD5 `cbf7a36dae79fa63fd6287a5b1b73278`, grants remain restricted to `service_role`, and post-apply padded/unpadded scope tests pass with synthetic changes rolled back. Production remains under a broader release HOLD until the `pgmq` schema `USAGE` delta is reviewed and core business-flow acceptance is rerun. Existing `schema_migrations` rows were never manually edited.
