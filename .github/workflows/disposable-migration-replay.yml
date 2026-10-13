@@ -55,13 +55,9 @@ jobs:
           cp supabase/staging/STAGE14_BOOTSTRAP.sql \
             supabase/migrations/20260925000000_ci_legacy_prototype_baseline.sql
 
-          # Historical production/staging ledger versions do not match source
-          # timestamps. These filename fixes apply ONLY to this temporary copy
-          # and are not proposed as remote migration-history repairs.
-          mv supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql \
-            supabase/migrations/20260926030100_stage_12_qualified_click_runtime.sql
-          mv supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql \
-            supabase/migrations/20260926040100_stage_13_atomic_settlement_runtime.sql
+          # The two legacy timestamp collisions are resolved in canonical
+          # source filenames. This disposable replay no longer renames them;
+          # it validates the filenames committed to the repository.
 
           # Deliberately use the canonical Stage 9 source without substituting
           # the staging sidecar. This is the regression test for the SQL fix.
