@@ -1,10 +1,11 @@
 # NextAction API & Contract Truth
 
-**Status:** Authoritative v1  
-**Depends on:** `docs/NEXTACTION_PRODUCT_DOMAIN_TRUTH.md`, `docs/architecture/NEXTACTION_ARCHITECTURE_TRUTH.md`, `docs/data-security/NEXTACTION_DATA_SECURITY_TRUTH.md`  
-**Baseline:** Stage 9 `master` commit `60022390f08e9975235542bf76149f3c2ed54ba3`
+**Status:** Current HTTP/API truth for the embed-only MVP; older Product Analysis behavior is superseded  
+**Depends on:** `docs/EMBED_ONLY_MVP_DECISION.md`, `docs/NEXTACTION_PRODUCT_DOMAIN_TRUTH.md`, `docs/architecture/NEXTACTION_ARCHITECTURE_TRUTH.md`, `docs/data-security/NEXTACTION_DATA_SECURITY_TRUTH.md`  
+**Current product contract:** Manual Publisher/Moment setup; public publisher key; `show_ads("<moment_key>")`; no URL crawling or AI analysis  
+**Historical baseline:** Stage 9 `master` commit `60022390f08e9975235542bf76149f3c2ed54ba3`
 **Runtime implementation:** Stage 10 branch `stage-10-click-runtime`  
-**Date:** 2026-09-26
+**Last reconciled:** 2026-10-14
 
 ## 1. Purpose
 
@@ -16,7 +17,7 @@ It separates:
 - authentication callbacks
 - internal application operations
 
-The contract remains authoritative for the executable runtime. Stage 14 carries the implementation through `/v1/track`, `/v1/offer`, `/v1/click/:delivery_token`, Qualified Click, and atomic Settlement, with deployment/release controls defined separately.
+The runtime and settlement provisions below remain authoritative where they match current handlers. The Product Analysis proposal is not a current API: `POST /api/analyze` returns HTTP 410. Current publisher activation is manual, and the embed path uses `/v1/public-offer` followed by the decision/delivery/click/settlement path. Historical Stage 15/16 prose is retained only where explicitly labeled historical.
 
 ## 2. API surface
 
@@ -28,12 +29,12 @@ Used by the NextAction web application.
 
 Authentication:
 - Supabase user session/cookie for authenticated operations
-- anonymous access only for explicitly public onboarding analysis
+- anonymous access only for explicitly public endpoints; anonymous Product Analysis is not supported
 
 Primary logical operations:
-- Product Analysis
-- Product Confirmation
-- Capability Selection
+- Publisher/Moment configuration
+- Product confirmation
+- Capability selection
 - Workspace/Product configuration
 - Offer configuration
 
@@ -43,15 +44,16 @@ These endpoints are application APIs, not the publisher integration API.
 
 Used by publisher SaaS integrations.
 
-Canonical endpoints:
+Runtime endpoints:
 
 ```
-POST /v1/track
-POST /v1/offer
+POST /v1/public-offer        # embed-first public publisher/Moment request
+POST /v1/track               # authenticated publisher event ingestion
+POST /v1/offer               # publisher offer/runtime integration
 GET  /v1/click/:delivery_token
 ```
 
-These are the externally meaningful runtime contract.
+The embed contract is defined by `public/nextaction.js` and `docs/EMBED_ONLY_MVP_DECISION.md`; server-held integration credentials never enter browser code.
 
 ## 3. Global API rules
 
@@ -171,7 +173,7 @@ Privileged database access is internal only.
 
 No browser or publisher request may carry a Supabase service-role secret.
 
-## 5. Product Analysis contract
+## 5. Removed Product Analysis endpoint — current contract
 
 ### Logical endpoint
 
@@ -179,55 +181,15 @@ No browser or publisher request may carry a Supabase service-role secret.
 POST /api/analyze
 ```
 
-Purpose:
-Return a proposed Product Understanding from an untrusted user-supplied URL.
+**Current behavior:** returns HTTP `410 Gone` with error code `product_analysis_removed`.
 
-This endpoint is a web onboarding API, not a publisher runtime API.
+The route is retained only as a fail-closed compatibility response. It does not fetch, crawl, or scrape the supplied URL, and it does not call an AI provider. The URL entered on `/activate` is metadata only.
 
-### Request
+Publishers manually register their application and Moments at `/activate`, create a public publisher key, include the `public/nextaction.js` script with its `data-publisher-key` attribute, and call `show_ads("<moment_key>")` from the appropriate application action.
 
-```json
-{
-  "url": "https://example-saas.com"
-}
-```
+### Historical contract note (superseded)
 
-The server must normalize and validate the URL before retrieval.
-
-### Response
-
-```json
-{
-  "analysis": {
-    "url": "https://example-saas.com",
-    "name": "Example SaaS",
-    "description": "A concise description.",
-    "moments": [
-      {
-        "key": "invoice_created",
-        "label": "Invoice Created",
-        "description": "An invoice has been created and is ready for follow-up."
-      }
-    ]
-  },
-  "request_id": "..."
-}
-```
-
-The response represents a proposal.
-
-It is not persisted Product truth until the authenticated user confirms it.
-
-### Public failure behavior
-
-Expected categories:
-- invalid URL -> `400`
-- rate limited -> `429`
-- upstream retrieval timeout -> bounded `5xx` or controlled analysis failure
-- provider unavailable -> `503`
-- malformed model output -> `502` or controlled analysis failure
-
-The endpoint must never echo raw upstream error bodies.
+The previous Product Understanding proposal contract accepted a URL and described crawler/provider error handling. That behavior and its expected `2xx/4xx/5xx` responses no longer describe the executable route. Keep prior tests, stage descriptions, and analysis artifacts as historical evidence only; do not re-enable URL retrieval to satisfy them. If product analysis is reconsidered, treat it as a separately reviewed feature with a new security acceptance gate, including scanner/SSRF issue #104.
 
 ## 6. Product confirmation contract
 
@@ -676,7 +638,7 @@ The integration credential remains the authorization boundary.
 Rate limits are part of the public runtime contract.
 
 At minimum, controls must exist for:
-- product analysis
+- `/v1/public-offer`
 - `/v1/track`
 - `/v1/offer`
 - `/v1/click/:delivery_token`
@@ -733,8 +695,9 @@ No runtime endpoint should require knowledge of NextAction's internal database I
 
 Stage 14 adds the deployment/release boundary around the executable runtime.
 
-The runtime remains:
+The current embed-first runtime surface includes:
 
+- `POST /v1/public-offer`
 - `POST /v1/track`
 - `POST /v1/offer`
 - `GET /v1/click/:delivery_token`
@@ -750,8 +713,8 @@ The release path now includes:
 
 The following remain intentionally unimplemented:
 
-- DNS-aware SSRF controls for a future server-side URL scanner
-- automated production promotion without the explicit CircleCI approval gate
+- a server-side URL scanner (not part of the current embed-only MVP; future implementation must pass the separate DNS/SSRF acceptance gate before it can be enabled)
+- automatic production promotion without explicit, reviewed approval through the current production Release Gate
 
 ## 19. Authentication callback contract
 
