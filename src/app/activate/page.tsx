@@ -255,6 +255,7 @@ export default function ActivatePage() {
 
         {state && (state.workspaces?.length ?? 0) > 1 && (
           <select
+            aria-label="Workspace"
             value={selectedWorkspace}
             onChange={(e) => { setWorkspaceId(e.target.value); void load(e.target.value).catch((error) => setMessage(error.message)); }}
             style={{ width: "100%", padding: 12, marginBottom: 20, background: "#18181b", color: "white", border: "1px solid #3f3f46", borderRadius: 8 }}
@@ -267,15 +268,15 @@ export default function ActivatePage() {
         <section style={panelStyle}>
           <h2>1. Publisher & Moments</h2>
           <p style={{ color: "#a1a1aa" }}>URL hanya metadata. NextAction tidak mengunjungi atau membaca URL tersebut.</p>
-          <input placeholder="https://invoice-app.com" value={url} onChange={(e) => setUrl(e.target.value)} style={inputStyle} />
-          <input placeholder="Nama aplikasi" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-          <textarea placeholder="Deskripsi singkat" value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, minHeight: 70 }} />
+          <input aria-label="URL aplikasi" placeholder="https://invoice-app.com" value={url} onChange={(e) => setUrl(e.target.value)} style={inputStyle} />
+          <input aria-label="Nama aplikasi" placeholder="Nama aplikasi" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+          <textarea aria-label="Deskripsi singkat aplikasi" placeholder="Deskripsi singkat" value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, minHeight: 70 }} />
           {moments.map((m, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 8, marginBottom: 8 }}>
-              <input placeholder="invoice_created" value={m.key} onChange={(e) => updateMoment(i, { key: e.target.value })} style={inputStyle} />
-              <input placeholder="Invoice Created" value={m.label} onChange={(e) => updateMoment(i, { label: e.target.value })} style={inputStyle} />
-              <input placeholder="Optional description" value={m.description} onChange={(e) => updateMoment(i, { description: e.target.value })} style={inputStyle} />
-              <button type="button" onClick={() => setMoments((current) => current.filter((_, n) => n !== i))} style={buttonStyle}>×</button>
+            <div key={i} className="moment-fields">
+              <input aria-label={`Moment ${i + 1} key`} placeholder="invoice_created" value={m.key} onChange={(e) => updateMoment(i, { key: e.target.value })} style={inputStyle} />
+              <input aria-label={`Moment ${i + 1} label`} placeholder="Invoice Created" value={m.label} onChange={(e) => updateMoment(i, { label: e.target.value })} style={inputStyle} />
+              <input aria-label={`Moment ${i + 1} description`} placeholder="Optional description" value={m.description} onChange={(e) => updateMoment(i, { description: e.target.value })} style={inputStyle} />
+              <button type="button" aria-label={`Hapus Moment ${i + 1}`} onClick={() => setMoments((current) => current.filter((_, n) => n !== i))} style={buttonStyle}>×</button>
             </div>
           ))}
           <button type="button" onClick={() => setMoments((current) => [...current, { key: "", label: "", description: "" }])} style={buttonStyle}>+ Moment</button>
