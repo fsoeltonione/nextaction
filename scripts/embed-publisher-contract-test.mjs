@@ -25,12 +25,25 @@ test("legacy AI analysis route is disabled", async () => {
   assert.doesNotMatch(route, /ANALYSIS_API_KEY/);
 });
 
-test("activation page avoids the legacy analysis endpoint and configures publisher only", async () => {
+test("activation page avoids legacy analysis and preserves an explicitly selected workspace", async () => {
   const page = await read("src/app/activate/page.tsx");
   assert.doesNotMatch(page, /\/api\/analyze/);
   assert.match(page, /show_ads\("invoice_created"\)/);
   assert.doesNotMatch(page, /\/api\/offers\/create/);
   assert.doesNotMatch(page, /reach_customers/);
+  assert.match(page, /searchParams\.get\("workspace_id"\)/);
+  assert.match(page, /apiWithTransientReadRetry\(statePath\)/);
+});
+
+test("dashboard publisher instructions match the embed-only product contract", async () => {
+  const page = await read("src/app/dashboard/page.tsx");
+  assert.doesNotMatch(page, /nextaction\.track\s*\(/);
+  assert.doesNotMatch(page, /Analyze a product to get started/);
+  assert.doesNotMatch(page, /Install the tracking snippet/);
+  assert.match(page, /show_ads\(/);
+  assert.match(page, /href=\{activationHref\}/);
+  assert.match(page, /Network error while creating the offer/);
+  assert.match(page, /finally\s*\{\s*setSavingOffer\(false\);/);
 });
 
 test("public offer endpoint records a server-side Moment event before decision", async () => {
