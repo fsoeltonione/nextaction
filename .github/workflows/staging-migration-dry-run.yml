@@ -101,21 +101,33 @@ jobs:
           const unpaired = [];
           for (const line of list.split(/\r?\n/)) {
             if (!line.includes("│")) continue;
-            const fields = line.split("│").map((value) => value.trim());
+            // Supabase CLI formats versions as `20260101000000`; strip Markdown-style
+            // backticks before comparing so historic rows are not silently skipped.
+            const fields = line.split("│").map((value) => value.trim().replace(/^`|`$/g, "").trim());
             if (fields.length < 2) continue;
             const local = fields[0], remote = fields[1];
             if (!version.test(local) && !version.test(remote)) continue;
             if (version.test(local) && version.test(remote)) paired++;
             else unpaired.push({local: local || "(missing)", remote: remote || "(missing)"});
           }
+          const localOnly = unpaired.filter((row) => version.test(row.local));
+          const remoteOnly = unpaired.filter((row) => version.test(row.remote));
           const noOp = /remote database is up to date|no migrations to apply|nothing to push/i.test(dry);
           const proposed = /would push these migrations|applying migration|pending migrations|migration.*will be applied/i.test(dry);
+          const remoteVersionsMissingLocally = /remote migration versions not found in local migrations directory/i.test(dry);
           console.log("Paired version rows: " + paired);
+          console.log("Local-only version rows: " + localOnly.length);
+          console.log("Remote-only version rows: " + remoteOnly.length);
           console.log("Unpaired version rows: " + unpaired.length);
           console.log("Dry-run reports no-op: " + noOp);
           console.log("Dry-run proposes migrations: " + proposed);
           if (process.env.STAGING_MIGRATION_LIST_EXIT_CODE !== "0") {
             throw new Error("Read-only staging migration list failed; sync not proven.");
+          }
+          if (remoteVersionsMissingLocally) {
+            console.error("Remote history contains versions absent from the local migration directory. This is a lineage blocker; do not run migration repair or push migrations.");
+            console.error(JSON.stringify(remoteOnly.slice(0, 60)));
+            throw new Error("Staging migration history diverges: remote versions are not present locally. No writes were executed.");
           }
           if (process.env.STAGING_DRY_RUN_EXIT_CODE !== "0") {
             throw new Error("Staging dry-run failed; sync not proven.");
