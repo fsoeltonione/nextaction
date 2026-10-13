@@ -13,6 +13,7 @@ An exact source match requires both byte length and MD5 to equal the entire curr
 - Current SQL sources: **51 files**.
 - Live hosted history: **54 staging entries** and **54 production entries**.
 - Exact full-file SQL payload matches: staging **27/54**, production **24/54**.
+- Strict source coverage by distinct file: **37/51** current SQL files have at least one byte-identical history payload in either environment. **14 files have no byte-identical payload in either staging or production**: `20260926050000_stage_9_runtime_rate_limit_reconciliation.sql`, `20260928233000_stage_16_atomic_integration_credential_provisioning.sql`, `20260929000500_stage_16_private_credential_verification_boundary.sql`, `20260929010000_stage_16_read_only_control_plane.sql`, `20261003000000_stage_17_remediation.sql`, `20261003020000_stage_17_final_reconcile.sql`, `20261004010000_h2_1_runtime_failure_containment.sql`, `20261004020000_h2_2_recovery_operations.sql`, `20261004021000_h2_2_runtime_ops_hardening.sql`, `20261004030000_h2_3_release_reliability_proof.sql`, `20261011010000_stage_16_moment_key_semantics.sql`, `20261011020000_h4_1_unsettled_settlement_recovery.sql`, `20261013010000_rate_limit_scope_normalization.sql`, and `20261013130000_pgmq_service_role_usage_hardening.sql`. These files may be represented by legacy SQL variants or other execution paths; absent byte matches do **not** prove they were unapplied. Their exact SQL/effect lineage remains open.
 - History version keys overlapping current local migration filename prefixes: staging **0** (none); production **13** (20260925205217, 20260925205428, 20260925205723, 20260925211435, 20260925211519, 20260925212247, 20260925212601, 20260925212930, 20260925225318, 20260927195830, 20260927200018, 20260927200219, 20261011105000).
 - Two timestamp collisions were in source: `20260926030000` (Stage 9 core vs Stage 12 qualified-click) and `20260926040000` (Stage 9 hardening vs Stage 13 settlement). This branch resolves them without a hosted DB change, using `20260926030100` for Stage 12 and `20260926040100` for Stage 13 to preserve the order already exercised in disposable replay.
 - Production `20260925205217 / stage_6_production_foundation` stores only a comment plus `SELECT 1;` marker; it is not the full `20260925205217_stage_6_production_foundation.sql` payload. It requires out-of-band deployment evidence, not direct-source classification.
@@ -159,3 +160,8 @@ Candidate mapping fields carried forward from the prior ledger are not certified
 5. Keep production out of scope until staging is proven synchronized by official dry-run plus catalog equivalence and staging acceptance.
 
 No hosted database was mutated while preparing this manifest.
+
+
+## CI follow-up — 2026-10-14
+
+A staging-only CLI proof workflow was added in this PR at `.github/workflows/staging-migration-dry-run.yml`. Its first run exits before making a database connection because the GitHub Actions secret `STAGING_DATABASE_URL` is not configured. No CLI migration list/dry-run ran during that attempt. Once a staging-only direct Postgres URL is configured, the workflow rejects any other host and requires both a fully paired migration list and an explicit no-op dry-run response. Until then staging sync remains **not proven**.
