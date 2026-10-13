@@ -61,20 +61,62 @@ jobs:
       - name: List staging migration history (read only)
         shell: bash
         run: |
-          set -euo pipefail
-          supabase migration list --db-url "$STAGING_DATABASE_URL"
+          set -uo pipefail
+          set +e
+          supabase migration list --db-url "$STAGING_DATABASE_URL" > "$RUNNER_TEMP/staging-migration-list.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/staging-migration-list.txt"
+          echo "STAGING_MIGRATION_LIST_EXIT_CODE=$status" >> "$GITHUB_ENV"
 
       - name: Preview migration changes with dry-run only
         shell: bash
         run: |
-          set -euo pipefail
-          supabase db push --dry-run --db-url "$STAGING_DATABASE_URL"
+          set -uo pipefail
+          set +e
+          supabase db push --dry-run --db-url "$STAGING_DATABASE_URL" > "$RUNNER_TEMP/staging-db-push-dry-run.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/staging-db-push-dry-run.txt"
+          echo "STAGING_DRY_RUN_EXIT_CODE=$status" >> "$GITHUB_ENV"
 
-      - name: Require explicit synchronized response
+      - name: Require synchronized migration history and no-op dry-run
         shell: bash
         run: |
           set -euo pipefail
-          echo "The previous step must explicitly report that the remote database is up to date."
-          echo "If the CLI preview lists or proposes migrations, the staging-sync gate remains blocked."
-          # This workflow deliberately has no 'supabase db push' without --dry-run,
-          # no migration repair, and no SQL writes to supabase_migrations.
+          node <<'NODE'
+          const fs = require("node:fs");
+          const listPath = process.env.RUNNER_TEMP + "/staging-migration-list.txt";
+          const dryPath = process.env.RUNNER_TEMP + "/staging-db-push-dry-run.txt";
+          const list = fs.readFileSync(listPath, "utf8");
+          const dry = fs.readFileSync(dryPath, "utf8");
+          const version = /^\\d{14}$/;
+          let paired = 0;
+          const unpaired = [];
+          for (const line of list.split(/\\r?\\n/)) {
+            if (!line.includes("│")) continue;
+            const fields = line.split("│").map((value) => value.trim());
+            if (fields.length < 2) continue;
+            const local = fields[0], remote = fields[1];
+            if (!version.test(local) && !version.test(remote)) continue;
+            if (version.test(local) && version.test(remote)) paired++;
+            else unpaired.push({local: local || "(missing)", remote: remote || "(missing)"});
+          }
+          const noOp = /remote database is up to date|no migrations to apply|nothing to push/i.test(dry);
+          const proposed = /would push these migrations|applying migration|pending migrations|migration.*will be applied/i.test(dry);
+          console.log("Paired version rows: " + paired);
+          console.log("Unpaired version rows: " + unpaired.length);
+          console.log("Dry-run reports no-op: " + noOp);
+          console.log("Dry-run proposes migrations: " + proposed);
+          if (process.env.STAGING_MIGRATION_LIST_EXIT_CODE !== "0") {
+            throw new Error("Read-only staging migration list failed; sync not proven.");
+          }
+          if (process.env.STAGING_DRY_RUN_EXIT_CODE !== "0") {
+            throw new Error("Staging dry-run failed; sync not proven.");
+          }
+          if (unpaired.length || !noOp || proposed) {
+            console.error(JSON.stringify(unpaired.slice(0, 20)));
+            throw new Error("Staging migration history is not synchronized. No writes were executed.");
+          }
+          console.log("STAGING MIGRATION SYNC PROOF: PASS (list paired and dry-run no-op).");
+          NODE
+          # This workflow contains no non-dry-run db push, no migration repair,
+          # and no writes to supabase_migrations.
