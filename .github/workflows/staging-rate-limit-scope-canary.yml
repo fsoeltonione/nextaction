@@ -1,0 +1,108 @@
+name: Staging Rate-Limit Scope Canary
+
+on:
+  push:
+    branches:
+      - ops/staging-rate-limit-scope-canary-20261013
+    paths:
+      - .github/workflows/staging-rate-limit-scope-canary.yml
+      - supabase/migrations/20261013010000_rate_limit_scope_normalization.sql
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-rate-limit-scope-canary
+  cancel-in-progress: false
+
+jobs:
+  staging-canary:
+    name: Apply canonical migration to staging only
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+      STAGING_SUPABASE_PROJECT_REF: njjybpswxalxjhqjlvqa
+      MIGRATION_VERSION: "20261013010000"
+      MIGRATION_FILE: supabase/migrations/20261013010000_rate_limit_scope_normalization.sql
+      EXPECTED_MIGRATION_BLOB_SHA: e8cf75965012db3ae9075ced22c91ba34e4f83b7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+
+      - name: Verify staging-only inputs and exact canonical source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "Missing repository secret SUPABASE_ACCESS_TOKEN"; exit 1; }
+          test -n "$STAGING_SUPABASE_DB_PASSWORD" || { echo "Missing repository secret STAGING_SUPABASE_DB_PASSWORD"; exit 1; }
+          test "$STAGING_SUPABASE_PROJECT_REF" = "njjybpswxalxjhqjlvqa"
+          actual_blob="$(git rev-parse "HEAD:$MIGRATION_FILE")"
+          test "$actual_blob" = "$EXPECTED_MIGRATION_BLOB_SHA" || {
+            echo "Canonical migration blob mismatch; aborting without database changes."
+            exit 1
+          }
+          echo "Target is staging project only; canonical migration blob verified."
+
+      - name: Prepare isolated one-migration CLI workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK_DIR="$RUNNER_TEMP/nextaction-staging-rate-limit-canary"
+          mkdir -p "$WORK_DIR"
+          cd "$WORK_DIR"
+          supabase init --force
+          cp "$GITHUB_WORKSPACE/$MIGRATION_FILE" "$WORK_DIR/supabase/migrations/"
+          test "$(find "$WORK_DIR/supabase/migrations" -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d '[:space:]')" = "1"
+          printf 'CANARY_WORK_DIR=%s\n' "$WORK_DIR" >> "$GITHUB_ENV"
+
+      - name: Link only the staging project
+        working-directory: ${{ env.CANARY_WORK_DIR }}
+        run: supabase link --project-ref "$STAGING_SUPABASE_PROJECT_REF" --password "$STAGING_SUPABASE_DB_PASSWORD"
+
+      - name: Dry-run and fail closed unless exactly the canonical migration is pending
+        working-directory: ${{ env.CANARY_WORK_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          DRY_RUN_LOG="$RUNNER_TEMP/nextaction-staging-rate-limit-dry-run.log"
+          supabase db push --linked --password "$STAGING_SUPABASE_DB_PASSWORD" --dry-run 2>&1 | tee "$DRY_RUN_LOG"
+          python3 - "$DRY_RUN_LOG" "$MIGRATION_VERSION" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          output = Path(sys.argv[1]).read_text()
+          expected = sys.argv[2]
+          versions = set(re.findall(r"(?<![0-9])([0-9]{14})(?![0-9])", output))
+          if expected not in versions:
+              raise SystemExit(f"Dry-run did not explicitly plan migration {expected}; refusing apply.")
+          unexpected = sorted(v for v in versions if v != expected)
+          if unexpected:
+              raise SystemExit(f"Dry-run included unexpected migration versions {unexpected}; refusing apply.")
+          lowered = output.lower()
+          if "remote migration versions not found in local migrations directory" in lowered:
+              raise SystemExit("Remote-only migration history detected; refusing apply.")
+          print(f"Fail-closed check passed: the only planned migration version is {expected}.")
+          PY
+
+      - name: Apply canonical migration to staging
+        working-directory: ${{ env.CANARY_WORK_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No --include-all and no production project reference are permitted.
+          supabase db push --linked --password "$STAGING_SUPABASE_DB_PASSWORD"
+
+      - name: Report applied migration version
+        run: |
+          echo "Staging canary command completed for migration $MIGRATION_VERSION."
+          echo "A separate read-only verification must confirm the recorded version, function body, privileges, and padded/unpadded scope test."
