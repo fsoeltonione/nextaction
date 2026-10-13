@@ -272,6 +272,16 @@ async function main() {
   const reportPath = path.join(outputDir, "report.json");
   await fs.writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", "utf8");
 
+  const runtimeFailureCount = report.cases.reduce(
+    (count, item) =>
+      count +
+      item.consoleErrors.length +
+      item.pageErrors.length +
+      item.failedSameOriginResponses.length +
+      (item.testError ? 1 : 0),
+    0,
+  );
+
   const summary = [
     "## NextAction UI audit",
     "",
@@ -279,7 +289,7 @@ async function main() {
     `**Pages/viewports checked:** ${report.cases.length} (${routes.length} routes × ${viewports.length} viewports)`,
     `**Horizontal overflow cases:** ${report.cases.filter((item) => item.horizontalOverflow).length}`,
     `**Axe violations recorded:** ${report.accessibility.violationCount} (critical/serious: ${report.accessibility.seriousOrCriticalCount})`,
-    `**Browser console/page/network failures:** ${report.failures.length}`,
+    `**Browser console/page/network failures:** ${runtimeFailureCount}`,
     "",
     "### Findings",
     ...(report.failures.length ? report.failures.map((failure) => `- ❌ ${failure}`) : ["- ✅ No blocking UI audit findings."]),
