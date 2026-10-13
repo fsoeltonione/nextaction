@@ -182,7 +182,7 @@ async function main() {
             const element = document.activeElement as HTMLElement | null;
             if (!element || element === document.body || element === document.documentElement) return null;
             const labelledBy = (element.getAttribute("aria-labelledby") || "")
-              .split(/\\s+/)
+              .split(/\s+/)
               .map((id) => document.getElementById(id)?.textContent?.trim() || "")
               .filter(Boolean)
               .join(" ");
@@ -193,7 +193,7 @@ async function main() {
               element.getAttribute("aria-label") || labelledBy || labels ||
               element.innerText || element.textContent ||
               element.getAttribute("placeholder") || element.getAttribute("title") || ""
-            ).replace(/\\s+/g, " ").trim();
+            ).replace(/\s+/g, " ").trim();
             return {
               tag: element.tagName.toLowerCase(),
               type: element.getAttribute("type"),
