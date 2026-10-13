@@ -66,8 +66,8 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20260926123026` | `20260925212930_stage_8_function_grant_hardening` | supabase/migrations/20260926010000_stage_8_function_grant_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260926123033` | `20260926010000_stage_8_function_grant_hardening` | supabase/migrations/20260926010000_stage_8_function_grant_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260926123123` | `stage14_staging_stage9_runtime_core` | supabase/migrations/20260926030000_stage_9_runtime_core.sql | **KHUSUS STAGING** | Salinan executable staging di supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql; key tables/index/FK ada di kedua DB. |
-| `20260926123133` | `stage14_staging_stage9_hardening` | supabase/migrations/20260926040000_stage_9_hardening.sql | **KHUSUS STAGING** | Salinan staging Stage 9; trigger tenant lama sudah tidak ada dan create_offer_activation sama antar-environment. |
-| `20260926123139` | `stage14_staging_stage9_surface_cleanup` | supabase/migrations/20260926044000_stage_9_runtime_surface_cleanup.sql | **KHUSUS STAGING** | Salinan staging cleanup; kedua RPC antrean usang tidak ada di kedua DB. |
+| `20260926123133` | `stage14_staging_stage9_hardening` | efek Stage 9 hardening; tidak ada file salinan spesifik di master saat ini | **KHUSUS STAGING** | Entri berlabel Stage14 staging; trigger/validator tenant lama sudah tidak ada dan create_offer_activation sama antar-environment. Isi SQL historis spesifik tidak tersimpan, jadi bukan klaim byte-identical. |
+| `20260926123139` | `stage14_staging_stage9_surface_cleanup` | efek Stage 9 surface cleanup; tidak ada file salinan spesifik di master saat ini | **KHUSUS STAGING** | Entri berlabel Stage14 staging; kedua RPC antrean usang tidak ada di kedua DB. Isi SQL historis spesifik tidak tersimpan, jadi bukan klaim byte-identical. |
 | `20260926123146` | `stage14_staging_stage9_rate_limit_reconciliation` | supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql | **KHUSUS STAGING** | Salinan executable di supabase/staging/STAGE14_STAGE9_RATE_LIMIT_RECONCILIATION.sql; staging trim scope, produksi masih menyimpan p_scope mentah. |
 | `20260926123152` | `stage10_click_runtime` | supabase/migrations/20260925225318_stage_10_click_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 10 row uses compact legacy slug; it maps to canonical Stage 10 click runtime source, while version differs from source timestamp. |
 | `20260926123202` | `stage12_qualified_click_runtime` | supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 12 row uses compact legacy slug; it maps to canonical qualified-click source, while version differs from source timestamp. |
@@ -250,6 +250,21 @@ Migrasi forward-only `20261013010000_rate_limit_scope_normalization.sql` adalah 
 - `pgmq` schema `USAGE` untuk `service_role`: production=true, staging=false.
 - Perbedaan rendering beberapa default UUID qualified/unqualified yang sebelumnya ditemukan tampak setara secara semantik, tetapi belum dinormalisasi dalam deklarasi kanonis.
 - Fungsi `private.runtime_quarantine_message`, `public.confirm_product_activation`, `public.resolve_runtime_integration`, `public.runtime_accept_event`, `public.runtime_readiness`, dan `public.runtime_worker_tick` memiliki hash definisi berbeda dalam snapshot. Jangan menganggap semuanya perbedaan kosmetik tanpa review semantik lanjutan; status mereka tidak boleh ditutup oleh hitungan index yang sama.
+
+
+## F. Inventaris script pendukung di `supabase/staging/`
+
+Script di direktori ini bukan bagian dari 50 file migrasi kanonis yang dipakai disposable replay. Script fixture/baseline sengaja dipisahkan agar tidak dianggap migrasi production.
+
+| File | Jenis | Hubungan ke history / source | Status | Batas bukti |
+|---|---|---|---|---|
+| `supabase/staging/STAGE14_BOOTSTRAP.sql` | Bootstrap kompatibilitas staging | Row `20260926122918 / stage14_staging_bootstrap` | **KHUSUS STAGING** | Fixture auth `stage14-smoke@nextaction.invalid` tersisa di staging; tidak ada di production. Tidak ada relasi `public.stage14_*` yang tertinggal. |
+| `supabase/staging/STAGE14_RESET.sql` | Utility reset fixture disposable | Tidak ditemukan sebagai row migration mandiri | **KHUSUS STAGING** | Tidak dijalankan saat audit. Skrip ini dapat menghapus fixture/menonaktifkan trigger dalam transaksi; jangan jalankan sebagai langkah rekonsiliasi history. |
+| `supabase/staging/STAGE14_SEED.sql` | Fixture publisher/advertiser & credit | Berkaitan dengan row `20260926215632 / stage14_make_credit_fixture_repeatable`; riwayat commit perubahan fixture `216baf5c` | **KHUSUS STAGING** | Ini seed/fixture, bukan source DDL production. Tidak ada `public.stage14_seed_output` yang tertinggal pada snapshot. |
+| `supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql` | Executable copy untuk bootstrap staging | Row `20260926123123 / stage14_staging_stage9_runtime_core`; salinan kanonis Stage 9 Runtime Core | **KHUSUS STAGING** | File secara eksplisit menjelaskan salinan ini dibuat karena sintaks khusus SQL pada sumber historis perlu diperbaiki untuk eksekusi staging. Objek inti terkait diverifikasi di kedua DB. |
+| `supabase/staging/STAGE14_STAGE9_RATE_LIMIT_RECONCILIATION.sql` | Executable copy rate-limit reconciliation | Row `20260926123146 / stage14_staging_stage9_rate_limit_reconciliation` | **KHUSUS STAGING** | Staging menormalisasi scope pada insert; production tidak. Ini bukan bukti kedua env memiliki perilaku yang sama. |
+
+Dua history row `stage14_staging_stage9_hardening` dan `stage14_staging_stage9_surface_cleanup` tidak mempunyai file copy masing-masing di folder staging pada master saat ini. Efek akhir yang relevan telah diverifikasi pada katalog, namun SQL historis per baris tidak tersedia; status `KHUSUS STAGING` pada ledger menyatakan jalur/lingkup entry tersebut, bukan jaminan kesamaan isi SQL byte-for-byte. Bila SQL aslinya ditemukan dalam artefak lama, tambahkan provenance/hash ke ledger tanpa mengubah history DB.
 
 ## E. Gerbang selesai yang direkomendasikan
 
