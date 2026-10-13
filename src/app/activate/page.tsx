@@ -117,10 +117,15 @@ export default function ActivatePage() {
       try {
         // /onboarding may carry a URL-first entry point, but the URL is metadata
         // only. Prefill it in the publisher form without fetching that URL.
-        const pendingUrl = new URLSearchParams(window.location.search).get("url");
+        const searchParams = new URLSearchParams(window.location.search);
+        const pendingUrl = searchParams.get("url");
+        const requestedWorkspaceId = searchParams.get("workspace_id");
         if (pendingUrl) setUrl(pendingUrl);
 
-        const payload = await apiWithTransientReadRetry("/api/onboarding/state");
+        const statePath = requestedWorkspaceId
+          ? "/api/onboarding/state?workspace_id=" + encodeURIComponent(requestedWorkspaceId)
+          : "/api/onboarding/state";
+        const payload = await apiWithTransientReadRetry(statePath);
         if (cancelled) return;
         applyActivationState(payload.state as ActivationState, {
           setState,
