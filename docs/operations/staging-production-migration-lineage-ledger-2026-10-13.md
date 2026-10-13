@@ -32,7 +32,7 @@ Audit dilakukan secara read-only pada kedua database Supabase. Tidak ada migrasi
 | File sumber kanonis di master | 50 |
 | History staging | 52 |
 | History production | 52 |
-| History staging berstatus belum terjelaskan | 4 |
+| History staging berstatus belum terjelaskan | 0 |
 | History production berstatus belum terjelaskan | 2 |
 | Migrasi scope-normalization baru yang belum diterapkan hosted | 1 (sengaja pending) |
 
@@ -69,10 +69,10 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20260926123133` | `stage14_staging_stage9_hardening` | supabase/migrations/20260926040000_stage_9_hardening.sql | **KHUSUS STAGING** | Salinan staging Stage 9; trigger tenant lama sudah tidak ada dan create_offer_activation sama antar-environment. |
 | `20260926123139` | `stage14_staging_stage9_surface_cleanup` | supabase/migrations/20260926044000_stage_9_runtime_surface_cleanup.sql | **KHUSUS STAGING** | Salinan staging cleanup; kedua RPC antrean usang tidak ada di kedua DB. |
 | `20260926123146` | `stage14_staging_stage9_rate_limit_reconciliation` | supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql | **KHUSUS STAGING** | Salinan executable di supabase/staging/STAGE14_STAGE9_RATE_LIMIT_RECONCILIATION.sql; staging trim scope, produksi masih menyimpan p_scope mentah. |
-| `20260926123152` | `stage10_click_runtime` | belum ditautkan ke file sumber di master | **BELUM TERJELASKAN** | Tidak ada pasangan nama/slug unik di manifest sumber saat ini dan belum cukup bukti katalog untuk menyatakan efek historis secara spesifik. |
-| `20260926123202` | `stage12_qualified_click_runtime` | belum ditautkan ke file sumber di master | **BELUM TERJELASKAN** | Tidak ada pasangan nama/slug unik di manifest sumber saat ini dan belum cukup bukti katalog untuk menyatakan efek historis secara spesifik. |
-| `20260926123209` | `stage13_atomic_settlement_runtime` | belum ditautkan ke file sumber di master | **BELUM TERJELASKAN** | Tidak ada pasangan nama/slug unik di manifest sumber saat ini dan belum cukup bukti katalog untuk menyatakan efek historis secara spesifik. |
-| `20260926123215` | `stage13_settlement_index_cleanup` | belum ditautkan ke file sumber di master | **BELUM TERJELASKAN** | Tidak ada pasangan nama/slug unik di manifest sumber saat ini dan belum cukup bukti katalog untuk menyatakan efek historis secara spesifik. |
+| `20260926123152` | `stage10_click_runtime` | supabase/migrations/20260925225318_stage_10_click_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 10 row uses compact legacy slug; it maps to canonical Stage 10 click runtime source, while version differs from source timestamp. |
+| `20260926123202` | `stage12_qualified_click_runtime` | supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 12 row uses compact legacy slug; it maps to canonical qualified-click source, while version differs from source timestamp. |
+| `20260926123209` | `stage13_atomic_settlement_runtime` | supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 13 row uses compact legacy slug; it maps to canonical atomic-settlement source, while version differs from source timestamp. |
+| `20260926123215` | `stage13_settlement_index_cleanup` | supabase/migrations/20260926040500_stage_13_settlement_index_cleanup.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 13 row uses compact legacy slug; it maps to canonical settlement-index source, while version differs from source timestamp. |
 | `20260926215632` | `stage14_make_credit_fixture_repeatable` | supabase/staging/STAGE14_SEED.sql | **KHUSUS STAGING** | Perubahan repeatability pada seed/credit fixture (commit 216baf5c); bukan migrasi produksi. |
 | `20260927195821` | `stage_15_production_smoke_harness` | supabase/migrations/20260927195830_stage_15_production_smoke_harness.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260927195955` | `stage_15_transactional_production_smoke` | supabase/migrations/20260927200018_stage_15_transactional_production_smoke.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
@@ -179,13 +179,13 @@ Setiap file kanonis di bawah masuk inventaris. Untuk sumber yang tidak mempunyai
 | `supabase/migrations/20260925212247_stage_8_capability_enforcement.sql` | `dca632c92c92` | ALIAS/TIMESTAMP HISTORIS (20260926123013) | COCOK LANGSUNG (20260925212247) |
 | `supabase/migrations/20260925212601_stage_8_destination_url_compatibility.sql` | `0bfcc7d2b84d` | ALIAS/TIMESTAMP HISTORIS (20260926123019) | COCOK LANGSUNG (20260925212601) |
 | `supabase/migrations/20260925212930_stage_8_function_grant_hardening.sql` | `b2fec4a26523` | Tidak ada pasangan history terverifikasi | Tidak ada pasangan langsung; cek status superseded/gap |
-| `supabase/migrations/20260925225318_stage_10_click_runtime.sql` | `432857bc0580` | Tidak ada pasangan history terverifikasi | COCOK LANGSUNG (20260925225318) |
+| `supabase/migrations/20260925225318_stage_10_click_runtime.sql` | `432857bc0580` | ALIAS/TIMESTAMP HISTORIS (20260926123152) | COCOK LANGSUNG (20260925225318) |
 | `supabase/migrations/20260926010000_stage_8_function_grant_hardening.sql` | `34f6acc7a5a2` | ALIAS/TIMESTAMP HISTORIS — row 20260926123033 | EFEK DIGANTIKAN MIGRASI LEBIH BARU — tidak ada row mandiri; grant final oleh 20260929010000_stage_16_read_only_control_plane.sql |
-| `supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql` | `50465e5f9daa` | Tidak ada pasangan history terverifikasi | ALIAS/TIMESTAMP HISTORIS (20260925231337) |
+| `supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql` | `50465e5f9daa` | ALIAS/TIMESTAMP HISTORIS (20260926123202) | ALIAS/TIMESTAMP HISTORIS (20260925231337) |
 | `supabase/migrations/20260926030000_stage_9_runtime_core.sql` | `4eebbc547ef9` | KHUSUS STAGING — executable copy STAGE14_STAGE9_RUNTIME_CORE.sql | ALIAS/TIMESTAMP HISTORIS — 20260925214730 |
-| `supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql` | `16757a84d59f` | Tidak ada pasangan history terverifikasi | ALIAS/TIMESTAMP HISTORIS (20260925232043) |
+| `supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql` | `16757a84d59f` | ALIAS/TIMESTAMP HISTORIS (20260926123209) | ALIAS/TIMESTAMP HISTORIS (20260925232043) |
 | `supabase/migrations/20260926040000_stage_9_hardening.sql` | `7575142dba7b` | KHUSUS STAGING — stage14_staging_stage9_hardening | ALIAS/TIMESTAMP HISTORIS — 20260925215210 |
-| `supabase/migrations/20260926040500_stage_13_settlement_index_cleanup.sql` | `8e49558349dd` | Tidak ada pasangan history terverifikasi | ALIAS/TIMESTAMP HISTORIS (20260925232130) |
+| `supabase/migrations/20260926040500_stage_13_settlement_index_cleanup.sql` | `8e49558349dd` | ALIAS/TIMESTAMP HISTORIS (20260926123215) | ALIAS/TIMESTAMP HISTORIS (20260925232130) |
 | `supabase/migrations/20260926044000_stage_9_runtime_surface_cleanup.sql` | `6ec1b6563d9d` | KHUSUS STAGING — stage14_staging_stage9_surface_cleanup | ALIAS/TIMESTAMP HISTORIS — 20260925215802 |
 | `supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql` | `b5c0cb5a361a` | KHUSUS STAGING — STAGE14_STAGE9_RATE_LIMIT_RECONCILIATION.sql | BELUM TERJELASKAN / DRIFT — tidak ada pasangan history unik; fungsi atomic upsert ada tetapi menyimpan scope tanpa btrim |
 | `supabase/migrations/20260927195830_stage_15_production_smoke_harness.sql` | `a9c09e3f4b74` | ALIAS/TIMESTAMP HISTORIS (20260927195821) | COCOK LANGSUNG (20260927195830) |
