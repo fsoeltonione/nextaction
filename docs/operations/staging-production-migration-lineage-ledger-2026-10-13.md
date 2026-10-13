@@ -245,6 +245,10 @@ Payload `stage_9_runtime_builtin_fix` (version production `20260925215343`) coco
 
 Disposable replay [run 38302803020](https://github.com/fsoeltonione/nextaction/actions/runs/38302803020) meluluskan migrasi baru dengan 81 assertion, tetapi belum membuktikan hosted staging. Langkah berikutnya adalah canary **staging saja** melalui jalur migrasi yang disetujui: verifikasi history row baru tepat satu kali, body/hash fungsi, EXECUTE grants hanya untuk `service_role`, dan regresi scope padded/unpadded. Jangan menerapkan ke production pada tahap ini.
 
+**Hasil pra-canary staging, 2026-10-13:** body dari file kanonis dieksekusi dalam transaksi staging yang di-`ROLLBACK`; tes memverifikasi request scope berpadded lalu unpadded menghasilkan hitungan 1 lalu 2, hanya ada satu bucket, dan EXECUTE tetap hanya untuk `service_role`. Hasil **PASS**, seluruh perubahan tes rollback. Snapshot sesudah tes mengonfirmasi history masih 52 row, version `20261013010000` belum tercatat, body hash tetap `cbf7a36dae79fa63fd6287a5b1b73278`, serta tidak ada row sintetis tertinggal. Ini membuktikan SQL/body dan kontrak fungsi pada staging, tetapi **belum** membuktikan migrasi persistent sudah diterapkan.
+
+Workflow GitHub [run 38408365426](https://github.com/fsoeltonione/nextaction/actions/runs/38408365426) gagal tertutup sebelum `supabase link` atau koneksi database karena repository/environment secrets `SUPABASE_ACCESS_TOKEN` dan `STAGING_SUPABASE_DB_PASSWORD` kosong. Tidak ada migrasi yang dijalankan oleh run tersebut; history/hash/grants production tetap pada baseline read-only. Untuk melanjutkan apply persisten, pemilik repo perlu mengisi dua secrets ini pada GitHub Environment `staging`, lalu menjalankan workflow canary dengan verifikasi dry-run satu versi saja.
+
 ### D3. Legacy Stage 8 grant dan Stage 17 verifier sudah digantikan
 
 - `20260926010000_stage_8_function_grant_hardening.sql`: tidak ada baris history mandiri di production, tetapi efek grant yang tepat telah digantikan oleh `20260929010000_stage_16_read_only_control_plane.sql`. Jangan reapply grant lama yang akan memberikan kembali `authenticated` execute.
