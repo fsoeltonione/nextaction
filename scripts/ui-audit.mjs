@@ -179,7 +179,7 @@ async function main() {
           // Verify keyboard navigation can reach a named interactive control.
           await page.keyboard.press("Tab");
           caseResult.keyboardFocus = await page.evaluate(() => {
-            const element = document.activeElement as HTMLElement | null;
+            const element = document.activeElement;
             if (!element || element === document.body || element === document.documentElement) return null;
             const labelledBy = (element.getAttribute("aria-labelledby") || "")
               .split(/\s+/)
