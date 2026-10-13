@@ -144,24 +144,24 @@ Candidate mapping fields carried forward from the prior ledger are not certified
 |---|---|---|
 | Per-row history inventory with SQL fingerprint | 54 live entries captured per project above | **Inventory complete** |
 | Exact current-source/payload reconciliation | Only 27 staging payloads match a whole current file; remaining rows still have a content/effect gap | **BLOCKED** |
-| Local migration filename uniqueness | Two collisions resolved in branch, subject to CI validation | **PENDING CI** |
-| Reset/replay from an empty disposable DB | Workflow #8 passed after baseline and temporary filename normalization | **PARTIAL; rerun after source rename** |
-| Official staging `supabase migration list --linked` agreement | Read-only remote versions do not overlap current local filename prefixes | **FAIL / NOT SYNCED** |
-| Official staging `supabase db push --dry-run --linked` | Cannot execute official CLI dry-run here without a staging Postgres connection/password; Supabase service API key is not a database password | **NOT RUN; no inference** |
+| Local migration filename uniqueness | Two timestamp collisions resolved in branch; Quality/replay had passed on the preceding commit and were re-triggered after workflow hardening | **CI rerun pending** |
+| Reset/replay from an empty disposable DB | Disposable Migration Replay #15 passed on commit `081203b04e2ae8636b4154295f86819036596e84`; rerun triggered after workflow hardening | **PASS on preceding commit** |
+| Official staging `supabase migration list --db-url` | Successful read-only connection on run #5, attempt 7: 51 current local version keys, 54 remote version keys, 0 overlaps (51 local-only and 54 remote-only rows) | **FAIL / NOT SYNCED** |
+| Official staging `supabase db push --dry-run --db-url` | Run #5, attempt 7 failed closed: remote migration versions are absent from the current local migration directory. CLI printed a suggested `migration repair --status reverted` command; it was **not executed**. The workflow parser is being hardened to report ASCII/Unicode separators and backticked versions accurately. | **BLOCKED; no writes** |
 | Exact catalogue equivalence | Four default and six function-definition differences | **FAIL / BLOCKED** |
 | Production history unchanged | No `db push`, `migration repair`, or hosted database writes executed | **PASS** |
 
 ## Safe next step
 
-1. Let this branch's filename contract and disposable replay checks run. The rename is source-only and does not synchronize hosted history.
-2. Configure a staging-only Postgres connection secret for an explicitly manual, read-only validation job. Run `supabase migration list --linked` and `supabase db push --dry-run --linked` against staging only; fail closed when secrets are missing and never log credentials.
-3. If the official dry-run proposes replaying historical migrations, stop. Reconcile payload and catalog differences first; do not run migrations as a synchronization shortcut.
-4. Only after per-row lineage and catalog semantics are validated should a project-specific staging history reconciliation plan be reviewed. Never manually edit `schema_migrations`.
-5. Keep production out of scope until staging is proven synchronized by official dry-run plus catalog equivalence and staging acceptance.
+1. Use the live staging CLI evidence to reconcile each of the 54 remote-only version keys against the manifest's payload fingerprints, historical aliases, and candidate source/effect; separately classify the 51 local-only version keys. Do not run the CLI-suggested repair command.
+2. Continue the read-only staging proof after the workflow parser correction. The purpose is to report the real lineage mismatch, not to force a green status by rewriting history.
+3. Review the four column-default and six function-definition differences; decide which are intentional and document evidence for each.
+4. Only after source/effect lineage and catalog semantics are validated should a project-specific staging history reconciliation plan be reviewed. Never manually edit `schema_migrations` as a shortcut.
+5. Keep production out of scope until staging has been reconciled, a no-write/approval plan has been reviewed, and catalogue equivalence plus staging acceptance are proven.
 
-No hosted database was mutated while preparing this manifest.
+No hosted database was mutated while preparing this manifest or during the reported staging CLI run.
 
 
 ## CI follow-up — 2026-10-14
 
-A staging-only CLI proof workflow was added in this PR at `.github/workflows/staging-migration-dry-run.yml`. Its first run exits before making a database connection because the GitHub Actions secret `STAGING_DATABASE_URL` is not configured. No CLI migration list/dry-run ran during that attempt. Once a staging-only direct Postgres URL is configured, the workflow rejects any other host and requires both a fully paired migration list and an explicit no-op dry-run response. Until then staging sync remains **not proven**.
+The staging-only CLI workflow at `.github/workflows/staging-migration-dry-run.yml` now connects through the project's IPv4-compatible Shared Session Pooler (port 5432) using repository secret `STAGING_DATABASE_URL`. Run #5, attempt 7 validated the staging target and completed the read-only migration list, then failed the dry-run because 54 remote migration version keys are absent from the current local directory. This is lineage evidence, **not** authorization to run `migration repair` or apply migrations. A parser fix for the CLI table's separators/backticks was committed after this run; the corrected workflow is being revalidated. Production remains untouched and staging sync remains **not proven**.
