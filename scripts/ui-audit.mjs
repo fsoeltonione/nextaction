@@ -225,13 +225,13 @@ async function main() {
           }
 
           const expectedUnauthorizedConsoleMessage =
-            /Failed to load resource: the server responded with a status of 401 \\(Unauthorized\\)/i;
+            "Failed to load resource: the server responded with a status of 401 (Unauthorized)";
           caseResult.consoleErrors = caseResult.consoleErrors.filter(
             (message) =>
               !(
                 route.name === "activation" &&
                 caseResult.expectedAuthResponses.length > 0 &&
-                expectedUnauthorizedConsoleMessage.test(message)
+                message.includes(expectedUnauthorizedConsoleMessage)
               ),
           );
           if (caseResult.consoleErrors.length) {
