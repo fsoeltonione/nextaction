@@ -68,3 +68,17 @@ body {
 }
 .btn-secondary:hover { background: #262626; }
 .btn-secondary:disabled { opacity: 0.5; }
+
+
+.moment-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .moment-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
