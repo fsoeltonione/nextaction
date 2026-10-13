@@ -68,14 +68,14 @@ function LoginContent() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+      <main className="min-h-screen bg-neutral-950 flex items-center justify-center">
         <div className="w-7 h-7 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4">
+    <main className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl p-8">
         <div className="flex justify-center mb-8">
           <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center">
@@ -123,7 +123,7 @@ function LoginContent() {
           <span>{loading ? "Connecting..." : "Continue with Google"}</span>
         </button>
       </div>
-    </div>
+    </main>
   );
 }
 
