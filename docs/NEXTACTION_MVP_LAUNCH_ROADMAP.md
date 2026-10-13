@@ -1,17 +1,19 @@
 # NextAction — Roadmap Audit & Official MVP-to-Launch Roadmap
 
-**Status:** Official post-Stage-15 roadmap  
-**Audit date:** 2026-10-11  
+**Status:** Historical Stage 14–22 roadmap; superseded as the source of current product/activation behavior  
+**Last reviewed:** 2026-10-14  
 **Repository:** `fsoeltonione/nextaction`  
-**Roadmap baseline master:** `f9cb8442214e7c840076682c5ec10c2b9536924e`  
-**Completed through:** Stage 15  
-**Current milestone:** Stage 16 — Activation Flow v2 completion (URL-first UI and authenticated activation are implemented; automated anonymous proposal proof is being added)
+**Historical roadmap baseline:** `f9cb8442214e7c840076682c5ec10c2b9536924e`  
+**Historical milestone marker:** Stage 15  
+**Current product truth:** `docs/EMBED_ONLY_MVP_DECISION.md`  
+**Current implemented flow:** Manual Publisher/Moment setup, public publisher key, and `show_ads("<moment_key>")` embed  
+**Supersession note:** The scanner, URL-analysis, anonymous Product Understanding proposal, and Stage 16 activation-flow narratives below are retained as historical audit context only. They are not current implementation requirements. `/api/analyze` returns HTTP 410 and must not be treated as an active URL-fetch or AI-analysis endpoint.
 
 ---
 
 ## 1. Purpose
 
-This document converts the repository's existing product truth, architecture truth, data/security truth, stage documents, MVP plan, and current implementation state into one ordered roadmap from the end of Stage 14 to public MVP launch.
+This document preserves the earlier Stage 14–22 launch-planning sequence for audit history. It is not a current milestone/status authority. For actual behavior and current implementation acceptance, use `docs/EMBED_ONLY_MVP_DECISION.md`, the executable API routes, the release workflow, and current GitHub checks. Do not reintroduce crawler or AI-analysis behavior to satisfy an older Stage 15/16 contract.
 
 It is intended to prevent two recurring problems:
 
@@ -92,59 +94,21 @@ Event
 
 Stage 14 is therefore **closed**.
 
-### Important gaps still visible in the current implementation
+### Current implementation status (reviewed 2026-10-14)
 
-The repository documents and current application source expose several remaining gaps that must shape the roadmap.
+The current MVP is **embed-only**, per `docs/EMBED_ONLY_MVP_DECISION.md`:
 
-#### A. Stage 15 scanner gap is now closed
+- `src/app/api/analyze/route.ts` returns HTTP 410 with `product_analysis_removed`; it does not fetch publisher URLs or invoke an AI provider.
+- `src/app/onboarding/page.tsx` redirects to `/activate`. A supplied URL is metadata only; the route does not crawl or analyze it.
+- `src/app/activate/page.tsx` lets the publisher declare application metadata and Moments explicitly, then create a public publisher key and install `public/nextaction.js`.
+- The active embed contract is a `data-publisher-key` script attribute plus `show_ads("<moment_key>")`.
+- DNS-rebinding/scanner issue [#104](https://github.com/fsoeltonione/nextaction/issues/104) is not a claim that a scanner is safe; scanner reactivation must remain blocked until its threat model and runtime boundary are proven. No public MVP acceptance test should depend on crawling.
 
-`src/lib/url.ts` performs URL normalization and rejects obvious blocked host forms.
+The current `master` dashboard still contains legacy `nextaction.track(...)` instructions and an “Analyze a product” empty-state CTA, and its create-offer handler lacks a network-error catch. Those issues are being addressed in [draft PR #139](https://github.com/fsoeltonione/nextaction/pull/139), which must pass its current checks before any merge. Do not describe those proposed changes as already deployed.
 
-`src/lib/external-url.ts` validates HTTP(S) destination syntax and rejects embedded credentials / obvious blocked hosts.
+#### C. Dashboard status must follow the current source
 
-`src/app/api/analyze/route.ts` now uses the Stage 15 server-side scanner before sending a bounded page snapshot to the model provider. Provider timeout/response/output validation remains in place.
-
-Therefore Stage 15 has now closed this trust-boundary gap. The current implementation performs controlled server-side retrieval with the security controls recorded in the Stage 15 contract. The historical pre-Stage-15 finding is retained here only to explain why Stage 15 existed.
-
-The authoritative data/security and architecture documents explicitly require:
-
-- normalization;
-- SSRF resistance;
-- DNS/IP safety checks;
-- redirect validation;
-- timeouts;
-- response-size limits;
-- content-type checks;
-- abuse/rate controls;
-- bounded LLM input;
-- structured output validation.
-
-#### B. Stage 16 URL-first activation is implemented; anonymous browser proof is now part of release acceptance
-
-The live homepage sends a normalized SaaS URL directly to `/onboarding?url=...`, without inserting a login wall. The onboarding page calls the public `/api/analyze` endpoint and renders an editable Product Understanding proposal before persistence.
-
-Saving is a separate boundary:
-- `GET /api/onboarding/state` remains private and returns HTTP 401 to anonymous users;
-- `POST /api/products/confirm` returns HTTP 401 until a user authenticates;
-- the browser preserves the pending normalized URL in the login query and the OAuth callback preserves approved internal activation context;
-- confirmed Products/Moments, workspace selection, capabilities, integration verification, and starter-offer setup are covered by the authenticated staging acceptance runner.
-
-The remaining acceptance gap was that the anonymous proposal/persistence boundary had only been checked manually while the automated Release Gate exercised the authenticated journey. The Stage 16 change adds a separate headless browser job that:
-1. opens staging as a truly anonymous browser;
-2. verifies the Product Understanding proposal and 3–8 Moments render before login;
-3. confirms the activation state endpoint remains private;
-4. attempts the UI confirmation, requires `POST /api/products/confirm` to return HTTP 401, and checks redirect to login preserves the exact normalized pending URL;
-5. never signs in or creates Product/Moment data.
-
-This job receives only the staging base URL, no Supabase service credentials, and is a required dependency of authenticated staging acceptance and the production approval gate. Stage 16 should be marked closed only after a Release Gate run on the new commit passes both anonymous and authenticated staging acceptance.
-
-#### C. Some dashboard behavior is still prototype-shaped
-
-The current dashboard contains the expected Monetize / Advertise surfaces and renders integration snippets / offer controls, but the advertiser balance display currently contains a hard-coded `$25.00` presentation.
-
-That is not sufficient for a real commercial control plane.
-
-Stage 17 must replace prototype presentation with authoritative workspace/account state.
+The older note that the balance was hard-coded to `$25.00` is stale: current source calls `/api/workspaces/balance` with `cache: "no-store"` and shows an unavailable state if the request fails. The remaining known dashboard contract/error-handling gaps are listed above and are under review in draft PR #139. Re-check current source and CI before marking them complete.
 
 #### D. Commercial operations are intentionally incomplete
 
@@ -177,9 +141,9 @@ The roadmap does not silently turn those into launch requirements unless explici
 
 ---
 
-## 3. Official remaining milestone count
+## 3. Historical milestone model (superseded for current MVP planning)
 
-There are **7 remaining milestones** after the completion of Stage 15, leading to the defined public MVP launch:
+The seven-milestone sequence below belongs to the earlier scanner and URL-first product generation. Preserve it as planning history; do not use it as the current remaining-work count for the embed-only MVP.
 
 | Stage | Milestone | Primary outcome |
 |---|---|---|
@@ -216,7 +180,7 @@ Stage 15 ✅ Scanner / SSRF
 
 ---
 
-# 4. Stage 15 — DNS-aware Product Scanner / SSRF Hardening (COMPLETED)
+# 4. [HISTORICAL / NOT ACTIVE IN THE MVP] Stage 15 — DNS-aware Product Scanner / SSRF Hardening (COMPLETED IN THE OLD ROADMAP)
 
 ## Objective
 
@@ -271,7 +235,7 @@ Stage 15 is complete only when:
 
 ---
 
-# 5. Stage 16 — Activation Flow v2 Completion
+# 5. [HISTORICAL / SUPERSEDED] Stage 16 — URL-first Activation Flow v2 Completion
 
 ## Objective
 
@@ -707,9 +671,9 @@ Roadmap
 
 ---
 
-## 15. Final roadmap answer
+## 15. Historical roadmap conclusion (superseded)
 
-**Remaining after Stage 15: 7 milestones.**
+**The “7 remaining milestones after Stage 15” count is historical, not the current state of the embed-only MVP.**
 
 ```
 15  DNS-aware Product Scanner / SSRF Hardening ✅ CLOSED
@@ -722,4 +686,4 @@ Roadmap
 22  Public MVP Launch
 ```
 
-Stage 15 is now closed. The next implementation target is **Stage 16 — Activation Flow v2 Completion**.
+This line records the former roadmap hand-off and is not a current implementation instruction. Current next work must be selected from open GitHub issues/PRs and verified against the embed-only product decision.
