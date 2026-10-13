@@ -2,7 +2,7 @@
 
 ## Keputusan gerbang produksi
 
-**STATUS: HOLD — jangan deploy migrasi baru ke database produksi.** Inventaris lengkap berhasil ditangkap, dan sebagian besar riwayat dapat dipetakan sebagai alias/timestamp historis atau efek yang sudah digantikan. Namun ada dua baris legacy produksi bernama `stage_9_runtime_reconciliation` yang tidak memiliki SQL sumber tersimpan atau pasangan unik di repo saat ini; provenance setiap baris tidak dapat dibuktikan. Selain itu, migrasi rate-limit kanonis tidak memiliki pasangan history produksi yang unik dan fungsi live produksi masih menyimpan `p_scope` tanpa normalisasi. Ini bukan kegagalan CI; ini celah lineage + drift aktual yang harus dipertahankan sebagai blocker.
+**STATUS: HOLD — jangan deploy migrasi baru ke database produksi.** Inventaris lengkap berhasil ditangkap, dan sebagian besar riwayat dapat dipetakan sebagai alias/timestamp historis atau efek yang sudah digantikan. Namun ada empat baris legacy produksi yang tidak memiliki SQL sumber tersimpan atau pasangan unik di repo saat ini: dua baris bernama `stage_9_runtime_reconciliation`, satu `stage_9_runtime_hardening`, dan satu `stage_9_decision_runtime_hardening`. Provenance tiap baris tidak dapat dibuktikan hanya dari keadaan katalog. Selain itu, migrasi rate-limit kanonis tidak memiliki pasangan history produksi yang unik dan fungsi live produksi masih menyimpan `p_scope` tanpa normalisasi. Ini bukan kegagalan CI; ini celah lineage + drift aktual yang harus dipertahankan sebagai blocker.
 
 Audit dilakukan secara read-only pada kedua database Supabase. Tidak ada migrasi yang dijalankan, tidak ada data yang diubah, dan tidak ada baris `schema_migrations` yang diedit. Tidak ada upaya membuat kedua history terlihat sama secara manual.
 
@@ -124,10 +124,10 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20260925215138` | `stage_9_runtime_reconciliation` | tidak ada file sumber unik di master | **BELUM TERJELASKAN** | Dua entri dengan nama sama (versi 20260925215138 dan 20260925215209); tidak ada file sumber tracked atau checksum SQL untuk menautkan setiap baris secara unik. Keadaan akhir objek tidak membuktikan SQL mana yang dijalankan pada masing-masing entri. |
 | `20260925215209` | `stage_9_runtime_reconciliation` | tidak ada file sumber unik di master | **BELUM TERJELASKAN** | Dua entri dengan nama sama (versi 20260925215138 dan 20260925215209); tidak ada file sumber tracked atau checksum SQL untuk menautkan setiap baris secara unik. Keadaan akhir objek tidak membuktikan SQL mana yang dijalankan pada masing-masing entri. |
 | `20260925215210` | `stage_9_hardening` | supabase/migrations/20260926040000_stage_9_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
-| `20260925215231` | `stage_9_runtime_hardening` | supabase/migrations/20260926030000_stage_9_runtime_core.sql | **EFEK DIGANTIKAN MIGRASI LEBIH BARU** | Sumber lama spesifik tidak ada di master; efek inti yang terlihat (credential unique index, decisions.moment_id/FK/index, unique moment occurrence event index) ada pada kedua DB. Ini memetakan keadaan akhir, bukan membuktikan isi SQL historis persis. |
+| `20260925215231` | `stage_9_runtime_hardening` | tidak ada file sumber unik di master; efek katalog bertumpang tindih dengan Stage 9 core | **BELUM TERJELASKAN** | Indeks credential hash, kolom/FK/index `decisions.moment_id`, dan unique event-occurrence index hadir di kedua DB, tetapi state akhir tidak membuktikan SQL spesifik yang menghasilkan baris historis ini. |
 | `20260925215322` | `stage_9_runtime_sql_fix` | supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql + parser correction commit 6bd6b13b | **EFEK DIGANTIKAN MIGRASI LEBIH BARU** | Nama lama cocok dengan perbaikan SQL/built-in Stage 9 yang kemudian masuk ke sumber kanonis. Fungsi live beroperasi, tetapi perilaku normalisasi scope di produksi tetap drift; status ini hanya untuk perbaikan sintaks, bukan bukti fungsi rate-limit seluruhnya konvergen. |
 | `20260925215343` | `stage_9_runtime_builtin_fix` | supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql + parser correction commit 6bd6b13b | **EFEK DIGANTIKAN MIGRASI LEBIH BARU** | Nama lama cocok dengan perbaikan SQL/built-in Stage 9 yang kemudian masuk ke sumber kanonis. Fungsi live beroperasi, tetapi perilaku normalisasi scope di produksi tetap drift; status ini hanya untuk perbaikan sintaks, bukan bukti fungsi rate-limit seluruhnya konvergen. |
-| `20260925215416` | `stage_9_decision_runtime_hardening` | supabase/migrations/20260926040000_stage_9_hardening.sql dan migrasi decision/offer lebih baru | **EFEK DIGANTIKAN MIGRASI LEBIH BARU** | Nama sumber lama tidak ada di master; fungsi runtime decision/delivery sama antar-environment dan hardening offer/moment yang relevan hadir. Status didasarkan pada keadaan akhir objek, bukan ekuivalensi SQL byte-for-byte. |
+| `20260925215416` | `stage_9_decision_runtime_hardening` | tidak ada file sumber unik di master; efek runtime decision/hardening berikutnya | **BELUM TERJELASKAN** | Fungsi decision/delivery saat ini sama antar-env, tetapi tidak ada SQL sumber lama yang membuktikan tepatnya efek entri ini atau apakah setiap efeknya sudah diabsorpsi migrasi berikutnya. |
 | `20260925215802` | `stage_9_runtime_surface_cleanup` | supabase/migrations/20260926044000_stage_9_runtime_surface_cleanup.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260925225318` | `stage_10_click_runtime` | supabase/migrations/20260925225318_stage_10_click_runtime.sql | **COCOK LANGSUNG** | Versi history sama dengan prefix timestamp sumber; nama adalah slug sumber (ekstensi .sql dapat tidak disimpan). |
 | `20260925231337` | `20260926030000_stage_12_qualified_click_runtime` | supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
@@ -224,14 +224,16 @@ Setiap file kanonis di bawah masuk inventaris. Untuk sumber yang tidak mempunyai
 
 ## D. Blocker lineage yang tersisa dan tindakan aman
 
-### D1. Dua entri production belum terjelaskan
+### D1. Empat entri production belum terjelaskan
 
 | Version | Name | Yang diketahui | Yang belum dapat dibuktikan |
 |---|---|---|---|
 | `20260925215138` | `stage_9_runtime_reconciliation` | Ada di ledger production, tidak ada file dengan path/nama itu di master. | Isi SQL dan efek unik entry ini tidak bisa dipisahkan secara tepercaya dari entry bernama sama berikutnya. |
 | `20260925215209` | `stage_9_runtime_reconciliation` | Entri kedua dengan nama sama, beberapa menit setelah yang pertama. | Tidak ada blob/checksum SQL atau source path tersimpan untuk mengaitkan isi SQL secara satu-ke-satu. |
+| `20260925215231` | `stage_9_runtime_hardening` | Efek yang berhubungan dengan core terlihat: indeks credential hash, kolom/FK/index `decisions.moment_id`, unique event-occurrence index ada di kedua DB. | File SQL spesifik tidak ada di master; katalog tidak membuktikan apakah entri ini identik dengan source core atau apakah ia membawa perubahan lain. |
+| `20260925215416` | `stage_9_decision_runtime_hardening` | Fungsi decision/delivery saat ini sama antar-env dan migrasi hardening canonical ada. | File SQL spesifik tidak ada di master; tidak ada bukti yang memetakan setiap perubahan entri ini ke source atau migrasi lanjutan secara unik. |
 
-**Untuk menutup dua baris ini:** butuhkan artefak asal yang otoritatif (file SQL yang dieksekusi pada saat itu, transcript apply-migration yang berisi SQL, backup/source bundle, atau audit log yang benar-benar menyimpan statement). Tanpa bukti itu, jangan menyebut keduanya cocok langsung dan jangan edit history.
+**Untuk menutup dua baris ini:** butuhkan artefak asal yang otoritatif (file SQL yang dieksekusi pada saat itu, transcript apply-migration yang berisi SQL, backup/source bundle, atau audit log yang benar-benar menyimpan statement). Tanpa bukti itu, jangan menyebut empat entri ini cocok langsung dan jangan edit history.
 
 ### D2. Canonical rate-limit migration tidak punya pasangan history production yang bersih
 
@@ -269,9 +271,9 @@ Dua history row `stage14_staging_stage9_hardening` dan `stage14_staging_stage9_s
 ## E. Gerbang selesai yang direkomendasikan
 
 Gerbang lineage baru boleh dinyatakan selesai setelah:
-1. dua entri `stage_9_runtime_reconciliation` punya artefak sumber historis atau keputusan tertulis yang secara eksplisit menerima ketidakpastian tersebut (bukan tebakan);
+1. empat entri Stage 9 legacy yang ditandai belum terjelaskan punya artefak sumber historis atau keputusan tertulis yang secara eksplisit menerima ketidakpastian tersebut (bukan tebakan);
 2. seluruh pemetaan sumber `20260926050000_stage_9_runtime_rate_limit_reconciliation.sql` terhadap production terdokumentasi dan gap perilaku dicatat sebagai migrasi forward-only;
 3. anomali grants dan function-definition diffs ditandai **diselesaikan** atau **diterima secara eksplisit** dengan bukti semantik;
 4. staging canary untuk `20261013010000_rate_limit_scope_normalization.sql` lulus sesudah langkah 1–3; baru setelah itu buka review deployment production.
 
-Tidak ada perubahan pada database hosted yang dilakukan sebagai bagian dari audit ini. Tidak ada instruksi untuk menyesuaikan row history secara manual. Ini adalah ledger lengkap atas entri yang teramati; beberapa entri berstatus **BELUM TERJELASKAN**, sehingga secara operasional gate produksi tetap **HOLD** sampai bukti tambahan tersedia.
+Tidak ada perubahan pada database hosted yang dilakukan sebagai bagian dari audit ini. Tidak ada instruksi untuk menyesuaikan row history secara manual. Ini adalah ledger lengkap atas entri yang teramati; empat entri production berstatus **BELUM TERJELASKAN**, sehingga secara operasional gate produksi tetap **HOLD** sampai bukti tambahan tersedia.
