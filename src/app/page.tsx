@@ -12,7 +12,7 @@ export default function Home() {
         <Link href="/activate" className="inline-flex mt-10 items-center justify-center rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-7 py-4 font-semibold transition-colors">
           Set up publisher
         </Link>
-        <p className="mt-5 text-sm text-neutral-500">No SDK. No crawling. No AI analysis.</p>
+        <p className="mt-5 text-sm text-neutral-400">No SDK. No crawling. No AI analysis.</p>
       </div>
     </main>
   );
