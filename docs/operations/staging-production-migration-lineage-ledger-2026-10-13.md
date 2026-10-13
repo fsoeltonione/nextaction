@@ -33,7 +33,7 @@ Audit dilakukan secara read-only pada kedua database Supabase. Tidak ada migrasi
 | History staging | 52 |
 | History production | 52 |
 | History staging berstatus belum terjelaskan | 0 |
-| History production berstatus belum terjelaskan | 2 |
+| History production berstatus belum terjelaskan | 4 |
 | Migrasi scope-normalization baru yang belum diterapkan hosted | 1 (sengaja pending) |
 
 ### Bukti katalog yang dicocokkan
@@ -63,7 +63,7 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20260926123006` | `20260925211519_stage_8_activation_foundation_hardening` | supabase/migrations/20260925211519_stage_8_activation_foundation_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260926123013` | `20260925212247_stage_8_capability_enforcement` | supabase/migrations/20260925212247_stage_8_capability_enforcement.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260926123019` | `20260925212601_stage_8_destination_url_compatibility` | supabase/migrations/20260925212601_stage_8_destination_url_compatibility.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
-| `20260926123026` | `20260925212930_stage_8_function_grant_hardening` | supabase/migrations/20260926010000_stage_8_function_grant_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
+| `20260926123026` | `20260925212930_stage_8_function_grant_hardening` | supabase/migrations/20260925212930_stage_8_function_grant_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Nama/version historis mengarah ke file sumber dengan timestamp 20260925212930; berbeda dari file grant Stage 8 kedua bertimestamp 20260926010000. |
 | `20260926123033` | `20260926010000_stage_8_function_grant_hardening` | supabase/migrations/20260926010000_stage_8_function_grant_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260926123123` | `stage14_staging_stage9_runtime_core` | supabase/migrations/20260926030000_stage_9_runtime_core.sql | **KHUSUS STAGING** | Salinan executable staging di supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql; key tables/index/FK ada di kedua DB. |
 | `20260926123133` | `stage14_staging_stage9_hardening` | efek Stage 9 hardening; tidak ada file salinan spesifik di master saat ini | **KHUSUS STAGING** | Entri berlabel Stage14 staging; trigger/validator tenant lama sudah tidak ada dan create_offer_activation sama antar-environment. Isi SQL historis spesifik tidak tersimpan, jadi bukan klaim byte-identical. |
@@ -119,7 +119,7 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20260925211519` | `stage_8_activation_foundation_hardening` | supabase/migrations/20260925211519_stage_8_activation_foundation_hardening.sql | **COCOK LANGSUNG** | Versi history sama dengan prefix timestamp sumber; nama adalah slug sumber (ekstensi .sql dapat tidak disimpan). |
 | `20260925212247` | `stage_8_capability_enforcement` | supabase/migrations/20260925212247_stage_8_capability_enforcement.sql | **COCOK LANGSUNG** | Versi history sama dengan prefix timestamp sumber; nama adalah slug sumber (ekstensi .sql dapat tidak disimpan). |
 | `20260925212601` | `stage_8_destination_url_compatibility` | supabase/migrations/20260925212601_stage_8_destination_url_compatibility.sql | **COCOK LANGSUNG** | Versi history sama dengan prefix timestamp sumber; nama adalah slug sumber (ekstensi .sql dapat tidak disimpan). |
-| `20260925212930` | `stage_8_function_grant_hardening` | supabase/migrations/20260926010000_stage_8_function_grant_hardening.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
+| `20260925212930` | `stage_8_function_grant_hardening` | supabase/migrations/20260925212930_stage_8_function_grant_hardening.sql | **COCOK LANGSUNG** | Version cocok dengan timestamp source; nama adalah slug sumber tanpa ekstensi .sql. |
 | `20260925214730` | `20260926030000_stage_9_runtime_core` | supabase/migrations/20260926030000_stage_9_runtime_core.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20260925215138` | `stage_9_runtime_reconciliation` | tidak ada file sumber unik di master | **BELUM TERJELASKAN** | Dua entri dengan nama sama (versi 20260925215138 dan 20260925215209); tidak ada file sumber tracked atau checksum SQL untuk menautkan setiap baris secara unik. Keadaan akhir objek tidak membuktikan SQL mana yang dijalankan pada masing-masing entri. |
 | `20260925215209` | `stage_9_runtime_reconciliation` | tidak ada file sumber unik di master | **BELUM TERJELASKAN** | Dua entri dengan nama sama (versi 20260925215138 dan 20260925215209); tidak ada file sumber tracked atau checksum SQL untuk menautkan setiap baris secara unik. Keadaan akhir objek tidak membuktikan SQL mana yang dijalankan pada masing-masing entri. |
@@ -178,7 +178,7 @@ Setiap file kanonis di bawah masuk inventaris. Untuk sumber yang tidak mempunyai
 | `supabase/migrations/20260925211519_stage_8_activation_foundation_hardening.sql` | `4247c95ea130` | ALIAS/TIMESTAMP HISTORIS (20260926123006) | COCOK LANGSUNG (20260925211519) |
 | `supabase/migrations/20260925212247_stage_8_capability_enforcement.sql` | `dca632c92c92` | ALIAS/TIMESTAMP HISTORIS (20260926123013) | COCOK LANGSUNG (20260925212247) |
 | `supabase/migrations/20260925212601_stage_8_destination_url_compatibility.sql` | `0bfcc7d2b84d` | ALIAS/TIMESTAMP HISTORIS (20260926123019) | COCOK LANGSUNG (20260925212601) |
-| `supabase/migrations/20260925212930_stage_8_function_grant_hardening.sql` | `b2fec4a26523` | Tidak ada pasangan history terverifikasi | Tidak ada pasangan langsung; cek status superseded/gap |
+| `supabase/migrations/20260925212930_stage_8_function_grant_hardening.sql` | `b2fec4a26523` | ALIAS/TIMESTAMP HISTORIS (20260926123026) | COCOK LANGSUNG (20260925212930) |
 | `supabase/migrations/20260925225318_stage_10_click_runtime.sql` | `432857bc0580` | ALIAS/TIMESTAMP HISTORIS (20260926123152) | COCOK LANGSUNG (20260925225318) |
 | `supabase/migrations/20260926010000_stage_8_function_grant_hardening.sql` | `34f6acc7a5a2` | ALIAS/TIMESTAMP HISTORIS — row 20260926123033 | EFEK DIGANTIKAN MIGRASI LEBIH BARU — tidak ada row mandiri; grant final oleh 20260929010000_stage_16_read_only_control_plane.sql |
 | `supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql` | `50465e5f9daa` | ALIAS/TIMESTAMP HISTORIS (20260926123202) | ALIAS/TIMESTAMP HISTORIS (20260925231337) |
@@ -233,7 +233,7 @@ Setiap file kanonis di bawah masuk inventaris. Untuk sumber yang tidak mempunyai
 | `20260925215231` | `stage_9_runtime_hardening` | Efek yang berhubungan dengan core terlihat: indeks credential hash, kolom/FK/index `decisions.moment_id`, unique event-occurrence index ada di kedua DB. | File SQL spesifik tidak ada di master; katalog tidak membuktikan apakah entri ini identik dengan source core atau apakah ia membawa perubahan lain. |
 | `20260925215416` | `stage_9_decision_runtime_hardening` | Fungsi decision/delivery saat ini sama antar-env dan migrasi hardening canonical ada. | File SQL spesifik tidak ada di master; tidak ada bukti yang memetakan setiap perubahan entri ini ke source atau migrasi lanjutan secara unik. |
 
-**Untuk menutup dua baris ini:** butuhkan artefak asal yang otoritatif (file SQL yang dieksekusi pada saat itu, transcript apply-migration yang berisi SQL, backup/source bundle, atau audit log yang benar-benar menyimpan statement). Tanpa bukti itu, jangan menyebut empat entri ini cocok langsung dan jangan edit history.
+**Untuk menutup empat entri ini:** butuhkan artefak asal yang otoritatif (file SQL yang dieksekusi pada saat itu, transcript apply-migration yang berisi SQL, backup/source bundle, atau audit log yang benar-benar menyimpan statement). Tanpa bukti itu, jangan menyebut empat entri ini cocok langsung dan jangan edit history.
 
 ### D2. Canonical rate-limit migration tidak punya pasangan history production yang bersih
 
