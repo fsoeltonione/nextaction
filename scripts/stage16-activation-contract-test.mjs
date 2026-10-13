@@ -84,7 +84,9 @@ assert.ok(momentKeyMigration.includes("'new', 'temp', 'thing', 'foo'"));
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
-assert.match(dashboard, /\/onboarding\?workspace_id=/);
+assert.match(dashboard, /href=\{activationHref\}/);
+assert.match(dashboard, /show_ads\(/);
+assert.doesNotMatch(dashboard, /nextaction\.track/);
 // Legacy onboarding/offer targeting UI assertion removed for embed-only MVP.
 // Legacy onboarding/offer targeting UI assertion removed for embed-only MVP.
 // Legacy URL-first / analysis onboarding assertions removed for embed-only MVP.
