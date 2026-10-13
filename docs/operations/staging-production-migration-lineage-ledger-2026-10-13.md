@@ -255,13 +255,22 @@ Workflow CLI percobaan [run 38408365426](https://github.com/fsoeltonione/nextact
 - `20261003010000_stage_17_smoke_verifier_fix.sql`: tidak ada history mandiri di production, namun `20261003020000_stage_17_final_reconcile.sql` membawa correction yang sekarang terverifikasi pada kedua DB. Tidak perlu backfill history hanya untuk meniru staging.
 - Dua nama history `stage14_staging_*` adalah jalur executable staging / alias untuk salinan staging; `stage14_staging_bootstrap` dan fixture seed bukan migrasi production. Fixture auth staging yang tertinggal telah dicatat di atas; jangan menghapusnya tanpa menilai efek pada smoke/fixture berikutnya.
 
-### D4. Drift katalog non-lineage yang tetap perlu keputusan
+### D4. Review semantik function/catalog diffs dan keputusan tersisa
 
-- `pgmq` schema `USAGE` untuk `service_role`: production=true, staging=false.
-- Perbedaan rendering beberapa default UUID qualified/unqualified yang sebelumnya ditemukan tampak setara secara semantik, tetapi belum dinormalisasi dalam deklarasi kanonis.
-- Fungsi `private.runtime_quarantine_message`, `public.confirm_product_activation`, `public.resolve_runtime_integration`, `public.runtime_accept_event`, `public.runtime_readiness`, dan `public.runtime_worker_tick` memiliki hash definisi berbeda dalam snapshot. Jangan menganggap semuanya perbedaan kosmetik tanpa review semantik lanjutan; status mereka tidak boleh ditutup oleh hitungan index yang sama.
+Diff token-aware sudah dilakukan pada enam function yang hash-nya berbeda. Hasilnya bukan enam behavior drift:
 
+- `public.confirm_product_activation` dan `public.runtime_readiness`: token SQL sama setelah whitespace/comment normalization; ini perbedaan formatting/line-wrap.
+- `public.resolve_runtime_integration`: selisih hanya alias nama `workspace_capabilities` (`wc`) versus fully-qualified table reference; efeknya ekuivalen.
+- `public.runtime_worker_tick`: staging mempunyai deklarasi lokal `v_now TIMESTAMPTZ` yang tidak dipakai; production tidak punya deklarasi itu. Tidak mengubah flow.
+- `public.runtime_accept_event`: staging memakai `btrim`, production memakai `trim` untuk normalisasi idempotency key/event type. Query langsung pada kedua environment menunjukkan default trim dan btrim menghasilkan nilai setara pada input spasi/tab yang diuji. Pattern allowlist juga menolak key/event type yang dipadding sebelum trimming. Ini belum memerlukan perbaikan behavior terpisah; canonical staging body tetap dipertahankan.
+- `private.runtime_quarantine_message`: staging secara eksplisit memasukkan `last_seen_at = timezone('utc', now())` lalu mengambilnya dari `EXCLUDED`; production mengandalkan default kolom yang sama dan meng-update ke `timezone('utc', now())`. Catalog membuktikan default `last_seen_at` sama antar-env, jadi selisih itu ekuivalen di bawah semantik `now()` transaction timestamp.
 
+Dua perbedaan katalog yang perlu keputusan terpisah:
+
+1. **Grant schema `pgmq` — beda privilej nyata.** Production memberi `USAGE` pada schema `pgmq` ke `service_role`; staging tidak. Pemeriksaan menunjukkan fungsi PGMQ mewarisi EXECUTE yang tersedia untuk role pada kedua environment, tetapi tanpa schema USAGE role tidak dapat mengakses routine lewat qualifier `pgmq`. Runtime worker/readiness functions adalah `SECURITY DEFINER` dan worker staging berjalan tanpa grant ini. Rekomendasi least-privilege adalah mencabut `USAGE` production dalam migration terpisah, setelah menguji worker/readiness dan memastikan tidak ada consumer yang memang perlu akses langsung ke PGMQ. **Belum diubah pada production.**
+2. **UUID defaults — beda deklarasi, tidak terbukti beda output kontrak.** Staging memakai `extensions.gen_random_uuid()` pada lima kolom awal, sementara production memakai built-in `gen_random_uuid()` (`pg_catalog`) pada empat kolom di antaranya. Staging juga menggunakan extension function untuk `private.runtime_integrity_snapshots.id` di keduanya. Kedua implementasi adalah UUID-v4 generators; perbedaan ini bukan blocker fungsi aplikasi yang sudah dibuktikan. Jangan mengubah default columns tanpa migration terpisah atau kebutuhan yang jelas.
+
+Kesimpulan: setelah normalisasi scope diterapkan di staging, **satu behavior drift yang terkonfirmasi tetap berada di production**: rate limiter menyimpan `p_scope` mentah. Grant `pgmq` juga merupakan perbedaan privilege yang nyata dan disarankan untuk hardening. Selisih function-definition lainnya di atas diklasifikasikan sebagai formatting, alias/syntax, variabel unused, atau timestamp/default ekuivalen; tidak ada yang diubah pada production.
 ## F. Inventaris script pendukung di `supabase/staging/`
 
 Script di direktori ini bukan bagian dari 50 file migrasi kanonis yang dipakai disposable replay. Script fixture/baseline sengaja dipisahkan agar tidak dianggap migrasi production.
