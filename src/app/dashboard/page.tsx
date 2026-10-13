@@ -40,6 +40,9 @@ function DashboardContent() {
 
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const activationHref = selectedWorkspaceId
+    ? "/activate?workspace_id=" + encodeURIComponent(selectedWorkspaceId)
+    : "/activate";
 
   useEffect(() => {
     async function loadData() {
@@ -173,6 +176,8 @@ function DashboardContent() {
         const body = await res.json().catch(() => null);
         setError(body?.error?.message ?? "Unable to create the offer.");
       }
+    } catch {
+      setError("Network error while creating the offer. Check your connection and try again.");
     } finally {
       setSavingOffer(false);
     }
@@ -266,18 +271,18 @@ function DashboardContent() {
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-3xl font-bold text-white mb-1">Your Products</h1>
-                <p className="text-neutral-400 text-sm">Install the tracking snippet to start monetizing moments.</p>
+                <h1 className="text-3xl font-bold text-white mb-1">Your Publishers</h1>
+                <p className="text-neutral-400 text-sm">Install the NextAction embed and call show_ads() at a registered Moment.</p>
               </div>
-              <Link href={selectedWorkspaceId ? "/onboarding?workspace_id=" + encodeURIComponent(selectedWorkspaceId) + "&mode=add_product" : "/onboarding?mode=add_product"} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-semibold transition-colors">
-                <Plus className="w-4 h-4" /> Add Product
+              <Link href={activationHref} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-semibold transition-colors">
+                <Plus className="w-4 h-4" /> Add Publisher
               </Link>
             </div>
 
             {products.length === 0 ? (
               <div className="text-center py-24 border border-dashed border-neutral-800 rounded-3xl">
-                <p className="text-neutral-500 mb-4">No products yet.</p>
-                <Link href="/" className="text-indigo-400 hover:underline text-sm">← Analyze a product to get started</Link>
+                <p className="text-neutral-500 mb-4">No publishers configured yet.</p>
+                <Link href={activationHref} className="text-indigo-400 hover:underline text-sm">Set up your publisher and first Moment</Link>
               </div>
             ) : (
               <div className="grid gap-6">
@@ -301,7 +306,7 @@ function DashboardContent() {
                           </div>
                           <div className="bg-black/50 p-2.5 rounded-lg overflow-x-auto">
                             <code className="text-xs font-mono text-emerald-400 whitespace-nowrap">
-                              {"nextaction.track('" + m.moment_key + "', uid)"}
+                              {"show_ads(" + JSON.stringify(m.moment_key) + ");"}
                             </code>
                           </div>
                         </div>
