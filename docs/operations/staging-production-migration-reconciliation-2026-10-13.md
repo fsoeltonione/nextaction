@@ -2,7 +2,7 @@
 
 ## Scope and safety
 
-This note records a read-only comparison of Supabase project `njjybpswxalxjhqjlvqa` (staging) and `khoygjyikxkdwonygzyh` (production), against `master` as observed on 2026-10-13. No hosted database was changed and no migration history row was edited.
+This note records the initial read-only comparison of Supabase project `njjybpswxalxjhqjlvqa` (staging) and `khoygjyikxkdwonygzyh` (production), against `master` as observed on 2026-10-13. Subsequent approved rollout is recorded below and in [the current migration-lineage ledger](./staging-production-migration-lineage-ledger-2026-10-13.md). No existing migration history row was manually edited.
 
 Both databases reported 52 migration-history entries. The repository manifest had 49 canonical migration files. A history row with a changed version/name must not be treated as equivalent solely because counts match; current database state and the later migrations that supersede earlier effects must also be checked.
 
@@ -37,7 +37,7 @@ The missing standalone history row is named `stage_17_smoke_verifier_fix` in sta
 - Index definitions: 223 of 223 matched, including validity/readiness flags.
 - Installed extensions: the same seven extensions, versions, and schemas were present.
 - Schedulers: the same three active jobs and commands were present: runtime worker every minute; integrity audit every five minutes; operations tick every five minutes. Numeric `cron.jobid` values differ as expected between databases.
-- A grant difference also exists for schema `pgmq`: production grants `USAGE` to `service_role`, staging does not. This is separate from the three file mappings and is still a policy decision to reconcile; this PR does not change it.
+- At the time of the initial read-only comparison, production granted `USAGE` on schema `pgmq` to `service_role` while staging did not. **Resolved after that snapshot:** the forward-only `20261013130000_pgmq_service_role_usage_hardening.sql` migration was applied through the official migration API in both environments. Read-only checks now confirm direct `USAGE` is false in staging and production; `public.runtime_readiness()` and the H3.1 release proof passed in both. Production acceptance is documented in Release Gate #40.
 - Four defaults render differently for `gen_random_uuid()` (schema-qualified in staging, unqualified in production). They are likely semantically equivalent but remain a catalog rendering/declaration difference to document or normalize separately.
 
 ## Verification plan for the rate-limit fix
@@ -47,4 +47,4 @@ The disposable migration replay must apply the new migration after the existing 
 2. an unpadded call increments that same scope to count two; and
 3. only one row exists for the equivalent scope representations.
 
-Hosted staging/production deployment is intentionally out of scope for this PR. After the PR and disposable tests pass, re-check the two live function bodies and their grants. Then stage the new migration through the approved migration process only after the broader migration manifest/history reconciliation is reviewed. Do not use manual `schema_migrations` edits to make the ledgers look equal.
+Follow-up after the read-only audit: the migration manifest was reviewed and the forward-only `20261013010000_rate_limit_scope_normalization.sql` was applied to staging and production via the official Supabase migration API. The platform recorded `20261013135832 / rate_limit_scope_normalization` in staging and `20261013141041 / rate_limit_scope_normalization` in production; both statements arrays have SQL length 2378 and MD5 `aab903f4a6318cf37defee52419e7488`. Both live limiter bodies now have MD5 `cbf7a36dae79fa63fd6287a5b1b73278`, grants remain restricted to `service_role`, and post-apply padded/unpadded scope tests pass with synthetic changes rolled back. The later PGMQ least-privilege migration also revoked direct `pgmq` schema `USAGE` from `service_role` in both environments, with runtime readiness verified after the change. The production release gate then completed successfully in [run #40](https://github.com/fsoeltonione/nextaction/actions/runs/38425884302): Cloudflare deployment audit (HTTP 200), production smoke, H3.1 proof, and final release proof all passed at `1d058c40456e483ddb585bf9683100113e2549b0`. Existing `schema_migrations` rows were never manually edited.
