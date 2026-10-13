@@ -2,18 +2,18 @@
 
 ## Keputusan gerbang produksi
 
-**STATUS: HOLD — gate production belum boleh dinyatakan selesai seluruhnya.** Keenam entri legacy Stage 9 sudah dipetakan; migrasi scope-normalization diterapkan ke staging dan production melalui migration API resmi. History kedua environment kini 53 entri, dengan version platform `20261013135832` (staging) dan `20261013141041` (production), masing-masing bernama `rate_limit_scope_normalization`. Body hash limiter pada keduanya sama (`cbf7a36dae79fa63fd6287a5b1b73278`), scope `padded/unpadded` terbukti memakai satu bucket, dan EXECUTE tetap hanya untuk `service_role`. **Gate tetap HOLD karena delta privilege schema `pgmq` di production belum direkonsiliasi, dan alur bisnis E2E perlu dijalankan setelah hardening privilege diputuskan.**
+**STATUS: HOLD — database hardening sudah diterapkan dan diverifikasi; gate rilis MVP tetap HOLD sampai acceptance ujung-ke-ujung lewat.** Keenam payload legacy Stage 9 sudah dipetakan. Scope-normalization kini diterapkan di kedua env, dan direct `USAGE` pada schema `pgmq` sudah dicabut di kedua env. RPC `runtime_readiness()` mengembalikan `ready` ketika dipanggil sebagai `service_role` di staging maupun production. Sisa gate adalah acceptance Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement, termasuk replay/idempotency dan settlement-integrity.
 
-Pengumpulan payload history dan perbandingan katalog dilakukan secara read-only. Setelah manifest tervalidasi, migration scope-normalization diterapkan secara resmi ke staging dan production. Platform mencatat staging `20261013135832` serta production `20261013141041`, keduanya bernama `rate_limit_scope_normalization`. Tidak ada row `schema_migrations` yang diedit manual.
+Payload history dan katalog dikumpulkan secara read-only. Dua migration forward-only baru lalu dicatat melalui migration API resmi pada staging dan production: `rate_limit_scope_normalization` (staging `20261013135832`, production `20261013141041`) serta `pgmq_service_role_usage_hardening` (staging `20261013142232`, production `20261013142338`). Tidak ada existing row `schema_migrations` yang diedit manual.
 
 ## Baseline dan metode
 
 - Repo: [`fsoeltonione/nextaction`](https://github.com/fsoeltonione/nextaction)
-- `master` yang diaudit: [`74cbbb64d0be7aa029e6f065290798bb94943e7a`](https://github.com/fsoeltonione/nextaction/commit/74cbbb64d0be7aa029e6f065290798bb94943e7a)
+- `master` yang diaudit: [`1d058c40456e483ddb585bf9683100113e2549b0`](https://github.com/fsoeltonione/nextaction/commit/1d058c40456e483ddb585bf9683100113e2549b0)
 - Staging project: `njjybpswxalxjhqjlvqa`
 - Production project: `khoygjyikxkdwonygzyh`
-- Sumber kanonis pada master: **50 file** di `supabase/migrations/`
-- History staging: **53 entri**; history production: **53 entri**
+- Sumber kanonis pada master: **51 file** di `supabase/migrations/`
+- History staging: **54 entri**; history production: **54 entri**
 - Kategori berikut diberikan per baris, bukan hanya dibandingkan berdasarkan jumlah:
   - **COCOK LANGSUNG** — version cocok dengan timestamp sumber dan slug cocok.
   - **ALIAS/TIMESTAMP HISTORIS** — slug/sumber dapat dipetakan, namun nama/version menggunakan alias atau timestamp deploy historis.
@@ -29,12 +29,12 @@ Pengumpulan payload history dan perbandingan katalog dilakukan secara read-only.
 
 | Ukuran | Hasil |
 |---|---:|
-| File sumber kanonis di master | 50 |
-| History staging | 53 (scope-normalization version `20261013135832`) |
-| History production | 53 (scope-normalization version `20261013141041`) |
+| File sumber kanonis di master | 51 |
+| History staging | 54 (scope-normalization + PGMQ hardening recorded by migration API) |
+| History production | 54 (scope-normalization + PGMQ hardening recorded by migration API) |
 | History staging berstatus belum terjelaskan | 0 |
 | History production berstatus belum terjelaskan | 0 |
-| Scope-normalization | Applied and verified in both environments; staging version `20261013135832`, production version `20261013141041` |
+| Scope-normalization | Applied and verified in both environments; staging `20261013135832`, production `20261013141041` |
 
 ### Bukti katalog yang dicocokkan
 
@@ -47,8 +47,8 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 5. `public.create_offer_activation` dan `public.production_smoke_fixture_verify` memiliki hash definisi sama pada kedua DB. Verifier memiliki `ORDER BY c.clicked_at DESC, c.id DESC`.
 6. Legacy activation RPCs mempunyai grant akhir `anon=false`, `authenticated=false`, `service_role=true` di kedua DB.
 7. State schema Stage 14: tidak ada relasi `public.stage14_*` yang tertinggal; satu auth fixture `stage14-smoke@nextaction.invalid` tersisa di staging dan tidak ada di production.
-8. Scope normalization kini konvergen: kedua DB menyimpan `pg_catalog.btrim(p_scope)` dan memakai body hash yang sama (`cbf7a36dae79fa63fd6287a5b1b73278`). Delta katalog yang tersisa adalah `service_role USAGE` pada schema `pgmq` di production (true) tetapi tidak di staging (false).
-9. Perbedaan lain yang belum ditutup: `service_role` memiliki `USAGE` pada schema `pgmq` di production, tetapi tidak di staging. Ini perlu kebijakan eksplisit; ledger tidak mengubah grant tersebut.
+8. Scope normalization kini konvergen: kedua DB menyimpan `pg_catalog.btrim(p_scope)` dan memakai body hash sama (`cbf7a36dae79fa63fd6287a5b1b73278`).
+9. PGMQ hardening kini konvergen: `service_role` tidak mempunyai `USAGE` pada schema `pgmq` di kedua DB. Pemanggilan `public.runtime_readiness()` sebagai `service_role` berhasil pada keduanya; status `ready`, queue `runtime-events` tersedia dengan count 0, worker dan operations job aktif serta sukses baru-baru ini.
 10. Walau jumlah relation/index/constraint/RLS policy/trigger/function/extension yang diaudit sebelumnya selaras dan semua index definitions yang disampel cocok, itu bukan pengganti lineage SQL per baris.
 
 ## A. Semua history staging
@@ -68,7 +68,7 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20260926123123` | `stage14_staging_stage9_runtime_core` | supabase/migrations/20260926030000_stage_9_runtime_core.sql | **KHUSUS STAGING** | Salinan executable staging di supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql; key tables/index/FK ada di kedua DB. |
 | `20260926123133` | `stage14_staging_stage9_hardening` | efek Stage 9 hardening; tidak ada file salinan spesifik di master saat ini | **KHUSUS STAGING** | Entri berlabel Stage14 staging; trigger/validator tenant lama sudah tidak ada dan create_offer_activation sama antar-environment. Isi SQL historis spesifik tidak tersimpan, jadi bukan klaim byte-identical. |
 | `20260926123139` | `stage14_staging_stage9_surface_cleanup` | efek Stage 9 surface cleanup; tidak ada file salinan spesifik di master saat ini | **KHUSUS STAGING** | Entri berlabel Stage14 staging; kedua RPC antrean usang tidak ada di kedua DB. Isi SQL historis spesifik tidak tersimpan, jadi bukan klaim byte-identical. |
-| `20260926123146` | `stage14_staging_stage9_rate_limit_reconciliation` | supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql | **KHUSUS STAGING** | Salinan executable di supabase/staging/STAGE14_STAGE9_RATE_LIMIT_RECONCILIATION.sql; staging trim scope, produksi masih menyimpan p_scope mentah. |
+| `20260926123146` | `stage14_staging_stage9_rate_limit_reconciliation` | supabase/migrations/20260926050000_stage_9_runtime_rate_limit_reconciliation.sql | **KHUSUS STAGING** | Executable copy used by the staging bootstrap; it already trims `p_scope`. The forward-only normalization migration was later applied to both environments, so production now has the same behavior. |
 | `20260926123152` | `stage10_click_runtime` | supabase/migrations/20260925225318_stage_10_click_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 10 row uses compact legacy slug; it maps to canonical Stage 10 click runtime source, while version differs from source timestamp. |
 | `20260926123202` | `stage12_qualified_click_runtime` | supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 12 row uses compact legacy slug; it maps to canonical qualified-click source, while version differs from source timestamp. |
 | `20260926123209` | `stage13_atomic_settlement_runtime` | supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql | **ALIAS/TIMESTAMP HISTORIS** | Stage 13 row uses compact legacy slug; it maps to canonical atomic-settlement source, while version differs from source timestamp. |
@@ -108,6 +108,7 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20261011104443` | `h4_3_redundant_financial_index` | supabase/migrations/20261011110000_h4_3_redundant_financial_index.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20261011105247` | `h4_4_redundant_financial_accounts_index` | supabase/migrations/20261011120000_h4_4_redundant_financial_accounts_index.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20261013135832` | `rate_limit_scope_normalization` | `supabase/migrations/20261013010000_rate_limit_scope_normalization.sql` | **ALIAS/TIMESTAMP HISTORIS — STAGING CANARY** | Migration API mencatat timestamp saat apply. SQL length 2378; MD5 `aab903f4a6318cf37defee52419e7488`. Bukan perubahan manual history. Production belum memiliki row ini. |
+| `20261013142232` | `pgmq_service_role_usage_hardening` | `supabase/migrations/20261013130000_pgmq_service_role_usage_hardening.sql` | **ALIAS/TIMESTAMP HISTORIS** | Platform migration API mencatat `REVOKE USAGE ON SCHEMA pgmq FROM service_role;` (46 karakter; MD5 `3e25aaa99541f80c48e62c5ae033ec70`). |
 
 ## B. Semua history production
 
@@ -166,6 +167,7 @@ Read-only catalog checks pada kedua environment menunjukkan hal berikut:
 | `20261011105000` | `h4_3_redundant_financial_index` | supabase/migrations/20261011110000_h4_3_redundant_financial_index.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20261011105817` | `h4_4_redundant_financial_accounts_index` | supabase/migrations/20261011120000_h4_4_redundant_financial_accounts_index.sql | **ALIAS/TIMESTAMP HISTORIS** | Slug/nama mengarah ke file sumber ini, tetapi versi history berbeda atau memakai timestamp historis. |
 | `20261013141041` | `rate_limit_scope_normalization` | `supabase/migrations/20261013010000_rate_limit_scope_normalization.sql` | **ALIAS/TIMESTAMP HISTORIS — PRODUCTION ROLLOUT** | Migration API mencatat timestamp aktual saat apply; SQL length 2378, MD5 `aab903f4a6318cf37defee52419e7488`. Tidak ada perubahan manual history. |
+| `20261013142338` | `pgmq_service_role_usage_hardening` | `supabase/migrations/20261013130000_pgmq_service_role_usage_hardening.sql` | **ALIAS/TIMESTAMP HISTORIS** | Platform migration API mencatat `REVOKE USAGE ON SCHEMA pgmq FROM service_role;` (46 karakter; MD5 `3e25aaa99541f80c48e62c5ae033ec70`). |
 
 ## C. Manifest semua file sumber di master
 
@@ -223,6 +225,7 @@ Setiap file kanonis di bawah masuk inventaris. Untuk sumber yang tidak mempunyai
 | `supabase/migrations/20261011110000_h4_3_redundant_financial_index.sql` | `2efba40144b7` | ALIAS/TIMESTAMP HISTORIS (20261011104443) | ALIAS/TIMESTAMP HISTORIS (20261011105000) |
 | `supabase/migrations/20261011120000_h4_4_redundant_financial_accounts_index.sql` | `b73afc3bc601` | ALIAS/TIMESTAMP HISTORIS (20261011105247) | ALIAS/TIMESTAMP HISTORIS (20261011105817) |
 | `supabase/migrations/20261013010000_rate_limit_scope_normalization.sql` | `e8cf75965012` | APPLIED AS ALIAS/TIMESTAMP HISTORIS: staging `20261013135832 / rate_limit_scope_normalization`; SQL MD5 `aab903f4a6318cf37defee52419e7488` | APPLIED AS ALIAS/TIMESTAMP HISTORIS: production `20261013141041 / rate_limit_scope_normalization`; same canonical SQL payload; row recorded by official migration API |
+| `supabase/migrations/20261013130000_pgmq_service_role_usage_hardening.sql` | `9d846dcb9c9a` | Applied as alias/timestamp history: staging `20261013142232 / pgmq_service_role_usage_hardening` | Applied as alias/timestamp history: production `20261013142338 / pgmq_service_role_usage_hardening`; same SQL payload MD5 `3e25aaa99541f80c48e62c5ae033ec70` |
 
 ## D. Blocker lineage yang tersisa dan tindakan aman
 
@@ -252,16 +255,28 @@ The canonical forward-only migration `20261013010000_rate_limit_scope_normalizat
 
 These are aliases/timestamp drift in the remote ledger; the canonical Git source remains `20261013010000_rate_limit_scope_normalization.sql`. No existing `schema_migrations` row was edited.
 
-**Post-apply verification: PASS in both environments.** Both histories now contain 53 rows; `public.check_runtime_rate_limit` has body MD5 `cbf7a36dae79fa63fd6287a5b1b73278`; it persists `pg_catalog.btrim(p_scope)`; EXECUTE is false for `anon` and `authenticated`, true for `service_role`. In separate transaction-scoped tests, padded then canonical scope calls returned count 1 then 2, one bucket total, then `ROLLBACK` removed synthetic rows. Production rate-limit scope drift is closed.
+**Post-apply verification: PASS in both environments.** Both hosted histories have **54 rows**. `public.check_runtime_rate_limit` has body MD5 `cbf7a36dae79fa63fd6287a5b1b73278`, persists `pg_catalog.btrim(p_scope)`, and EXECUTE is false for `anon` and `authenticated` and true for `service_role`. Transaction-scoped tests: padded then canonical scope returned counts 1 then 2, one bucket total; `ROLLBACK` removed test rows. Production rate-limit scope drift is closed.
 
-The exploratory CLI canary [run 38408365426](https://github.com/fsoeltonione/nextaction/actions/runs/38408365426) stopped before DB connection because the expected GitHub environment secrets were absent; its workflow did not apply anything and was deleted from its operational branch. The persistent changes described above were applied separately through the connected Supabase migration API, with post-apply read-only verification.
-### D3. Legacy Stage 8 grant dan Stage 17 verifier sudah digantikan
+The exploratory CLI canary [run 38408365426](https://github.com/fsoeltonione/nextaction/actions/runs/38408365426) stopped before DB connection because the GitHub environment secrets were empty; it did not apply anything and its temporary workflow was removed. The persistent migration API applies are recorded separately above. No `schema_migrations` row was manually edited.
+### D3. PGMQ schema privilege hardening applied and verified
+
+The forward-only source [`20261013130000_pgmq_service_role_usage_hardening.sql`](https://github.com/fsoeltonione/nextaction/blob/master/supabase/migrations/20261013130000_pgmq_service_role_usage_hardening.sql) revokes only direct `USAGE` on schema `pgmq` from `service_role`; runtime calls remain behind `SECURITY DEFINER` RPCs with empty `search_path`.
+
+| Environment | Recorded version | History name | SQL length | SQL MD5 |
+|---|---|---|---:|---|
+| Staging | `20261013142232` | `pgmq_service_role_usage_hardening` | 46 | `3e25aaa99541f80c48e62c5ae033ec70` |
+| Production | `20261013142338` | `pgmq_service_role_usage_hardening` | 46 | `3e25aaa99541f80c48e62c5ae033ec70` |
+
+Read-only verification confirms `has_schema_privilege('service_role','pgmq','USAGE') = false` in both environments. `public.runtime_readiness()` is `SECURITY DEFINER`, pins an empty `search_path`, and remains executable by `service_role`. Called inside a transaction after `SET LOCAL ROLE service_role`, it returned `status=ready` in both staging and production; queue exists, worker/operations schedules are active, and their latest runs were successful. No data-changing test was used for this RPC check.
+
+The source change was merged by [PR #138](https://github.com/fsoeltonione/nextaction/pull/138) at commit `1d058c40456e483ddb585bf9683100113e2549b0`; disposable migration replay [run 38412080047](https://github.com/fsoeltonione/nextaction/actions/runs/38412080047) and quality CI [run 38412080083](https://github.com/fsoeltonione/nextaction/actions/runs/38412080083) passed. The two environment history versions differ from the source filename timestamp because the official migration API assigns platform versions; retain that mapping and do not edit existing history rows.
+### D4. Legacy Stage 8 grant dan Stage 17 verifier sudah digantikan
 
 - `20260926010000_stage_8_function_grant_hardening.sql`: tidak ada baris history mandiri di production, tetapi efek grant yang tepat telah digantikan oleh `20260929010000_stage_16_read_only_control_plane.sql`. Jangan reapply grant lama yang akan memberikan kembali `authenticated` execute.
 - `20261003010000_stage_17_smoke_verifier_fix.sql`: tidak ada history mandiri di production, namun `20261003020000_stage_17_final_reconcile.sql` membawa correction yang sekarang terverifikasi pada kedua DB. Tidak perlu backfill history hanya untuk meniru staging.
 - Dua nama history `stage14_staging_*` adalah jalur executable staging / alias untuk salinan staging; `stage14_staging_bootstrap` dan fixture seed bukan migrasi production. Fixture auth staging yang tertinggal telah dicatat di atas; jangan menghapusnya tanpa menilai efek pada smoke/fixture berikutnya.
 
-### D4. Review semantik function/catalog diffs dan keputusan tersisa
+### D5. Review semantik function/catalog diffs dan keputusan tersisa
 
 Diff token-aware sudah dilakukan pada enam function yang hash-nya berbeda. Hasilnya bukan enam behavior drift:
 
@@ -273,13 +288,13 @@ Diff token-aware sudah dilakukan pada enam function yang hash-nya berbeda. Hasil
 
 Dua perbedaan katalog yang perlu keputusan terpisah:
 
-1. **Grant schema `pgmq` — beda privilege nyata.** Production memberi `USAGE` pada schema `pgmq` ke `service_role`; staging tidak. Runtime worker/readiness functions adalah `SECURITY DEFINER`, dan pemanggilan `runtime_readiness()` sebagai `service_role` berhasil pada kedua env. PR terpisah [#138](https://github.com/fsoeltonione/nextaction/pull/138) mengusulkan pencabutan `USAGE` dengan tes pgTAP bahwa schema access tetap tertutup sementara RPC readiness tetap bisa dipanggil. **PR #138 belum lulus CI dan migrasi tersebut belum diterapkan ke database mana pun.**
+1. **Grant schema `pgmq` — delta sudah ditutup.** Direct `USAGE` is absent in staging and production. The `runtime_readiness()` SECURITY DEFINER RPC was called as `service_role` in each environment after revocation and returned `ready`; pgTAP coverage for this path passed in disposable migration replay.
 2. **UUID defaults — beda deklarasi, tidak terbukti beda output kontrak.** Staging memakai `extensions.gen_random_uuid()` pada lima kolom awal, sementara production memakai built-in `gen_random_uuid()` (`pg_catalog`) pada empat kolom di antaranya. Staging juga menggunakan extension function untuk `private.runtime_integrity_snapshots.id` di keduanya. Kedua implementasi adalah UUID-v4 generators; perbedaan ini bukan blocker fungsi aplikasi yang sudah dibuktikan. Jangan mengubah default columns tanpa migration terpisah atau kebutuhan yang jelas.
 
-Kesimpulan: setelah normalisasi scope diterapkan di kedua environment, **rate-limit behavior drift telah tertutup**. Perbedaan privilege `pgmq` tetap merupakan delta nyata yang belum direkonsiliasi; selisih function-definition lainnya di atas diklasifikasikan sebagai formatting, alias/syntax, variabel unused, atau timestamp/default ekuivalen. Tidak ada grant `pgmq` yang diubah selama rollout scope-normalization.
+Kesimpulan: scope-normalization dan pencabutan direct `pgmq` USAGE sudah diterapkan di kedua environment. Keenam payload legacy Stage 9 telah dipetakan. Sisa perbedaan katalog yang belum menjadi bukti behavior defect adalah UUID-default qualification; perbedaan tersebut tetap dicatat tanpa perubahan skema.
 ## F. Inventaris script pendukung di `supabase/staging/`
 
-Script di direktori ini bukan bagian dari 50 file migrasi kanonis yang dipakai disposable replay. Script fixture/baseline sengaja dipisahkan agar tidak dianggap migrasi production.
+Script di direktori ini bukan bagian dari 51 file migrasi kanonis
 
 | File | Jenis | Hubungan ke history / source | Status | Batas bukti |
 |---|---|---|---|---|
@@ -287,18 +302,16 @@ Script di direktori ini bukan bagian dari 50 file migrasi kanonis yang dipakai d
 | `supabase/staging/STAGE14_RESET.sql` | Utility reset fixture disposable | Tidak ditemukan sebagai row migration mandiri | **KHUSUS STAGING** | Tidak dijalankan saat audit. Skrip ini dapat menghapus fixture/menonaktifkan trigger dalam transaksi; jangan jalankan sebagai langkah rekonsiliasi history. |
 | `supabase/staging/STAGE14_SEED.sql` | Fixture publisher/advertiser & credit | Berkaitan dengan row `20260926215632 / stage14_make_credit_fixture_repeatable`; riwayat commit perubahan fixture `216baf5c` | **KHUSUS STAGING** | Ini seed/fixture, bukan source DDL production. Tidak ada `public.stage14_seed_output` yang tertinggal pada snapshot. |
 | `supabase/staging/STAGE14_STAGE9_RUNTIME_CORE.sql` | Executable copy untuk bootstrap staging | Row `20260926123123 / stage14_staging_stage9_runtime_core`; salinan kanonis Stage 9 Runtime Core | **KHUSUS STAGING** | File secara eksplisit menjelaskan salinan ini dibuat karena sintaks khusus SQL pada sumber historis perlu diperbaiki untuk eksekusi staging. Objek inti terkait diverifikasi di kedua DB. |
-| `supabase/staging/STAGE14_STAGE9_RATE_LIMIT_RECONCILIATION.sql` | Executable copy rate-limit reconciliation | Row `20260926123146 / stage14_staging_stage9_rate_limit_reconciliation` | **KHUSUS STAGING** | Staging menormalisasi scope pada insert; production tidak. Ini bukan bukti kedua env memiliki perilaku yang sama. |
+| `supabase/staging/STAGE14_STAGE9_RATE_LIMIT_RECONCILIATION.sql` | Executable copy rate-limit reconciliation | Row `20260926123146 / stage14_staging_stage9_rate_limit_reconciliation` | **KHUSUS STAGING** | This sidecar has `btrim(p_scope)`. After the forward-only migration, production now has matching scope-normalization semantics. |
 
 Dua history row `stage14_staging_stage9_hardening` dan `stage14_staging_stage9_surface_cleanup` tidak mempunyai file copy masing-masing di folder staging pada master saat ini. Efek akhir yang relevan telah diverifikasi pada katalog, namun SQL historis per baris tidak tersedia; status `KHUSUS STAGING` pada ledger menyatakan jalur/lingkup entry tersebut, bukan jaminan kesamaan isi SQL byte-for-byte. Bila SQL aslinya ditemukan dalam artefak lama, tambahkan provenance/hash ke ledger tanpa mengubah history DB.
 
 ## E. Gerbang selesai yang direkomendasikan
 
-Migration scope-normalization sudah diterapkan dan diverifikasi di staging serta production; keenam payload legacy Stage 9 juga sudah diklasifikasikan. Gate produk secara keseluruhan tetap **HOLD** sampai delta privilege `pgmq` ditangani dan alur bisnis inti diuji ulang.
+**Status database hardening: PASS untuk scope normalization dan PGMQ privilege boundary. Status MVP release: HOLD sampai route-level acceptance selesai.**
 
-1. Review [PR #138](https://github.com/fsoeltonione/nextaction/pull/138) yang menambahkan migrasi hardening `pgmq` schema `USAGE`. Tunggu disposable replay dan quality CI hijau; perubahan belum diterapkan ke database hosted.
-2. Setelah CI lulus, terapkan migrasi privilege ke staging saja melalui migration API; verifikasi worker, integrity audit, readiness, operations cron dan pastikan tidak ada consumer sah yang perlu akses langsung ke `pgmq`.
-3. Setelah staging privilege proof lulus, lakukan production change secara terpisah dengan baseline pre-deployment dan post-deployment read-only verification.
-4. Lanjutkan MVP E2E acceptance: Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement, termasuk replay/idempotency serta settlement integrity. Ini tahap berikutnya setelah delta privilege ditutup atau diterima secara eksplisit.
-5. Reconcile ledger dengan kedua timestamp remote aktual yang dicatat platform. Jangan mengedit history rows manual.
-
-Scope-normalization mengubah schema/history di kedua environment melalui migration API resmi. Tidak ada history row lama yang diedit, digabung, atau dihapus. `pgmq` grant belum disentuh.
+1. Readiness check pasca-hardening berhasil di kedua env saat dipanggil sebagai `service_role`: status `ready`, queue `runtime-events` ada, worker dan operations cron aktif serta baru sukses. History staging dan production masing-masing 54 baris; dua migrasi baru tercatat sebagai alias/timestamp yang dibuat oleh migration API. Jangan mengubah history lama secara manual.
+2. Langkah produk berikutnya adalah menjalankan **Release Gate `workflow_dispatch` dengan `release_target=staging`** di [`.github/workflows/release.yml`](https://github.com/fsoeltonione/nextaction/blob/master/.github/workflows/release.yml). Pipeline menjalankan staging smoke, H3.1 release proof/runtime smoke, anonymous embed-first acceptance, dan authenticated staging acceptance. Canari CLI percobaan yang berhenti karena secret kosong tidak sama dengan release gate ini dan tidak mengubah DB.
+3. Setelah staging workflow lulus, verifikasi alur bisnis inti Event → Moment → Decision → Delivery → Click → Qualified Click → Settlement, termasuk idempotent replay dan settlement exactly-once/ledger integrity.
+4. Baru setelah bukti staging tersebut lulus, buka rollout production sebagai keputusan terpisah dengan baseline sebelum perubahan serta verifikasi sesudahnya. Tidak ada production deployment baru yang diusulkan oleh dokumen audit ini.
+5. Simpan manifest lineage, source commit, recorded history versions, SQL length/MD5, dan post-deployment proof dalam ledger; jangan mengubah, menghapus, atau menggabungkan `schema_migrations` rows.
