@@ -100,10 +100,10 @@ jobs:
           let paired = 0;
           const unpaired = [];
           for (const line of list.split(/\r?\n/)) {
-            if (!line.includes("│")) continue;
-            // Supabase CLI formats versions as `20260101000000`; strip Markdown-style
-            // backticks before comparing so historic rows are not silently skipped.
-            const fields = line.split("│").map((value) => value.trim().replace(/^`|`$/g, "").trim());
+            // Supabase CLI output can use ASCII pipes or Unicode box-drawing separators.
+            if (!line.includes("|") && !line.includes("│")) continue;
+            // Version values may be wrapped in Markdown-style backticks.
+            const fields = line.split(/[|│]/).map((value) => value.trim().replace(/^`|`$/g, "").trim());
             if (fields.length < 2) continue;
             const local = fields[0], remote = fields[1];
             if (!version.test(local) && !version.test(remote)) continue;
