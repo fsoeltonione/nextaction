@@ -88,10 +88,10 @@ jobs:
           const dryPath = process.env.RUNNER_TEMP + "/staging-db-push-dry-run.txt";
           const list = fs.readFileSync(listPath, "utf8");
           const dry = fs.readFileSync(dryPath, "utf8");
-          const version = /^\\d{14}$/;
+          const version = /^\d{14}$/;
           let paired = 0;
           const unpaired = [];
-          for (const line of list.split(/\\r?\\n/)) {
+          for (const line of list.split(/\r?\n/)) {
             if (!line.includes("│")) continue;
             const fields = line.split("│").map((value) => value.trim());
             if (fields.length < 2) continue;
