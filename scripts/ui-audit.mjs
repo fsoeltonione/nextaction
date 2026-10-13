@@ -6,7 +6,10 @@ import AxeBuilder from "@axe-core/playwright";
 const baseURL = new URL(process.env.UI_AUDIT_BASE_URL || "http://127.0.0.1:3000");
 const outputDir = path.resolve(process.env.UI_AUDIT_OUTPUT_DIR || "artifacts/ui-audit");
 const viewports = [
+  { name: "mobile-320", width: 320, height: 800 },
+  { name: "mobile-375", width: 375, height: 812 },
   { name: "mobile-390", width: 390, height: 844 },
+  { name: "tablet-768", width: 768, height: 1024 },
   { name: "desktop-1440", width: 1440, height: 900 },
 ];
 const routes = [
@@ -59,6 +62,8 @@ async function main() {
           expectedAuthResponses: [],
           failedSameOriginResponses: [],
           axeViolations: [],
+          reducedMotionPreference: null,
+          keyboardFocus: null,
           screenshot: null,
         };
 
@@ -105,6 +110,12 @@ async function main() {
           caseResult.finalURL = page.url();
           caseResult.title = await page.title();
           caseResult.heading = await page.locator("h1").first().innerText();
+          caseResult.reducedMotionPreference = await page.evaluate(() =>
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+          );
+          if (!caseResult.reducedMotionPreference) {
+            report.failures.push(`${viewport.name} ${route.name}: reduced-motion preference was not applied to the browser context`);
+          }
 
           if (route.expectedPath) {
             const actualPath = new URL(page.url()).pathname;
@@ -164,6 +175,37 @@ async function main() {
           caseResult.horizontalOverflow = metrics.horizontalOverflow;
           caseResult.unnamedControls = metrics.unnamedControls;
           caseResult.layout = metrics;
+
+          // Verify keyboard navigation can reach a named interactive control.
+          await page.keyboard.press("Tab");
+          caseResult.keyboardFocus = await page.evaluate(() => {
+            const element = document.activeElement as HTMLElement | null;
+            if (!element || element === document.body || element === document.documentElement) return null;
+            const labelledBy = (element.getAttribute("aria-labelledby") || "")
+              .split(/\\s+/)
+              .map((id) => document.getElementById(id)?.textContent?.trim() || "")
+              .filter(Boolean)
+              .join(" ");
+            const labels = "labels" in element && element.labels
+              ? Array.from(element.labels).map((label) => label.textContent?.trim() || "").filter(Boolean).join(" ")
+              : "";
+            const accessibleName = (
+              element.getAttribute("aria-label") || labelledBy || labels ||
+              element.innerText || element.textContent ||
+              element.getAttribute("placeholder") || element.getAttribute("title") || ""
+            ).replace(/\\s+/g, " ").trim();
+            return {
+              tag: element.tagName.toLowerCase(),
+              type: element.getAttribute("type"),
+              accessibleName,
+              focusVisible: element.matches(":focus-visible"),
+            };
+          });
+          if (!caseResult.keyboardFocus) {
+            report.failures.push(`${viewport.name} ${route.name}: Tab did not move focus to an interactive element`);
+          } else if (!caseResult.keyboardFocus.accessibleName) {
+            report.failures.push(`${viewport.name} ${route.name}: first keyboard-focusable element has no accessible name`);
+          }
 
           if (metrics.horizontalOverflow) {
             report.failures.push(
@@ -286,7 +328,7 @@ async function main() {
     "## NextAction UI audit",
     "",
     `**Status:** ${report.status.toUpperCase()}`,
-    `**Pages/viewports checked:** ${report.cases.length} (${routes.length} routes × ${viewports.length} viewports)`,
+    `**Pages/viewports checked:** ${report.cases.length} (${routes.length} routes × ${viewports.length} viewports: 320/375/390 mobile, 768 tablet, 1440 desktop)`,
     `**Horizontal overflow cases:** ${report.cases.filter((item) => item.horizontalOverflow).length}`,
     `**Axe violations recorded:** ${report.accessibility.violationCount} (critical/serious: ${report.accessibility.seriousOrCriticalCount})`,
     `**Browser console/page/network failures:** ${runtimeFailureCount}`,
