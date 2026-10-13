@@ -10,7 +10,7 @@ on:
       - "public/**"
       - "package.json"
       - "package-lock.json"
-      - "scripts/ui-audit.cjs"
+      - "scripts/ui-audit.mjs"
       - ".github/workflows/ui-audit.yml"
   workflow_dispatch:
 
@@ -64,7 +64,7 @@ jobs:
           exit 1
 
       - name: Audit mobile and desktop UI
-        run: node scripts/ui-audit.cjs
+        run: node scripts/ui-audit.mjs
 
       - name: Upload UI audit report and screenshots
         if: always()
