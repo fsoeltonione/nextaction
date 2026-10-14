@@ -16,6 +16,54 @@ This is a decision matrix, not an instruction to execute repairs. Production is 
 - Disposable replay and quality CI passed in the reported runs. Replay proves the current source chain on an isolated disposable database with the Stage 14 baseline; it does not prove remote historical payload lineage.
 - Live catalog differences previously recorded: four UUID defaults, six function definitions. The source manifest says `runtime_accept_event` needs a targeted contract test.
 
+## Additional live verification completed on 2026-10-14
+
+### Official staging-only CLI proof
+
+Run: https://github.com/fsoeltonione/nextaction/actions/runs/38589868869
+
+- Project-target validation passed for the staging Session Pooler target. The workflow then executed both read-only commands: migration history list and `db push --dry-run`.
+- The gate failed closed with **0 paired version rows, 51 local-only rows, 54 remote-only rows**, and the CLI reported remote migration versions absent from the local migrations directory.
+- This is a confirmed lineage blocker, not a CLI connectivity problem. No write command exists in the workflow; no migration repair or non-dry-run push was executed.
+- The same result recurred on the updated branch in run https://github.com/fsoeltonione/nextaction/actions/runs/38593098757.
+
+### Disposable replay and Quality gates
+
+- Quality run https://github.com/fsoeltonione/nextaction/actions/runs/38589868560 passed all jobs, including lint, typecheck, build, Cloudflare build, migration filename uniqueness and existing runtime contracts.
+- Disposable replay retry https://github.com/fsoeltonione/nextaction/actions/runs/38589868484 passed: all 51 canonical source migrations plus one runner-only Stage 14 baseline were applied in the isolated database, history matched 52/52 in timestamp order, and database RPC tests passed. The preceding attempt failed before SQL replay because of transient Docker Hub rate limiting and an occupied local container port; it was infrastructure noise, not a migration SQL failure.
+- A new test, `supabase/tests/runtime_accept_event_contract.sql`, has now been added to the PR branch. Its run on the latest commit is still in progress at the time of this edit. Do not count its assertions as passed until CI finishes.
+
+### Stronger row-level SQL provenance obtained through read-only queries
+
+The staging history's `statements` payloads were read directly (SELECT only) and compared with GitHub source blobs:
+
+| Staging history version | Evidence found | Classification now supported |
+|---|---|---|
+| `20261003013324 / stage_17_remediation` | Entire 17,202-character payload exactly matches `supabase/migrations/20261003000000_stage_17_remediation.sql` at commit `694c99a820a8785b7938005d90c10104d19bd616` | **Historical exact-source provenance closed for this row** |
+| `20261003193248 / h2_3_release_reliability_proof` | Entire 3,162-character payload exactly matches the source blob at commit `651a505848f02bc61c50ade6d45e4c82f7318b61`. The later commit `4873a63bf049445d71900c78cf4703ed058ca22c` adds a required-migration check, so the current file is intentionally not byte-identical to the historical applied revision. | **Historical exact-source provenance closed; version evolution documented** |
+| `20260928163633 / stage_16_atomic_integration_credential_provisioning` | After removing SQL line comments and outer transaction wrappers only, the executable source body matches the stored payload (2,276 normalized characters on each side) | **Executable-body match; not whole-file byte identity** |
+| `20260928170043 / stage_16_private_credential_verification_boundary` | Executable body matches after removing line comments and outer transaction wrappers (946 characters each) | **Executable-body match; not whole-file byte identity** |
+| `20261003181343 / h2_2_runtime_ops_hardening` | Executable body matches after the same normalization (6,961 characters each) | **Executable-body match; not whole-file byte identity** |
+| `20261010224151 / stage_16_moment_key_semantics` | Executable body matches after the same normalization (913 characters each) | **Executable-body match; not whole-file byte identity** |
+| `20261011000951 / h4_1_unsettled_settlement_recovery` | Executable body matches after the same normalization (6,471 characters each) | **Executable-body match; not whole-file byte identity** |
+| `20261013135832 / rate_limit_scope_normalization` | Stored executable statement and current source body match exactly after removing leading comments and `BEGIN/COMMIT` wrappers (2,378 characters); the prior release ledger independently records matching payload fingerprints in both environments | **Forward-correction payload corroborated** |
+| `20261013142232 / pgmq_service_role_usage_hardening` | Stored statement is exactly `REVOKE USAGE ON SCHEMA pgmq FROM service_role;`; this is the complete executable body of the current migration after removing comments and transaction wrappers | **Forward-correction payload corroborated** |
+
+These results improve the source-lineage classification but do not make remote version keys equal local filename prefixes and therefore do **not** make staging CLI sync pass.
+
+Still open at row level:
+
+- `20260926123146 / stage14_staging_stage9_rate_limit_reconciliation`: the stored payload differs from current source and the inspected historical source revisions; the executable text diverges around qualified `pg_catalog.greatest` versus unqualified `GREATEST`. Keep the row as a legacy variant until the staging sidecar/commit history and applied effect are reconciled. Later forward normalization does not rewrite this history.
+- `20261003154220 / stage_17_remediation`: the 17,799-character payload was inspected directly, but it does not match the current Stage 17 file or the historical commit that exactly matches the earlier 17,202-character Stage 17 row. Exact source commit remains unbound.
+- `20261003154641 / stage_17_final_reconcile`: 23,867-character stored payload differs from the current 24,292-character source in its uniqueness-constraint/index handling. Preserve as a separate historical revision; confirm the final constraint state and rollback implications rather than backfilling or repairing history.
+- `20260929010000 / stage_16_read_only_control_plane`, `20261003175300 / h2_1_runtime_failure_containment`, `20261003180823 / h2_2_recovery_operations`, and `20261003193248 / h2_3_release_reliability_proof` require the separate row statuses above to be kept distinct: comments/formatting differences are not enough to infer SQL equivalence. H2.3 is now historically matched to its earlier source commit as documented above.
+
+### Fresh function-definition comparison
+
+Read-only `pg_get_functiondef` inspection confirms the six fingerprints still differ between environments. For `public.runtime_accept_event`, the inspected bodies agree on the key business contract: required integration, idempotency-key format, event-type format, object-only JSON payload, active integration and `make_money` capability checks, one queue message on first insert, exact-replay idempotency, and rejection of reuse with different payload. Textual differences are `btrim` versus `trim`, unqualified `jsonb_typeof` versus `pg_catalog.jsonb_typeof`, and formatting. Given pinned empty `search_path`, these appear semantically equivalent, but the new isolated contract test remains the acceptance gate.
+  
+`public.runtime_worker_tick` has an unused `v_now` declaration in staging; `private.runtime_quarantine_message` sets `last_seen_at` explicitly in staging while production uses the column default and updates it with `now()`. Their expected behavior appears equivalent under transaction timestamp semantics, but no live routine was changed. Keep `runtime_readiness` and the other function differences under regression/security review until the full contract gate is recorded.
+
 ## Row group decision matrix
 
 The matrix retains distinctions between the historical history row, current source, observable final state and permitted next step. “Candidate” is not a certified byte-level lineage match.
@@ -44,7 +92,7 @@ The matrix retains distinctions between the historical history row, current sour
 2. **Close the highest-impact behavior gap:** write and run disposable differential contract tests for `public.runtime_accept_event` (idempotency key, type, malformed/null/valid payload, trim semantics), then runtime worker/readiness and private quarantine behavior. Do not replace a live function just to make its definition hash match.
 3. **Catalog and release evidence:** rerun read-only catalog fingerprints, grants/RLS/function security checks, job schedules and readiness. Preserve previous release-gate results as separate historical evidence rather than claiming they prove the present migration list is synchronized.
 4. **Matrix review:** each row requires source commit/blob evidence, risk, decision, rollback/backup implication, and expected postcondition. Unknown stays HOLD.
-5. **Prepare staging-only proof:** configure the project-locked secret `STAGING_DATABASE_URL` only after ensuring it is staging's Session Pooler URL on port 5432, username `postgres.njjybpswxalxjhqjlvqa`, path `/postgres`. Never echo the value. Re-run the read-only workflow. A successful dry-run that proposes migrations is not a no-op pass; continue HOLD until history and dry-run semantics are fully reconciled.
+5. **Staging-only CLI proof already attempted:** the project-locked `STAGING_DATABASE_URL` passed host/project target validation; both read-only CLI commands ran. The official gate still fails because all remote history versions are unpaired with the local directory. Do not alter history to silence this error; continue HOLD while lineage and dispositions are reconciled.
 6. **Only after review:** separately approve a staging backup/restore plan and a bounded staging execution plan. No production action is part of this plan.
 
 ## Final gate
