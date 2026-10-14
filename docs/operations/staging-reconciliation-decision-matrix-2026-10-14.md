@@ -265,6 +265,8 @@ Latest verified status on the pre-refresh head `a83f3c234bf43149c6a2fd5ba5885734
 - [Quality 38615138881](https://github.com/fsoeltonione/nextaction/actions/runs/38615138881): PASS.
 - [Staging Migration Dry-Run (Read-Only) 38615138956](https://github.com/fsoeltonione/nextaction/actions/runs/38615138956): FAILED closed after target validation and both read-only commands; 0 paired, 51 local-only, 54 remote-only.
 
+On the subsequent docs-only head `c28c361a940f1aa2fa434f9a9d31f2b0b1ecd78a`, [CLI rerun 38618404472](https://github.com/fsoeltonione/nextaction/actions/runs/38618404472) again failed closed with 0 paired, 51 local-only and 54 remote-only. At that status poll, Quality [38618404709](https://github.com/fsoeltonione/nextaction/actions/runs/38618404709) was in progress and disposable replay [38618404854](https://github.com/fsoeltonione/nextaction/actions/runs/38618404854) was pending. The final plan records these as point-in-time results; verify current-head checks separately before any merge.
+
 Approved disposition outcomes:
 - D1–D3, D6: accepted source/effect classifications and explicit source-identity exceptions. Do not replay them against hosted staging.
 - D4–D5: approved to remain OPEN pending disposable proof of constraint/index and verifier semantics.
@@ -291,7 +293,7 @@ Phased sequence and state:
 2. **Extend the regression contracts:** `runtime_accept_event`'s 10 assertions, the 78-RPC ACL/catalog assertions, the four PGMQ hardening assertions, and three rate-limit assertions all pass on the latest disposable replay. Add the uncovered resolver, worker/quarantine, readiness/H0-H1, activation tenant-isolation, and H3/H4 financial behavior cases enumerated in Task 5. Do not replace a live function just to make its definition hash match.
 3. **Catalog and release evidence:** rerun read-only catalog fingerprints, grants/RLS/function security checks, job schedules and readiness. Preserve previous release-gate results as separate historical evidence rather than claiming they prove the present migration list is synchronized.
 4. **Matrix review:** each row requires source commit/blob evidence, risk, decision, rollback/backup implication, and expected postcondition. Unknown stays HOLD.
-5. **Staging-only CLI gate remains explicitly OPEN BLOCKER:** latest verified run on pre-refresh head `a83f3c234bf43149c6a2fd5ba5885734c5cf697b` is `38615138956`. Target validation and read-only `migration list` plus `db push --dry-run` ran; synchronization assertion failed: 0 paired, 51 local-only, 54 remote-only. This is **not waived** and is not authorization to repair history. Acceptance of D7 as an open blocker means no execution and PR stays Draft.
+5. **Staging-only CLI gate remains explicitly OPEN BLOCKER:** latest checked CLI rerun at the next documentation head `c28c361a940f1aa2fa434f9a9d31f2b0b1ecd78a` is `38618404472`. Target validation and read-only `migration list` plus `db push --dry-run` ran; synchronization assertion failed: 0 paired, 51 local-only, 54 remote-only. This is **not waived** and is not authorization to repair history. Acceptance of D7 as an open blocker means no execution and PR stays Draft.
 6. **Only after review:** separately approve a staging backup/restore plan and a bounded staging execution plan. No production action is part of this plan.
 
 ## Final gate
