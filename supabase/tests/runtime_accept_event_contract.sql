@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(10);
+SELECT plan(12);
 
 -- Disposable contract fixture only. All writes are contained in this test
 -- transaction and rolled back below; this test never targets hosted databases.
@@ -117,17 +117,45 @@ SELECT is(
 );
 
 SELECT throws_ok(
-  $$SELECT * FROM public.runtime_accept_event(
+  $SELECT * FROM public.runtime_accept_event(
     '00000000-0000-4000-8000-000000000103',
     'contract_accept_event_01',
     'contract_test',
     '2026-10-14T00:00:00Z',
     '{"contract":"runtime_accept_event","version":2}'::jsonb,
     NULL
-  )$$,
+  )$,
   '23505',
   'idempotency key was already used with different event data',
   'same idempotency key with changed payload is rejected'
+);
+
+SELECT throws_ok(
+  $SELECT * FROM public.runtime_accept_event(
+    '00000000-0000-4000-8000-000000000103',
+    'contract_accept_event_01',
+    'changed_event_type',
+    '2026-10-14T00:00:00Z',
+    '{"contract":"runtime_accept_event","version":1}'::jsonb,
+    NULL
+  )$,
+  '23505',
+  'idempotency key was already used with different event data',
+  'same idempotency key with changed event type is rejected'
+);
+
+SELECT throws_ok(
+  $SELECT * FROM public.runtime_accept_event(
+    '00000000-0000-4000-8000-000000000103',
+    'contract_accept_event_01',
+    'contract_test',
+    '2026-10-15T00:00:00Z',
+    '{"contract":"runtime_accept_event","version":1}'::jsonb,
+    NULL
+  )$,
+  '23505',
+  'idempotency key was already used with different event data',
+  'same idempotency key with changed occurred_at is rejected'
 );
 
 SELECT throws_ok(
