@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(19);
+SELECT plan(18);
 
 SELECT throws_ok(
   $$SELECT * FROM public.runtime_worker_tick(0, 60)$$,
