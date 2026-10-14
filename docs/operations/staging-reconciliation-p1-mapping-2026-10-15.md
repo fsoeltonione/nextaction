@@ -191,9 +191,17 @@ P1 has no unclassified rows, but these approved/open decisions are not closed by
 | **D7 — CLI history sync** | Current CLI gate remains 0 paired / 51 local-only / 54 remote-only. | Keep blocker open. P1 does not repair it; no writes, PR stays Draft. |
 | **P1 vs P2** | P1 establishes inventory and classifications, not full behavioral correctness. | Continue disposable tests; do not mark D4/D5/D8/D9/D12 closed using this map alone. |
 
+### Current-source effects that remain not demonstrated by exact history payload
+
+| Local source / row | What is established | What is not established | Gate |
+|---|---|---|---|
+| `20261004030000_h2_3_release_reliability_proof.sql` / staging `20261003193248` | Stored payload exactly matches the historic source blob `2afbe75f...` at commit `651a505...`. | Current source later adds the required-migration guard. This history row does not prove that addition is present via another path; it is not proof the guard is absent from the live database. | Keep as a source/effect question for read-only effect verification and P2/P3. No “unapplied” assertion. |
+| `20261003020000_stage_17_final_reconcile.sql` / staging `20261003154641` | Remaining body matches after the changed constraint block is excluded; live staging uniqueness invariant was previously observed. | The exact historical DDL variant and its equivalence to current UNIQUE USING INDEX handling are not proven by that row. | D5 remains OPEN; P2 disposable comparison required. |
+| `20261003000000_stage_17_remediation.sql` / staging `20261003154220` | Older revision has exact-source provenance on staging `20261003013324`; some blocks of the second row map to candidate sources. | The second row's complete payload/source blob and materially different constraint/verifier blocks are unbound. | D4 remains OPEN; P2 financial verifier/constraint tests required. |
+
 ## 5. Mapping conclusion and exit assessment
 
-**P1: COMPLETE for inventory/classification.** All 54 staging history rows have a classification and source/effect disposition; all 51 current local migration files have a linked staging history representation. “Accepted source exception” remains distinct from “effect proven safe”; partial Stage 17 constraint behavior remains open for P2.
+**P1: COMPLETE for inventory/classification.** All 54 staging history rows have a classification and source/effect disposition; all 51 current local migration files have a candidate staging row plus an explicit representation-state label, including historical-only, normalized-body, partial and not-demonstrated-current-delta cases. This is not a claim that every current SQL file was deployed byte-for-byte or that all current-source deltas are present. “Accepted source exception” remains distinct from “effect proven safe”; D4/D5 and the H2.3 current-source guard remain open for later gates.
 
 **Overall state: HOLD — NO DATABASE WRITES.** P2 may proceed only in local/disposable environments. P3 CLI strategy, P5 staging preflight and any P6 change window cannot proceed while D7 remains unresolved or until their own exit criteria and separate approval are satisfied.
 
