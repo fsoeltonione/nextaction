@@ -12,7 +12,7 @@ This is a decision matrix, not an instruction to execute repairs. Production is 
 - Live migration history lists 54 entries in staging and 54 in production.
 - In the 2026-10-14 manifest, 27/54 staging and 24/54 production rows match a full current migration source by stored statement length + MD5. It identifies 14 current source files without an exact payload in either environment. Absence of an exact match is **not evidence the migration was unapplied**.
 - Staging history version keys have zero exact overlap with current local migration filename prefixes. The latest read-only `list_migrations` re-confirmed that aliases/legacy versions remain.
-- PR #141 is open and draft. Latest-head staging-only CLI proof run `38610138124` passed target validation and executed both read-only `migration list` and `db push --dry-run`; its final synchronization gate failed with **0 paired versions, 51 local-only versions, 54 remote-only versions**. This is a confirmed migration-lineage blocker, not a connection/configuration failure. No write was executed.
+- PR #141 is open and draft. The 2026-10-14 CLI observation was **0 paired / 51 local-only / 54 remote-only**. Current follow-up evidence dated 2026-10-15 is recorded below: the branch now has 52 local migration files after adding a proposed P2 readiness migration, and the current CLI gate is **0 paired / 52 local-only / 54 remote-only**. Both gates fail closed and execute no writes.
 - Disposable replay and quality CI passed in the reported runs. Replay proves the current source chain on an isolated disposable database with the Stage 14 baseline; it does not prove remote historical payload lineage.
 - Live catalog differences previously recorded: four UUID defaults, six function definitions. The source manifest says `runtime_accept_event` needs a targeted contract test.
 
@@ -230,7 +230,7 @@ Staging catalog confirms the v2 activation wrappers \`public.confirm_product_act
 - The inspected RLS flags are enabled but not FORCE RLS. The current API boundary also depends on table grants, function ACLs, fixed search paths and the private functions' own authorization checks; test the actual PostgREST/role path rather than treating the presence of RLS alone as proof.
 - \`public.runtime_readiness()\` latest read was \`ready\` at \`2026-10-14T17:57:37Z\`, with queue count \(0\), worker recent success true and operations recent success true. This is a point-in-time operational observation, not evidence of migration-history pairing.
 
-#### Regression-contract status on current PR head
+#### Regression-contract status on earlier PR head (historical; superseded by the P2 refresh below)
 
 Latest CI/replay status for \`3e09ca5701e2ed321da3d0ed44bd02d8e79fbbf0\`:
 
@@ -245,7 +245,7 @@ Latest CI/replay status for \`3e09ca5701e2ed321da3d0ed44bd02d8e79fbbf0\`:
 | \`supabase/tests/pgmq_service_role_usage_hardening.sql\` | 4 | **PASS** | PGMQ schema usage hardening and service-role invocation of the privileged RPC path. |
 | \`supabase/tests/runtime_rate_limit_scope_normalization.sql\` | 3 | **PASS** | Rate-limit scope normalization and keying behavior covered by the targeted assertions. |
 
-The current test suite does **not** close all high-impact behavior gaps. Add/extend isolated contracts in this order:
+The suite at that earlier commit did **not** close all high-impact behavior gaps. The updated 2026-10-15 follow-up below records newly passed contracts and still-open cases:
 
 1. **Resolver + acceptance security:** active success; malformed/missing credential; revoked or inactive integration; unconfirmed product; inactive/missing \`make_money\`; reject invalid payloads before insert; exact replay equality including \`occurred_at\`; conflicting replay by event type and timestamp as well as payload; assert no leaked credential/hash.
 2. **Worker + quarantine:** invalid quantity/visibility bounds; bounded retry progression; poison/malformed message classification; retry-exhaustion threshold; dead-letter row upsert updates \`last_seen_at\` and request/event metadata; archive success and queue-message-absent paths; failed archive stays recoverable; concurrent workers do not process the same queue row twice.
@@ -255,6 +255,17 @@ The current test suite does **not** close all high-impact behavior gaps. Add/ext
 6. **Catalog drift checks:** keep tests asserting event idempotency uniqueness, settlement uniqueness and financial checks/indexes; assert expected UUID-default behavior semantically rather than hard-coding schema qualification where not contractually significant.
 
 Task 5 does not change live functions, defaults, grants, RLS, indexes, or migration history. No new remote write is proposed.
+
+#### P2 follow-up — verified disposable contracts (2026-10-15)
+
+- Tested code commit: `c52478936d82d90fba07b994a46bbf80b02e4de7`.
+- [Disposable Migration Replay run 38637990437](https://github.com/fsoeltonione/nextaction/actions/runs/38637990437): PASS — 13 SQL test files and **194 assertions**, all tests successful.
+- [Quality run 38637990582](https://github.com/fsoeltonione/nextaction/actions/runs/38637990582): PASS, including Cloudflare build.
+- Detailed contract matrix and remaining gaps: [P2 Disposable Behavioral Contract Results — 2026-10-15](staging-reconciliation-p2-contract-results-2026-10-15.md).
+- Verified behavior includes focused resolver/Event idempotency cases; worker bounds, quarantine upsert and actual malformed-message handling; D10 full-integrity readiness contract; Stage 16 non-member workspace boundaries; H3.1 active Network Moment targeting plus legacy fallback; no-capacity/success/replay settlement; H4.1 stale Qualified Click recovery; and UUID default resolution.
+- **P2 remains OPEN** for actual retry-budget/exhaustion, failed-archive recovery and concurrent worker claims; D4/D5 historical pre-state and `created_at` versus `clicked_at` verifier proof; composite click/settlement atomicity and concurrent financial writes; readiness positive-path with fresh successful scheduler runs + snapshot; and remaining resolver/activation edge cases.
+- The new migration `20261015120000_runtime_full_integrity_readiness.sql` exists only in the branch/disposable replay. The P1 file map is a snapshot of the earlier 51-file set; the current branch has 52 migration files.
+- Current staging-only CLI [run 38637990404](https://github.com/fsoeltonione/nextaction/actions/runs/38637990404) fails closed: **0 paired / 52 local-only / 54 remote-only**. Its commands were read-only/dry-run and logs explicitly say no writes were executed. D7 remains open; PR #141 remains Draft.
 
 ### Task 6 — approved final reconciliation plan and phased gates (read-only, 2026-10-15)
 
@@ -272,13 +283,13 @@ Approved disposition outcomes:
 - D4–D5: approved to remain OPEN pending disposable proof of constraint/index and verifier semantics.
 - D7: approved to remain an OPEN CLI blocker. **No writes, no migration repair, no merge of PR #141 while the blocker remains.**
 - D8–D9, D12: approved to remain OPEN pending function/runtime, tenant isolation, and financial/network recovery behavior tests.
-- D10: approved **FULL-INTEGRITY readiness contract**; target health semantics must include the integrity-audit scheduler and a fresh successful snapshot. This is not yet a live change.
+- D10: approved **FULL-INTEGRITY readiness contract**. A forward-only candidate migration and disposable contract now implement/check the integrity-audit scheduler and fresh zero-anomaly snapshot requirement on the PR branch. The candidate has not been applied to hosted staging or production.
 - D11: approved provisionally; no hosted UUID default normalization.
 
 Phased sequence and state:
 1. **P0 — decisions/freeze: COMPLETE.** Approval recorded; PR stays Draft; no hosted writes.
-2. **P1 — complete 54 staging-row / 51 local-file map: NEXT.** Source/effect mapping, explicit accepted exceptions, no unknown/unclassified rows.
-3. **P2 — disposable contracts: OPEN.** Resolver/event, worker/quarantine, full-integrity readiness, authenticated/anon workspace boundaries, Stage 17 financial constraints, H3/H4 recovery and UUID-default semantics.
+2. **P1 — 54 staging-row / 51 local-file baseline map: COMPLETE for inventory/classification.** The additional P2 readiness migration is a new current-branch candidate outside that P1 snapshot.
+3. **P2 — disposable contracts: IN PROGRESS.** 194 assertions across 13 SQL files pass, but remaining gaps keep P2 OPEN.
 4. **P3 — CLI/history strategy: BLOCKED on P1/P2.** Compare retaining the mismatch with an evidence-backed CLI-supported metadata reconciliation; no direct DML, no duplicate alias files in active migrations, no blind bulk repair.
 5. **P4 — backup/restore readiness: NOT STARTED.** Verify actual staging backup/PITR availability and rehearse recovery; do not assume the plan includes PITR.
 6. **P5 — staging preflight: BLOCKED while D7 remains open.** Read-only target/history/catalog and dry-run validation.
@@ -293,19 +304,19 @@ P1 inventory/classification is **COMPLETE**. A fresh read-only SELECT against st
 
 - [P1 mapping — all 54 staging rows and 51 local files](staging-reconciliation-p1-mapping-2026-10-15.md) contains the full row-by-row register and local file/blob mapping.
 - Staging row classes: **27** exact current source payloads; **3** exact historical source revisions; **19** executable-body matches (including explicitly qualified H2.1/source-blob exception and the separate D3 rate-limit attribution exception); **1** token-sequence match; **3** partial/superseded rows (D1, D4, D5); and **1** fixture effect-only row (D2). These categories remain distinct and are not interchangeable evidence strengths.
-- All **51 current local migration SQL files** now have a mapped staging candidate row and a category: 27 exact current-file matches, 3 exact historical-source revisions, 18 normal executable-body mappings, 1 Stage 16 token-sequence mapping, 1 partial Stage 17 final-reconcile mapping, and 1 H2.1 body-match/source-blob exception. A candidate mapping does not mean the current file was deployed byte-for-byte or is safe to replay.
+- All **51 local migration SQL files present at P1 snapshot time** have a mapped staging candidate row and a category: 27 exact current-file matches, 3 exact historical-source revisions, 18 normal executable-body mappings, 1 Stage 16 token-sequence mapping, 1 partial Stage 17 final-reconcile mapping, and 1 H2.1 body-match/source-blob exception. The branch now contains 52 migration files; the new P2 readiness migration is an additional unpaired candidate, not a historical mapping claim.
 - D1–D3 and D6 remain accepted, bounded source exceptions. D4/D5 remain OPEN for P2 financial constraint/verifier tests. No mismatch is labeled “unapplied” solely because its strict hash differs.
-- Latest completed staging CLI gate before this document refresh, [run 38624748754](https://github.com/fsoeltonione/nextaction/actions/runs/38624748754), still fails **0 paired / 51 local-only / 54 remote-only**. D7 remains an explicit blocker, so P1 completion does not authorize staging changes.
+- Latest completed staging CLI gate, [run 38637990404](https://github.com/fsoeltonione/nextaction/actions/runs/38637990404), fails **0 paired / 52 local-only / 54 remote-only**. D7 remains an explicit blocker; no hosted change is authorized.
 
-P1 exit criteria are satisfied for **inventory and classification only**. P2 remains a separate behavioral-correctness gate.
+P1 exit criteria are satisfied for **inventory and classification only** as of the baseline snapshot. P2 behavior closure remains a separate gate.
 
 ## Ordered next actions / gates
 
-1. **P1 complete:** 54/54 staging fingerprints and all 51 local migration files are mapped in docs/operations/staging-reconciliation-p1-mapping-2026-10-15.md. Mapping/classification is not proof that every current file is the exact applied revision. D1–D12 dispositions remain as recorded in the final plan.
-2. **P2 next:** `runtime_accept_event`'s 10 assertions, the 78-RPC ACL/catalog assertions, the four PGMQ hardening assertions, and three rate-limit assertions passed on the last fully completed disposable replay. Add the uncovered resolver, worker/quarantine, readiness/FULL-INTEGRITY, activation tenant-isolation, D4/D5 constraint/verifier, and H3/H4 financial behavior cases enumerated in Tasks 5–6. Do not replace a live function just to make its definition hash match.
+1. **P1 complete as baseline:** 54/54 staging fingerprints and all 51 migration files present at the P1 snapshot are mapped in docs/operations/staging-reconciliation-p1-mapping-2026-10-15.md. The additional P2 readiness migration is not part of that historical map.
+2. **P2 in progress:** 13 SQL test files / 194 assertions pass. Use staging-reconciliation-p2-contract-results-2026-10-15.md for verified coverage and residuals. Remaining work includes worker retry/archive/concurrency; D4/D5 historical verifier/pre-state; composite settlement atomicity/concurrency; readiness positive-path; and remaining resolver/activation edge cases.
 3. **Catalog and release evidence:** rerun read-only catalog fingerprints, grants/RLS/function security checks, job schedules and readiness. Preserve previous release-gate results as separate historical evidence rather than claiming they prove the present migration list is synchronized.
 4. **Matrix review:** each row requires source commit/blob evidence, risk, decision, rollback/backup implication, and expected postcondition. Unknown stays HOLD.
-5. **Staging-only CLI gate remains explicitly OPEN BLOCKER:** latest checked CLI rerun at the next documentation head `c28c361a940f1aa2fa434f9a9d31f2b0b1ecd78a` is `38618404472`. Target validation and read-only `migration list` plus `db push --dry-run` ran; synchronization assertion failed: 0 paired, 51 local-only, 54 remote-only. This is **not waived** and is not authorization to repair history. Acceptance of D7 as an open blocker means no execution and PR stays Draft.
+5. **Staging-only CLI gate remains explicitly OPEN BLOCKER:** current checked CLI run `38637990404` failed the synchronization assertion: 0 paired, 52 local-only, 54 remote-only. Read-only `migration list` and `db push --dry-run` ran and no writes were executed. This is **not waived** and is not authorization to repair history. D7 remaining open means no execution and PR stays Draft.
 6. **Only after review:** separately approve a staging backup/restore plan and a bounded staging execution plan. No production action is part of this plan.
 
 ## Final gate
