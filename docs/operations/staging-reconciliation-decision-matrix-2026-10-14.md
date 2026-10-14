@@ -256,26 +256,42 @@ The current test suite does **not** close all high-impact behavior gaps. Add/ext
 
 Task 5 does not change live functions, defaults, grants, RLS, indexes, or migration history. No new remote write is proposed.
 
-### Task 6 — final reconciliation plan and explicit dispositions (read-only, 2026-10-15)
+### Task 6 — approved final reconciliation plan and phased gates (read-only, 2026-10-15)
 
-The full conditional plan and user decision register are now in [staging-reconciliation-final-plan-2026-10-15.md](staging-reconciliation-final-plan-2026-10-15.md). It consolidates the source map, regression status, sequencing, go/no-go checks, no-write controls and a disposition request for every known open gap.
+The user approved all D1–D12 dispositions on 2026-10-15. This approves the documented classifications/statuses and the conditional plan only; it does not authorize hosted database writes. The full roadmap is [staging-reconciliation-final-plan-2026-10-15.md](staging-reconciliation-final-plan-2026-10-15.md).
 
-Evidence on checked head e338821cd5394c89ada6eb3400c4346dd7063168:
-- [Disposable Migration Replay 38613116566](https://github.com/fsoeltonione/nextaction/actions/runs/38613116566): PASS, including all four SQL contract files.
-- [Quality 38613116762](https://github.com/fsoeltonione/nextaction/actions/runs/38613116762): PASS.
-- [Staging Migration Dry-Run (Read-Only) 38613116804](https://github.com/fsoeltonione/nextaction/actions/runs/38613116804): FAILED closed after target validation and both read-only commands; 0 paired, 51 local-only, 54 remote-only.
+Latest verified status on the pre-refresh head `a83f3c234bf43149c6a2fd5ba5885734c5cf697b`:
+- [Disposable Migration Replay 38615138763](https://github.com/fsoeltonione/nextaction/actions/runs/38615138763): PASS, including all four SQL contract files.
+- [Quality 38615138881](https://github.com/fsoeltonione/nextaction/actions/runs/38615138881): PASS.
+- [Staging Migration Dry-Run (Read-Only) 38615138956](https://github.com/fsoeltonione/nextaction/actions/runs/38615138956): FAILED closed after target validation and both read-only commands; 0 paired, 51 local-only, 54 remote-only.
 
-Disposition has not yet been approved by the user. The final plan registers D1–D12: the three Stage 14/Stage 9 provenance gaps; two partial Stage 17 variants; the H2.1 exact-source blob gap; CLI history mismatch; six function differences/remaining tests; activation-helper tenant security contracts; readiness/integrity-audit contract; UUID default-expression differences; and incomplete worker/H3/H4 behavior contracts.
+Approved disposition outcomes:
+- D1–D3, D6: accepted source/effect classifications and explicit source-identity exceptions. Do not replay them against hosted staging.
+- D4–D5: approved to remain OPEN pending disposable proof of constraint/index and verifier semantics.
+- D7: approved to remain an OPEN CLI blocker. **No writes, no migration repair, no merge of PR #141 while the blocker remains.**
+- D8–D9, D12: approved to remain OPEN pending function/runtime, tenant isolation, and financial/network recovery behavior tests.
+- D10: approved **FULL-INTEGRITY readiness contract**; target health semantics must include the integrity-audit scheduler and a fresh successful snapshot. This is not yet a live change.
+- D11: approved provisionally; no hosted UUID default normalization.
 
-**Decision boundary:** acceptance of a source-provenance limitation records an audit exception only. Accepting D7 as an open CLI blocker explicitly means keep no-write mode and PR #141 Draft; it never permits db push, migration repair, direct edits to hosted migration history, or production actions.
+Phased sequence and state:
+1. **P0 — decisions/freeze: COMPLETE.** Approval recorded; PR stays Draft; no hosted writes.
+2. **P1 — complete 54 staging-row / 51 local-file map: NEXT.** Source/effect mapping, explicit accepted exceptions, no unknown/unclassified rows.
+3. **P2 — disposable contracts: OPEN.** Resolver/event, worker/quarantine, full-integrity readiness, authenticated/anon workspace boundaries, Stage 17 financial constraints, H3/H4 recovery and UUID-default semantics.
+4. **P3 — CLI/history strategy: BLOCKED on P1/P2.** Compare retaining the mismatch with an evidence-backed CLI-supported metadata reconciliation; no direct DML, no duplicate alias files in active migrations, no blind bulk repair.
+5. **P4 — backup/restore readiness: NOT STARTED.** Verify actual staging backup/PITR availability and rehearse recovery; do not assume the plan includes PITR.
+6. **P5 — staging preflight: BLOCKED while D7 remains open.** Read-only target/history/catalog and dry-run validation.
+7. **P6 — bounded staging execution: NOT AUTHORIZED.** Requires all prior gates and a separate explicit approval of exact commands/versions.
+8. **P7 — post-change verification: NOT AUTHORIZED until P6 has separately been approved and performed.** Validate migration map, no unexpected SQL, security/financial/runtime invariants and preserve evidence.
+
+**Decision boundary:** accepting D7 as an open blocker means no execution and PR remains Draft. Approval of D1–D12 is not approval to run `db push`, `migration repair`, alter hosted migration history, apply schema SQL, or touch production.
 
 ## Ordered next actions / gates
 
-1. **Disposition register:** Task 6 created docs/operations/staging-reconciliation-final-plan-2026-10-15.md with a recommended disposition and required acceptance state for D1–D12. None is approved yet. Do not infer user acceptance from the proposal.
+1. **Disposition register:** D1–D12 are approved as recorded in Task 6 and in docs/operations/staging-reconciliation-final-plan-2026-10-15.md. Approval records the agreed disposition, not missing evidence or execution authorization.
 2. **Extend the regression contracts:** `runtime_accept_event`'s 10 assertions, the 78-RPC ACL/catalog assertions, the four PGMQ hardening assertions, and three rate-limit assertions all pass on the latest disposable replay. Add the uncovered resolver, worker/quarantine, readiness/H0-H1, activation tenant-isolation, and H3/H4 financial behavior cases enumerated in Task 5. Do not replace a live function just to make its definition hash match.
 3. **Catalog and release evidence:** rerun read-only catalog fingerprints, grants/RLS/function security checks, job schedules and readiness. Preserve previous release-gate results as separate historical evidence rather than claiming they prove the present migration list is synchronized.
 4. **Matrix review:** each row requires source commit/blob evidence, risk, decision, rollback/backup implication, and expected postcondition. Unknown stays HOLD.
-5. **Staging-only CLI gate remains explicitly OPEN BLOCKER:** latest checked run on head `e338821cd5394c89ada3d0ed44bd02d8e79fbbf0` is `38613116804`. Target validation and read-only `migration list` plus `db push --dry-run` ran; synchronization assertion failed: 0 paired, 51 local-only, 54 remote-only. This is **not waived** and is not authorization to repair history. Acceptance of D7 as an open blocker means no execution and PR stays Draft.
+5. **Staging-only CLI gate remains explicitly OPEN BLOCKER:** latest verified run on pre-refresh head `a83f3c234bf43149c6a2fd5ba5885734c5cf697b` is `38615138956`. Target validation and read-only `migration list` plus `db push --dry-run` ran; synchronization assertion failed: 0 paired, 51 local-only, 54 remote-only. This is **not waived** and is not authorization to repair history. Acceptance of D7 as an open blocker means no execution and PR stays Draft.
 6. **Only after review:** separately approve a staging backup/restore plan and a bounded staging execution plan. No production action is part of this plan.
 
 ## Final gate
