@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(18);
+SELECT plan(21);
 
 SELECT throws_ok(
   $$SELECT * FROM public.runtime_worker_tick(0, 60)$$,
@@ -189,6 +189,63 @@ SELECT ok(
       AND d.last_seen_at > '2000-01-01T00:00:00Z'::TIMESTAMPTZ
   ),
   'repeat quarantine updates last_seen_at'
+);
+
+
+CREATE TEMP TABLE p2_bad_queue_messages (
+  message_kind TEXT NOT NULL,
+  message_id BIGINT NOT NULL
+);
+
+INSERT INTO pg_temp.p2_bad_queue_messages (message_kind, message_id)
+VALUES
+  (
+    'non_object',
+    pgmq.send('runtime-events', '[]'::JSONB)
+  ),
+  (
+    'invalid_event_id',
+    pgmq.send(
+      'runtime-events',
+      pg_catalog.jsonb_build_object('event_id', 'not-a-uuid')
+    )
+  );
+
+SELECT is(
+  (
+    SELECT result_failed
+    FROM public.runtime_worker_tick(20, 5)
+  ),
+  2,
+  'actual worker RPC reports both malformed queue messages as failures'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::INTEGER
+    FROM private.runtime_dead_letters AS d
+    JOIN pg_temp.p2_bad_queue_messages AS b
+      ON b.message_id = d.queue_message_id
+    WHERE d.queue_name = 'runtime-events'
+      AND d.failure_class = 'malformed'
+      AND (
+        (b.message_kind = 'non_object' AND d.failure_code = 'invalid_queue_message')
+        OR (b.message_kind = 'invalid_event_id' AND d.failure_code = 'invalid_event_id')
+      )
+  ),
+  2,
+  'actual worker records distinct malformed-payload failure codes'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::INTEGER
+    FROM pgmq."q_runtime-events" AS q
+    JOIN pg_temp.p2_bad_queue_messages AS b
+      ON b.message_id = q.msg_id
+  ),
+  0,
+  'actual worker quarantines and archives both malformed queue messages'
 );
 
 SELECT * FROM finish();
