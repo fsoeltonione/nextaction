@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(17);
+SELECT plan(16);
 
 -- Disposable-only synthetic user because the existing smoke fixture creates
 -- workspace rows that reference auth.users. All effects roll back at the end.
