@@ -147,15 +147,15 @@ SELECT throws_ok(
 );
 
 SELECT throws_ok(
-  $$SELECT * FROM public.create_network_offer_activation_v1(
+  $SELECT * FROM public.create_network_offer_activation_v1(
     '00000000-0000-4000-8000-000000000243'::UUID,
     'Invalid Network Target',
     NULL,
     'Open',
     'https://p2-network-target.invalid',
     ARRAY['p2_missing_network_moment']
-  )$$,
-  '42501',
+  )$,
+  '22023',
   'one or more target network moments are not available',
   'network Offer activation rejects a missing or inactive Network Moment target'
 );
