@@ -105,42 +105,42 @@ SELECT is(
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.confirm_product_activation_v2(
+  $p2$SELECT * FROM public.confirm_product_activation_v2(
     '00000000-0000-4000-8000-000000000244'::UUID,
     'https://p2-wrong-workspace.invalid',
     'p2-wrong-workspace.invalid',
     'Must fail',
     NULL,
     '[{"key":"safe_key","label":"Safe key"}]'::JSONB
-  )$$p2$,
+  )$p2$,
   '42501',
   'workspace not authorized',
   'member of workspace A cannot activate a product in workspace B'
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.create_offer_activation_v2(
+  $p2$SELECT * FROM public.create_offer_activation_v2(
     '00000000-0000-4000-8000-000000000244'::UUID,
     'Unauthorized Offer',
     NULL,
     'Open',
     'https://p2-offer.invalid',
     ARRAY[]::UUID[]
-  )$$p2$,
+  )$p2$,
   '42501',
   'workspace not authorized',
   'member of workspace A cannot create an Offer in workspace B'
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.create_network_offer_activation_v1(
+  $p2$SELECT * FROM public.create_network_offer_activation_v1(
     '00000000-0000-4000-8000-000000000244'::UUID,
     'Unauthorized Network Offer',
     NULL,
     'Open',
     'https://p2-network-offer.invalid',
     ARRAY['p2_missing_network_moment']
-  )$$p2$,
+  )$p2$,
   '42501',
   'workspace not authorized',
   'network Offer activation rejects a workspace outside caller membership'
@@ -161,10 +161,10 @@ SELECT throws_ok(
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.set_moment_network_mapping_v1(
+  $p2$SELECT * FROM public.set_moment_network_mapping_v1(
     '00000000-0000-4000-8000-000000000246'::UUID,
     'p2_missing_network_moment'
-  )$$p2$,
+  )$p2$,
   '22023',
   'network moment is not available',
   'Moment mapping rejects a missing or inactive Network Moment'
@@ -181,14 +181,14 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000241', true);
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.create_network_offer_activation_v1(
+  $p2$SELECT * FROM public.create_network_offer_activation_v1(
     '00000000-0000-4000-8000-000000000243'::UUID,
     'Missing Capability',
     NULL,
     'Open',
     'https://p2-no-capability.invalid',
     ARRAY['p2_missing_network_moment']
-  )$$p2$,
+  )$p2$,
   '42501',
   'reach customers capability not selected',
   'network Offer activation is rejected when reach_customers capability is disabled'
