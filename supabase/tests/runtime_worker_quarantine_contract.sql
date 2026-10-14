@@ -198,18 +198,18 @@ CREATE TEMP TABLE p2_bad_queue_messages (
 );
 
 INSERT INTO pg_temp.p2_bad_queue_messages (message_kind, message_id)
-VALUES
-  (
-    'non_object',
-    pgmq.send('runtime-events', '[]'::JSONB)
-  ),
-  (
-    'invalid_event_id',
-    pgmq.send(
-      'runtime-events',
-      pg_catalog.jsonb_build_object('event_id', 'not-a-uuid')
-    )
-  );
+SELECT
+  'non_object',
+  sent.message_id
+FROM pgmq.send('runtime-events', '[]'::JSONB) AS sent(message_id)
+UNION ALL
+SELECT
+  'invalid_event_id',
+  sent.message_id
+FROM pgmq.send(
+  'runtime-events',
+  pg_catalog.jsonb_build_object('event_id', 'not-a-uuid')
+) AS sent(message_id);
 
 SELECT is(
   (
