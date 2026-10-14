@@ -159,56 +159,56 @@ SELECT throws_ok(
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.runtime_accept_event(
+  $p2$SELECT * FROM public.runtime_accept_event(
     NULL,
     'contract_accept_event_02',
     'contract_test',
     '2026-10-14T00:00:00Z',
     '{}'::jsonb,
     NULL
-  )$$p2$,
+  )$p2$,
   '22023',
   'integration is required',
   'missing integration ID is rejected'
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.runtime_accept_event(
+  $p2$SELECT * FROM public.runtime_accept_event(
     '00000000-0000-4000-8000-000000000103',
     'invalid key with spaces',
     'contract_test',
     '2026-10-14T00:00:00Z',
     '{}'::jsonb,
     NULL
-  )$$p2$,
+  )$p2$,
   '22023',
   'invalid idempotency key',
   'malformed idempotency key is rejected before Event insertion'
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.runtime_accept_event(
+  $p2$SELECT * FROM public.runtime_accept_event(
     '00000000-0000-4000-8000-000000000103',
     'contract_accept_event_03',
     'invalid event type',
     '2026-10-14T00:00:00Z',
     '{}'::jsonb,
     NULL
-  )$$p2$,
+  )$p2$,
   '22023',
   'invalid event type',
   'malformed event type is rejected before Event insertion'
 );
 
 SELECT throws_ok(
-  $$p2$SELECT * FROM public.runtime_accept_event(
+  $p2$SELECT * FROM public.runtime_accept_event(
     '00000000-0000-4000-8000-000000000103',
     'contract_accept_event_04',
     'contract_test',
     '2026-10-14T00:00:00Z',
     '[]'::jsonb,
     NULL
-  )$$p2$,
+  )$p2$,
   '22023',
   'event data must be an object',
   'non-object JSON payload is rejected'
