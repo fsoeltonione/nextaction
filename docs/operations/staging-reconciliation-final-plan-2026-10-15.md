@@ -116,9 +116,10 @@ The approval applies to dispositions and the plan only. It is not permission to 
 
 ## 6. Final state
 
-**HOLD — NO DATABASE WRITES.** Task 6 creates a reviewable proposed plan and asks for explicit dispositions. It does not reconcile hosted history, alter schema, reset data, run repair, change function definitions, or approve/merge PR #141.
+**HOLD — NO DATABASE WRITES.** D1–D12 dispositions are approved; P1 inventory/classification is complete. No hosted history reconciliation, schema/data mutation, migration repair, function replacement, PR merge or production action has occurred or is authorized.
 
 Related evidence:
+- [P1 mapping register — 54 staging rows / 51 local SQL files](staging-reconciliation-p1-mapping-2026-10-15.md)
 - [PR #141](https://github.com/fsoeltonione/nextaction/pull/141)
 - [Migration manifest](https://github.com/fsoeltonione/nextaction/blob/audit/staging-migration-lineage-20261014/docs/operations/staging-production-migration-manifest-2026-10-14.md)
 - [Decision matrix](https://github.com/fsoeltonione/nextaction/blob/audit/staging-migration-lineage-20261014/docs/operations/staging-reconciliation-decision-matrix-2026-10-14.md)
@@ -138,26 +139,24 @@ The D1–D12 dispositions are **APPROVED**, as recorded above. The plan is appro
 | Phase | Purpose | Allowed environment/actions | Status after this approval | Exit gate |
 |---|---|---|---|---|
 | **P0 — Record decisions and freeze** | Record D1–D12, define safety boundary, refresh links/status | Repository documentation only | **Complete** | Approved dispositions appear consistently in plan, matrix and PR text; no database writes |
-| **P1 — Complete staging row/effect map** | Reconcile all 54 staging rows to source/effect/exception and all 51 local migrations to their representation status | GitHub source/history artifacts and read-only staging queries only | **Next** | Every staging row classified; D4/D5 differences described; every local migration categorized; no inferred “unapplied” status from hash mismatch alone |
-| **P2 — Close disposable behavioral contracts** | Test effective financial, runtime, readiness, network and workspace boundaries | Isolated local/disposable Supabase only; synthetic IDs/data; rollback-contained tests | **Open** | Existing/new contracts pass from clean replay; negative-path, concurrency and financial invariants pass; no hosted project was the test target |
+| **P1 — Complete staging row/effect map** | Reconcile all 54 staging rows to source/effect/exception and all 51 local migrations to their representation status | GitHub source/history artifacts and read-only staging queries only | **COMPLETE — inventory/classification** | Every staging row classified; D4/D5 differences described; every local migration categorized; no inferred “unapplied” status from hash mismatch alone |
+| **P2 — Close disposable behavioral contracts** | Test effective financial, runtime, readiness, network and workspace boundaries | Isolated local/disposable Supabase only; synthetic IDs/data; rollback-contained tests | **NEXT** | Existing/new contracts pass from clean replay; negative-path, concurrency and financial invariants pass; no hosted project was the test target |
 | **P3 — Design CLI/history convergence** | Select and prove a version-history strategy for the 0/51/54 mismatch | Source analysis, current CLI help, docs review, disposable rehearsal; no hosted repair | **Blocked on P1/P2 evidence** | Row-by-row action map exists; each metadata transition has effect proof, order, stop and recovery conditions; disposable rehearsal yields the intended state |
 | **P4 — Backup/restore readiness** | Establish recovery before any potential hosted staging change | Read-only check of actual backup availability; rehearsal in disposable environment; no staging mutation | **Not started** | Backup/PITR availability and retention verified, not assumed; exact recovery steps and access documented; restore rehearsed and independently verified |
 | **P5 — Staging go/no-go preflight** | Revalidate target, source head, live history/catalog and expected CLI result | Read-only staging commands/queries only | **Blocked while D7 remains open** | Exact target verified; no production target selectable; current before-state fingerprint captured; CLI gate resolved and dry-run no-op or its reviewed output expressly expected |
 | **P6 — Bounded staging change window** | Apply only a separately approved history reconciliation mechanism | **Not authorized now.** Potentially staging only, after separate explicit approval | **NO-GO / HOLD** | Exact commands/versions approved; one bounded metadata change at a time; immediate read-only validation; stop conditions and recovery ready |
 | **P7 — Post-change verification and closeout** | Prove history, schema, authorization, financial invariants and operations after any future approved change | Read-only staging verification and disposable regression suite | **Not authorized until P6 separately approved and completed** | Expected history map matches; dry-run has no unexpected SQL; catalog/security/financial/runtime checks pass; residual risks recorded |
 
-### P1 — Complete the 54-row staging / 51-file local map
+### P1 — Complete the 54-row staging / 51-file local map — COMPLETE (2026-10-15)
 
-1. Start from the checked-in manifest, not filenames alone. For each of the 54 staging rows, capture remote version/name, statement length and MD5, mapped source path, source commit and Git blob SHA when available, normalized executable-body comparison, dependency/order, observed effect and confidence category.
-2. Apply the approved disposition without overstating evidence:
-   - D1/D2: source-identity limitations remain accepted staging-only bootstrap/fixture exceptions; neither is a migration to replay.
-   - D3: retain executable-body match and original sidecar-source attribution note.
-   - D4/D5: remain open; record the exact constraint/index and verifier behavior to be tested in P2.
-   - D6: retain H2.1 executable-body classification and source-blob exception; behavior tests remain in P2.
-3. Categorize all 51 local migrations as historical source match; effect represented by a mapped legacy payload; required effect not proven present; superseded/unsafe to replay without further analysis; or no demonstrated mapping. State evidence for every assignment.
-4. Identify fixture/smoke/marker rows separately from schema migrations. Do not automatically make them canonical product migrations, delete them, or copy staging-only payloads to production.
-5. Compare staging and production only as historical context already present in the manifest; this phase must not query or change production.
-6. **P1 exit gate:** a 54-row disposition table and 51-file mapping have no unclassified rows. “Accepted source exception” and “effect not proven” remain distinct. D4/D5 stay OPEN until P2 provides behavioral evidence.
+P1 deliverable: [P1 mapping register — all 54 staging rows and 51 current local files](staging-reconciliation-p1-mapping-2026-10-15.md).
+
+1. **Inventory/fingerprint verification complete:** a fresh staging read-only SELECT confirmed every remote row's version, name, stored SQL-character count and MD5 matched the prior manifest, **54/54**. No migration SQL was replayed and no hosted write ran.
+2. The 54 rows are classified as 27 exact current-source payloads, 3 exact historical source revisions, 19 executable-body matches (including explicitly qualified source exceptions), 1 token-sequence match, 3 partial/superseded rows (D1/D4/D5), and 1 fixture-effect-only row (D2). The classes are not interchangeable evidence strengths.
+3. All 51 local SQL files have a candidate staging row and a representation-state label: 27 direct current-file payload matches, 3 historic source revisions, 18 normalized executable-body mappings, 1 token-sequence mapping, 1 partial Stage 17 final-reconcile mapping, and 1 H2.1 body-match/source-blob exception. This is not a claim that each current file is the exact deployed revision or safe to replay.
+4. Current source/effect questions remain explicit: D4/D5 constraint/verifier differences, H2.1 original full-file blob identity, and the H2.3 current-source required-migration guard not demonstrated by the historic payload. These do not imply an effect is absent; prove the effective behavior before any future history decision.
+5. Preserve approved exceptions D1–D3/D6. Keep D4/D5 OPEN for P2. Fixture/smoke/marker history stays distinguished from canonical schema migrations. Production remains out of scope.
+6. **P1 exit gate satisfied for inventory/classification only.** No staging row or local file remains unclassified. D4/D5 behavior, current-source deltas and D7 remain open for their own gates.
 
 ### P2 — Disposable-only behavioral test work
 
@@ -226,6 +225,6 @@ If and only if P1–P5 pass and the user separately approves the exact execution
 
 ### Proposed sequencing and dependencies
 
-P0 (complete) → P1 (54-row map) → P2 (regression contracts) → P3 (CLI strategy and rehearsal) → P4 (backup/restore rehearsal) → P5 (read-only preflight) → separate user go/no-go → P6 (if separately approved) → P7 (if completed).
+P0 (complete) → P1 (complete: 54-row/51-file map) → P2 (next: disposable contracts) → P3 (CLI strategy and rehearsal) → P4 (backup/restore rehearsal) → P5 (read-only preflight) → separate user go/no-go → P6 (if separately approved) → P7 (if completed).
 
-P1/P2 can use separate read-only/disposable workstreams, but P3 depends on both. P4 depends on a concrete P3 proposal so recovery covers the actual risks. P5/P6 cannot proceed while D7 remains open. Approval of D1–D12 does not change this order.
+P1 is complete; P2 is the next phase and runs only in disposable environments. P3 depends on the P1 map and P2 tests. P4 depends on a concrete P3 proposal so recovery covers actual risks. P5/P6 cannot proceed while D7 remains open. Approval of D1–D12 does not change this order.
