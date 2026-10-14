@@ -287,10 +287,22 @@ Phased sequence and state:
 
 **Decision boundary:** accepting D7 as an open blocker means no execution and PR remains Draft. Approval of D1–D12 is not approval to run `db push`, `migration repair`, alter hosted migration history, apply schema SQL, or touch production.
 
+### P1 — staging history and local migration mapping complete (read-only, 2026-10-15)
+
+P1 inventory/classification is **COMPLETE**. A fresh read-only SELECT against staging `supabase_migrations.schema_migrations` reconciled every remote `version`, `name`, stored SQL length and MD5 to the manifest: **54/54 fingerprints matched**. No hosted write or migration command was executed by P1.
+
+- [P1 mapping — all 54 staging rows and 51 local files](staging-reconciliation-p1-mapping-2026-10-15.md) contains the full row-by-row register and local file/blob mapping.
+- Staging row classes: **27** exact current source payloads; **3** exact historical source revisions; **19** executable-body matches (including explicitly qualified H2.1/source-blob exception and the separate D3 rate-limit attribution exception); **1** token-sequence match; **3** partial/superseded rows (D1, D4, D5); and **1** fixture effect-only row (D2). These categories remain distinct and are not interchangeable evidence strengths.
+- All **51 current local migration SQL files** now have a mapped staging candidate row and a category: 27 exact current-file matches, 3 exact historical-source revisions, 18 normal executable-body mappings, 1 Stage 16 token-sequence mapping, 1 partial Stage 17 final-reconcile mapping, and 1 H2.1 body-match/source-blob exception. A candidate mapping does not mean the current file was deployed byte-for-byte or is safe to replay.
+- D1–D3 and D6 remain accepted, bounded source exceptions. D4/D5 remain OPEN for P2 financial constraint/verifier tests. No mismatch is labeled “unapplied” solely because its strict hash differs.
+- Latest staging CLI gate after this mapping document's commit, [run 38623083416](https://github.com/fsoeltonione/nextaction/actions/runs/38623083416), still fails **0 paired / 51 local-only / 54 remote-only**. D7 remains an explicit blocker, so P1 completion does not authorize staging changes.
+
+P1 exit criteria are satisfied for **inventory and classification only**. P2 remains a separate behavioral-correctness gate.
+
 ## Ordered next actions / gates
 
-1. **Disposition register:** D1–D12 are approved as recorded in Task 6 and in docs/operations/staging-reconciliation-final-plan-2026-10-15.md. Approval records the agreed disposition, not missing evidence or execution authorization.
-2. **Extend the regression contracts:** `runtime_accept_event`'s 10 assertions, the 78-RPC ACL/catalog assertions, the four PGMQ hardening assertions, and three rate-limit assertions all pass on the latest disposable replay. Add the uncovered resolver, worker/quarantine, readiness/H0-H1, activation tenant-isolation, and H3/H4 financial behavior cases enumerated in Task 5. Do not replace a live function just to make its definition hash match.
+1. **P1 complete:** 54/54 staging fingerprints and all 51 local migration files are mapped in docs/operations/staging-reconciliation-p1-mapping-2026-10-15.md. Mapping/classification is not proof that every current file is the exact applied revision. D1–D12 dispositions remain as recorded in the final plan.
+2. **P2 next:** `runtime_accept_event`'s 10 assertions, the 78-RPC ACL/catalog assertions, the four PGMQ hardening assertions, and three rate-limit assertions passed on the last fully completed disposable replay. Add the uncovered resolver, worker/quarantine, readiness/FULL-INTEGRITY, activation tenant-isolation, D4/D5 constraint/verifier, and H3/H4 financial behavior cases enumerated in Tasks 5–6. Do not replace a live function just to make its definition hash match.
 3. **Catalog and release evidence:** rerun read-only catalog fingerprints, grants/RLS/function security checks, job schedules and readiness. Preserve previous release-gate results as separate historical evidence rather than claiming they prove the present migration list is synchronized.
 4. **Matrix review:** each row requires source commit/blob evidence, risk, decision, rollback/backup implication, and expected postcondition. Unknown stays HOLD.
 5. **Staging-only CLI gate remains explicitly OPEN BLOCKER:** latest checked CLI rerun at the next documentation head `c28c361a940f1aa2fa434f9a9d31f2b0b1ecd78a` is `38618404472`. Target validation and read-only `migration list` plus `db push --dry-run` ran; synchronization assertion failed: 0 paired, 51 local-only, 54 remote-only. This is **not waived** and is not authorization to repair history. Acceptance of D7 as an open blocker means no execution and PR stays Draft.
