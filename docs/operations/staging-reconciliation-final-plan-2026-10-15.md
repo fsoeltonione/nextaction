@@ -11,16 +11,16 @@
 
 A user acceptance of an unresolved evidence gap may authorize documenting that limitation as an audit exception. It does **not** make the CLI gate pass and does **not** authorize any database write.
 
-## 2. Evidence snapshot at the latest checked PR head
+## 2. Evidence snapshot — latest status immediately before this revision
 
 Repository: [fsoeltonione/nextaction](https://github.com/fsoeltonione/nextaction), PR [#141](https://github.com/fsoeltonione/nextaction/pull/141), branch `audit/staging-migration-lineage-20261014`. Last fully completed Quality/replay evidence was on commit `a83f3c234bf43149c6a2fd5ba5885734c5cf697b`; this document has since been updated and the PR remains **open and Draft**.
 
 - The manifest covers 54 staging history rows, 54 production history rows, and 51 local SQL migration files. Exact full-file payload matches were 27/54 in staging and 24/54 in production; 14 local SQL files have no strict full-file payload match in either hosted history. No exact match does not establish that a migration was unapplied.
 - Staging remote version keys have zero exact overlap with current local filename prefixes.
-- Latest checked staging-only CLI run [38618404472](https://github.com/fsoeltonione/nextaction/actions/runs/38618404472) passed target validation and ran the read-only migration list and `db push --dry-run`; the final gate failed: **0 paired, 51 local-only, 54 remote-only**. The command reported remote migration versions missing from the local migrations directory. No write command ran.
+- Latest staging-only CLI gate checked immediately before this revision was [38618848748](https://github.com/fsoeltonione/nextaction/actions/runs/38618848748) on documentation head `c80c4c751308d1511d3d26cfb75e0bf59b2f23a1`. It passed target validation and ran the read-only migration list and `db push --dry-run`, but the final gate failed: **0 paired, 51 local-only, 54 remote-only**. The command reported remote migration versions missing from the local migrations directory. No write command ran.
 - Last completed disposable replay on the fully checked prior head [38615138763](https://github.com/fsoeltonione/nextaction/actions/runs/38615138763) passed and reports all four SQL contract files successful. Last completed Quality run on the fully checked prior head [38615138881](https://github.com/fsoeltonione/nextaction/actions/runs/38615138881) passed. These prove the tested source chain/contracts in an isolated database; neither proves hosted staging history is synchronized.
 - Task 5 observed six cross-environment function-definition fingerprint differences and four UUID default-expression differences. No live function, table default, grant, RLS policy, index, or migration-history row was changed by Tasks 1–6.
-- After documentation updates on head `c28c361a940f1aa2fa434f9a9d31f2b0b1ecd78a`, the latest CLI rerun [38618404472](https://github.com/fsoeltonione/nextaction/actions/runs/38618404472) failed with the same 0/51/54 result. At the last status poll, Quality [38618404709](https://github.com/fsoeltonione/nextaction/actions/runs/38618404709) was in progress and disposable replay [38618404854](https://github.com/fsoeltonione/nextaction/actions/runs/38618404854) was pending; these runs must be rechecked on the final documentation head.
+- The preceding docs-only head `c28c361a940f1aa2fa434f9a9d31f2b0b1ecd78a` also failed the CLI gate in [run 38618404472](https://github.com/fsoeltonione/nextaction/actions/runs/38618404472), with the same 0/51/54 result. At the pre-revision status poll, Quality [38618848731](https://github.com/fsoeltonione/nextaction/actions/runs/38618848731) and disposable replay [38618848721](https://github.com/fsoeltonione/nextaction/actions/runs/38618848721) were in progress. This revision will trigger new documentation-head checks; recheck them before any merge. These CI states do not affect the open CLI blocker.
 
 ## 3. Disposition register — approved 2026-10-15
 
