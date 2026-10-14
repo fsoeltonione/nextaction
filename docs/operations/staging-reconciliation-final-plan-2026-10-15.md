@@ -2,7 +2,7 @@
 
 ## 1. Decision and safety boundary
 
-**Decision: HOLD — NO DATABASE WRITES.** This is a conditional plan and an explicit disposition request, not execution authorization.
+**Decision: HOLD — NO DATABASE WRITES.** The user has approved all D1–D12 dispositions and the phased plan; that approval is not execution authorization.
 
 - In scope for eventual reconciliation: staging project `njjybpswxalxjhqjlvqa` only.
 - Explicitly out of scope: production project `khoygjyikxkdwonygzyh`. No production writes or migration actions are authorized by this document.
@@ -36,7 +36,7 @@ The user approved all D1–D12 dispositions in this register on 2026-10-15. This
 | **D7** | CLI sync gate: zero paired versions, 51 local-only, 54 remote-only on latest checked run. | **APPROVED — KEEP OPEN BLOCKER; do not waive as a pass.** The release/reconciliation plan stops before execution until evidence-backed pairing is resolved. An explicit decision to accept this blocker means **remain in no-write mode and keep PR #141 Draft**. | This is the critical gate. Accepting “blocker remains open” is not an exception that permits `db push`, `migration repair`, merge, or production action. |
 | **D8** | Six function fingerprint differences: `runtime_accept_event`, `runtime_worker_tick`, `private.runtime_quarantine_message`, `runtime_readiness`, `confirm_product_activation`, and `resolve_runtime_integration`. Only the core acceptance behavior has a new focused contract with 10 passing disposable assertions; other semantic comparisons are incomplete. | **APPROVED — KEEP OPEN** for behavior closure on untested cases; do not replace live functions to make hashes equal. Preserve `runtime_accept_event`'s passing test as limited evidence, not full equivalence certification. | Requires the targeted differential/negative-path contracts in the decision matrix before any behavior-change proposal can be considered. |
 | **D9** | Activation v2 wrappers and some private `SECURITY DEFINER` helper implementations grant `authenticated` EXECUTE; helpers have authorization checks but the existing 78-assertion RPC contract verifies catalog/ACL shape rather than full tenant-isolation behavior. | **APPROVED — KEEP OPEN pending disposable role-based tests** for non-member/wrong-workspace, missing capability, invalid IDs/input, and anon denial. Do not label the grant alone a vulnerability. | Closes only after tests demonstrate the tenant/capability boundary for the exposed helper paths. |
-| **D10** | `runtime_readiness()` reported `ready` with empty queue and recent worker/operations successes, but its current body does not check the integrity-audit scheduler/latest snapshot. | **APPROVED — FULL-INTEGRITY readiness contract:** add integrity-audit scheduler/latest-snapshot freshness assertions before claiming full operational readiness. No live function change now. No live function change now. | Requires an approved health-contract definition and isolated tests for missing, inactive, stale and successful integrity-audit runs. |
+| **D10** | `runtime_readiness()` reported `ready` with empty queue and recent worker/operations successes, but its current body does not check the integrity-audit scheduler/latest snapshot. | **APPROVED — FULL-INTEGRITY readiness contract:** add integrity-audit scheduler/latest-snapshot freshness assertions before claiming full operational readiness. No live function change now. | Requires an approved health-contract definition and isolated tests for missing, inactive, stale and successful integrity-audit runs. |
 | **D11** | Four staging UUID defaults use `extensions.gen_random_uuid()`; previous cross-environment inspection recorded unqualified `gen_random_uuid()` in production. | **APPROVED PROVISIONALLY — likely schema-qualification-only difference; retain both forms until disposable resolution tests confirm equivalent UUID generation and extension binding.** | Does not authorize normalizing defaults or treating different catalog text as a migration blocker by itself. |
 | **D12** | Behavior contracts remain incomplete for worker retry/quarantine, inactive/unavailable H3 network mappings, H4 `no_capacity` recovery, and duplicate settlement/ledger prevention under repeat/concurrent calls. | **APPROVED — KEEP FINANCIAL/RUNTIME REGRESSION GATE OPEN.** Add and pass disposable contracts before any reconciliation execution is separately proposed. | A clean catalog or zero-row live anomaly count is not a substitute for these tests. No production financial event may be created to test them. |
 
@@ -56,17 +56,17 @@ The approval applies to dispositions and the plan only. It is not permission to 
 
 ### Phase A — freeze and preserve evidence (no writes)
 
-1. Keep PR #141 Draft and preserve the current branch/head until the disposition response has been recorded.
+1. Keep PR #141 Draft and preserve the reviewed branch; documentation and isolated tests may proceed, but no production merge/deploy or hosted database change is authorized.
 2. Do not rename, delete, duplicate, or reorder canonical migration files to silence the CLI. Do not place archival remote payload copies in the active `supabase/migrations` directory: the CLI could interpret them as migrations to apply.
 3. Keep the per-row manifest as the source of truth. For every remote staging row, maintain: remote version/name; exact stored payload hash/length; source repository path, commit and blob SHA (or explicit unbound classification); behavioral effect; dependency/order; evidence category; chosen disposition; replay risk; acceptance proof.
 4. Production remains excluded. Its existing manifest rows are evidence only; production history is not to be repaired as a side effect of staging work.
 
 ### Phase B — close or accept provenance rows (no writes)
 
-1. Recover exact historical artifacts for D1–D6 from Git history and any existing archived sidecar/release evidence.
-2. If an original file/blob remains unavailable, do not manufacture provenance. Record it as unbound and request an explicit audit-exception acceptance for that row.
-3. For D4 and D5, prove the effective unique constraint/index and verifier semantics through disposable migrations/contracts; preserve financial uniqueness and immutable ledger evidence.
-4. Keep a source gap “open” if payload differences may change settlement/authorization semantics. A live catalog snapshot can establish present state; it cannot prove which historical file caused it.
+1. Search for additional source evidence for D1–D6 in Git history and archived sidecar/release evidence; D1–D3 and D6 exceptions are already accepted, so new evidence should refine the record rather than silently change the disposition.
+2. If an original file/blob remains unavailable, retain it as unbound and preserve the approved audit exception for D1–D3/D6. Do not manufacture provenance.
+3. For D4 and D5, prove effective unique constraint/index and verifier semantics through disposable migrations/contracts; their source/behavior classification remains OPEN until that evidence is accepted.
+4. Keep any gap open if payload differences may change settlement/authorization semantics. A live catalog snapshot can establish present state; it cannot prove which historical file caused it.
 
 ### Phase C — close functional contracts in disposable replay
 
