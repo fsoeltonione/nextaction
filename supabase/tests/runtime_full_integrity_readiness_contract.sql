@@ -28,9 +28,9 @@ $p2_unschedule$;
 
 INSERT INTO pg_temp.p2_readiness_jobs (job_name, job_id)
 VALUES
-  ('worker', cron.schedule('nextaction-runtime-worker', '* * * * *', 'SELECT 1')),
-  ('operations', cron.schedule('nextaction-runtime-operations', '* * * * *', 'SELECT 1')),
-  ('integrity', cron.schedule('nextaction-runtime-integrity-audit', '* * * * *', 'SELECT 1'));
+  ('worker', cron.schedule('nextaction-runtime-worker', '0 0 1 1 *', 'SELECT 1')),
+  ('operations', cron.schedule('nextaction-runtime-operations', '0 0 1 1 *', 'SELECT 1')),
+  ('integrity', cron.schedule('nextaction-runtime-integrity-audit', '0 0 1 1 *', 'SELECT 1'));
 
 CREATE OR REPLACE FUNCTION pg_temp.p2_readiness_record_run(
   p_job_id BIGINT,
@@ -121,11 +121,11 @@ SELECT ok(
 SELECT is(public.runtime_readiness()->>'status', 'ready',
   'fresh successful worker, operations and integrity runs plus a fresh zero-anomaly snapshot produce ready');
 
-UPDATE cron.job SET active = FALSE
-WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'worker');
+SELECT cron.unschedule((SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'worker'));
 SELECT is(public.runtime_readiness()->>'status', 'not_ready', 'inactive worker schedule forces not_ready');
-UPDATE cron.job SET active = TRUE
-WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'worker');
+UPDATE pg_temp.p2_readiness_jobs
+SET job_id = cron.schedule('nextaction-runtime-worker', '0 0 1 1 *', 'SELECT 1')
+WHERE job_name = 'worker';
 
 DELETE FROM cron.job_run_details
 WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'worker');
@@ -147,11 +147,11 @@ SELECT pg_temp.p2_readiness_record_run(
   'succeeded', INTERVAL '0 seconds'
 );
 
-UPDATE cron.job SET active = FALSE
-WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'operations');
+SELECT cron.unschedule((SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'operations'));
 SELECT is(public.runtime_readiness()->>'status', 'not_ready', 'inactive operations schedule forces not_ready');
-UPDATE cron.job SET active = TRUE
-WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'operations');
+UPDATE pg_temp.p2_readiness_jobs
+SET job_id = cron.schedule('nextaction-runtime-operations', '0 0 1 1 *', 'SELECT 1')
+WHERE job_name = 'operations';
 
 DELETE FROM cron.job_run_details
 WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'operations');
@@ -165,11 +165,11 @@ SELECT pg_temp.p2_readiness_record_run(
   'succeeded', INTERVAL '0 seconds'
 );
 
-UPDATE cron.job SET active = FALSE
-WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'integrity');
+SELECT cron.unschedule((SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'integrity'));
 SELECT is(public.runtime_readiness()->>'status', 'not_ready', 'inactive integrity-audit schedule forces not_ready');
-UPDATE cron.job SET active = TRUE
-WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'integrity');
+UPDATE pg_temp.p2_readiness_jobs
+SET job_id = cron.schedule('nextaction-runtime-integrity-audit', '0 0 1 1 *', 'SELECT 1')
+WHERE job_name = 'integrity';
 
 DELETE FROM cron.job_run_details
 WHERE jobid = (SELECT job_id FROM pg_temp.p2_readiness_jobs WHERE job_name = 'integrity');
