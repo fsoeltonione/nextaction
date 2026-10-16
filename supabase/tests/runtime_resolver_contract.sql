@@ -139,6 +139,9 @@ SELECT is(
   'missing integration secret row is indistinguishable from an unknown credential'
 );
 
+DELETE FROM public.integrations
+WHERE id = '00000000-0000-4000-8000-000000000203';
+
 SELECT is(
   (SELECT result_status FROM public.resolve_runtime_integration(repeat('a', 64))),
   'invalid_integration_credential',
