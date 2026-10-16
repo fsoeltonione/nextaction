@@ -10,7 +10,8 @@ This document converts P1's row-level source/effect classification into a CLI tr
 - Reviewed head when this register was prepared: `d8ef472b9d7ee133031080ce7460869814f08b4e`
 - Staging project: `njjybpswxalxjhqjlvqa`; production `khoygjyikxkdwonygzyh` is out of scope.
 - Detailed prior provenance/effect evidence: [P1 row-by-row source mapping](./staging-reconciliation-p1-mapping-2026-10-15.md) and [canonical staging/production manifest](./staging-production-migration-manifest-2026-10-14.md).
-- Latest-head gates: [Quality PASS, run 38884134384](https://github.com/fsoeltonione/nextaction/actions/runs/38884134384); [Disposable Migration Replay PASS, run 38884134381](https://github.com/fsoeltonione/nextaction/actions/runs/38884134381); [Staging Migration Dry-Run FAIL-CLOSED, run 38884134410](https://github.com/fsoeltonione/nextaction/actions/runs/38884134410).
+- Latest implementation head rechecked: `979e6c93ccfb4917f5624119e0fb939f72c819ae`. The two commits since the originally reviewed head are documentation-only; comparison shows no migration SQL or runtime test source changed.
+- Latest-head gates: [Quality PASS, run 38886934535](https://github.com/fsoeltonione/nextaction/actions/runs/38886934535); [Disposable Migration Replay PASS, run 38886934606](https://github.com/fsoeltonione/nextaction/actions/runs/38886934606); [Staging Migration Dry-Run FAIL-CLOSED, run 38886934583](https://github.com/fsoeltonione/nextaction/actions/runs/38886934583).
 
 ## Current CLI facts, confirmed from latest read-only run
 
@@ -20,7 +21,7 @@ The pinned staging workflow uses Supabase CLI 2.120.0 and performed only:
 3. `supabase db push --dry-run`,
 4. a gate assertion.
 
-The gate output on head `d8ef472b9d7ee133031080ce7460869814f08b4e` was:
+The latest-head rerun output on `979e6c93ccfb4917f5624119e0fb939f72c819ae` was:
 
 | Signal | Result |
 |---|---:|
