@@ -42,10 +42,11 @@ LANGUAGE plpgsql
 AS $record_run$
 BEGIN
   INSERT INTO cron.job_run_details (
-    jobid, database, username, command, status,
+    runid, jobid, database, username, command, status,
     return_message, start_time, end_time
   )
   SELECT
+    COALESCE((SELECT max(d.runid) + 1 FROM cron.job_run_details AS d), 1),
     j.jobid, j.database, j.username, j.command, p_status,
     'P2 disposable readiness fixture',
     clock_timestamp() - p_age,
