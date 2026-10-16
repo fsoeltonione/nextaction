@@ -39,7 +39,7 @@ psql_db -c "
   CREATE TRIGGER p2_test_pause_deadletter
     BEFORE INSERT ON private.runtime_dead_letters
     FOR EACH ROW EXECUTE FUNCTION private.p2_test_pause_deadletter();
-  SELECT pgmq.send('runtime-events', '{\\"p2_concurrency\\":\\"worker\\"}'::jsonb);
+  SELECT pgmq.send('runtime-events', jsonb_build_object('p2_concurrency', 'worker'));
 " >/dev/null
 
 psql_db -c "SELECT result_processed || ':' || result_failed FROM public.runtime_worker_tick(1, 5);" >"$TMP_DIR/worker-a.out" &
@@ -79,7 +79,7 @@ psql_db -c "
     '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated', 'p2-concurrent-settlement@contract.invalid', '',
     timezone('utc'::text, now()),
-    '{\\"provider\\":\\"email\\",\\"providers\\":[\\"email\\"]}'::JSONB,
+    jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email')),
     '{}'::JSONB, timezone('utc'::text, now()), timezone('utc'::text, now())
   )
   ON CONFLICT (id) DO NOTHING;
