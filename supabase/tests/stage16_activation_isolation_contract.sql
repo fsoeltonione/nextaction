@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(11);
+SELECT plan(14);
 
 INSERT INTO auth.users (
   id, instance_id, aud, role, email, encrypted_password,
@@ -168,6 +168,48 @@ SELECT throws_ok(
   '22023',
   'network moment is not available',
   'Moment mapping rejects a missing or inactive Network Moment'
+);
+
+SELECT throws_ok(
+  $p2$SELECT * FROM public.confirm_product_activation_v2(
+    '00000000-0000-4000-8000-000000000243'::UUID,
+    'not-a-canonical-url',
+    'p2-activation.invalid',
+    'Invalid URL Product',
+    NULL,
+    '[{"key":"valid_key","label":"Valid key"}]'::JSONB
+  )$p2$,
+  '22023',
+  'invalid canonical product URL',
+  'product activation rejects malformed canonical URLs before writing'
+);
+
+SELECT throws_ok(
+  $p2$SELECT * FROM public.confirm_product_activation_v2(
+    '00000000-0000-4000-8000-000000000243'::UUID,
+    'https://p2-empty-moments.invalid',
+    'p2-empty-moments.invalid',
+    'Empty Moments Product',
+    NULL,
+    '[]'::JSONB
+  )$p2$,
+  '22023',
+  'between 1 and 20 moments are required',
+  'product activation rejects an empty Moment definition array'
+);
+
+SELECT throws_ok(
+  $p2$SELECT * FROM public.create_offer_activation_v2(
+    '00000000-0000-4000-8000-000000000243'::UUID,
+    'Invalid Destination Offer',
+    NULL,
+    'Open',
+    'javascript:alert(1)',
+    ARRAY['00000000-0000-4000-8000-000000000246'::UUID]
+  )$p2$,
+  '22023',
+  'invalid destination URL',
+  'Offer activation rejects a non-HTTP destination URL'
 );
 
 RESET ROLE;
