@@ -206,4 +206,70 @@ psql_db -c "
   DROP FUNCTION IF EXISTS private.p2_test_pause_settlement();
 " >/dev/null
 
+echo "== First-workspace bootstrap race (two independent sessions) =="
+psql_db -c "
+  INSERT INTO auth.users (
+    id, instance_id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+  )
+  VALUES (
+    '00000000-0000-4000-8000-000000000431',
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated', 'p2-concurrent-bootstrap@contract.invalid', '',
+    timezone('utc'::text, now()),
+    jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email')),
+    '{}'::JSONB, timezone('utc'::text, now()), timezone('utc'::text, now())
+  )
+  ON CONFLICT (id) DO NOTHING;
+" >/dev/null
+
+bootstrap_call() {
+  psql_db -c "
+    SET ROLE authenticated;
+    SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000431', false);
+    SELECT * FROM public.confirm_product_activation_v2(
+      NULL::UUID,
+      'https://p2-first-workspace.invalid',
+      'p2-first-workspace.invalid',
+      'P2 First Workspace Bootstrap',
+      NULL,
+      '[{""key"":""first_moment"",""label"":""First Moment""}]'::JSONB
+    );
+  "
+}
+bootstrap_call >"$TMP_DIR/bootstrap-a.out" 2>&1 &
+bootstrap_a=$!
+sleep 0.2
+bootstrap_call >"$TMP_DIR/bootstrap-b.out" 2>&1 &
+bootstrap_b=$!
+set +e
+wait "$bootstrap_a"; bootstrap_a_status=$?
+wait "$bootstrap_b"; bootstrap_b_status=$?
+set -e
+
+if [[ "$bootstrap_a_status" -ne 0 && "$bootstrap_b_status" -ne 0 ]]; then
+  echo "Both concurrent bootstrap calls failed." >&2
+  cat "$TMP_DIR/bootstrap-a.out" "$TMP_DIR/bootstrap-b.out" >&2
+  exit 1
+fi
+
+bootstrap_counts="$(
+  psql_db -c "
+    SELECT
+      (SELECT count(*) FROM public.workspaces
+       WHERE user_id = '00000000-0000-4000-8000-000000000431'::UUID) || '|' ||
+      (SELECT count(*) FROM public.products
+       WHERE canonical_url = 'https://p2-first-workspace.invalid') || '|' ||
+      (SELECT count(*) FROM public.moments m
+       JOIN public.products p ON p.id = m.product_id
+       WHERE p.canonical_url = 'https://p2-first-workspace.invalid');
+  " | tr -d '[:space:]'
+)"
+if [[ "$bootstrap_counts" != "1|1|1" ]]; then
+  echo "Concurrent first-workspace bootstrap created an unexpected shape: [$bootstrap_counts]" >&2
+  cat "$TMP_DIR/bootstrap-a.out" "$TMP_DIR/bootstrap-b.out" >&2
+  exit 1
+fi
+echo "PASS: concurrent first-workspace calls persist exactly one Workspace, Product, and Moment."
+
 echo "PASS: all cross-session contracts completed against the disposable database."
