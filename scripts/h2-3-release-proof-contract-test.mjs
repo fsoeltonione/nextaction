@@ -26,7 +26,7 @@ const [
   readFile(".github/workflows/release.yml", "utf8"),
   readFile(".github/workflows/quality-gates.yml", "utf8"),
   readFile("package.json", "utf8"),
-  readFile("supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql", "utf8"),
+  readFile("supabase/migrations/20260926040100_stage_13_atomic_settlement_runtime.sql", "utf8"),
   readFile("supabase/migrations/20261003020000_stage_17_final_reconcile.sql", "utf8"),
 ]);
 

@@ -10,6 +10,8 @@ on:
       - 'supabase/staging/STAGE14_BOOTSTRAP.sql'
       - '.github/workflows/disposable-migration-replay.yml'
       - 'scripts/migration-filenames-test.mjs'
+      - 'scripts/test-disposable-runtime-concurrency.sh'
+      - 'scripts/test-stage17-historical-prestate.sh'
   workflow_dispatch:
 
 permissions:
@@ -55,13 +57,9 @@ jobs:
           cp supabase/staging/STAGE14_BOOTSTRAP.sql \
             supabase/migrations/20260925000000_ci_legacy_prototype_baseline.sql
 
-          # Historical production/staging ledger versions do not match source
-          # timestamps. These filename fixes apply ONLY to this temporary copy
-          # and are not proposed as remote migration-history repairs.
-          mv supabase/migrations/20260926030000_stage_12_qualified_click_runtime.sql \
-            supabase/migrations/20260926030100_stage_12_qualified_click_runtime.sql
-          mv supabase/migrations/20260926040000_stage_13_atomic_settlement_runtime.sql \
-            supabase/migrations/20260926040100_stage_13_atomic_settlement_runtime.sql
+          # The two legacy timestamp collisions are resolved in canonical
+          # source filenames. This disposable replay no longer renames them;
+          # it validates the filenames committed to the repository.
 
           # Deliberately use the canonical Stage 9 source without substituting
           # the staging sidecar. This is the regression test for the SQL fix.
@@ -120,6 +118,45 @@ jobs:
       - name: Start disposable Supabase
         working-directory: ${{ runner.temp }}/nextaction-migration-replay
         run: supabase start -x studio,imgproxy,mailpit,vector,logflare
+      - name: Verify Stage 17 historical constraint branches and verifier pre-state
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$REPLAY_WORKDIR"
+          MIGRATION_DIR="$REPLAY_WORKDIR/supabase/migrations"
+          POST_STAGE17="$RUNNER_TEMP/nextaction-post-stage17-migrations"
+          mkdir -p "$POST_STAGE17"
+          restore_post_stage17() {
+            shopt -s nullglob
+            local migration
+            for migration in "$POST_STAGE17"/*.sql; do
+              mv "$migration" "$MIGRATION_DIR/"
+            done
+          }
+          trap restore_post_stage17 EXIT
+          for migration in "$MIGRATION_DIR"/*.sql; do
+            base="$(basename "$migration")"
+            version="$(printf '%s' "$base" | cut -d '_' -f1)"
+            if [[ "$version" =~ ^[0-9]{14}$ ]] && [[ "$version" > "20261003000000" || "$version" == "20261003000000" ]]; then
+              mv "$migration" "$POST_STAGE17/"
+            fi
+          done
+          test -f "$POST_STAGE17/20261003000000_stage_17_remediation.sql"
+          supabase db reset --local --no-seed
+          bash "$GITHUB_WORKSPACE/scripts/test-stage17-historical-prestate.sh" prepare-index
+          mv "$POST_STAGE17/20261003000000_stage_17_remediation.sql" "$MIGRATION_DIR/"
+          supabase migration up --local
+          bash "$GITHUB_WORKSPACE/scripts/test-stage17-historical-prestate.sh" verify-index
+          mv "$MIGRATION_DIR/20261003000000_stage_17_remediation.sql" "$POST_STAGE17/"
+          supabase db reset --local --no-seed
+          bash "$GITHUB_WORKSPACE/scripts/test-stage17-historical-prestate.sh" prepare-direct
+          mv "$POST_STAGE17/20261003000000_stage_17_remediation.sql" "$MIGRATION_DIR/"
+          supabase migration up --local
+          bash "$GITHUB_WORKSPACE/scripts/test-stage17-historical-prestate.sh" verify-direct
+          mv "$MIGRATION_DIR/20261003000000_stage_17_remediation.sql" "$POST_STAGE17/"
+          restore_post_stage17
+          trap - EXIT
+          echo "PASS: Stage 17 applied from index-only and no-index pre-states; historical verifier regression reproduced only in the disposable database."
       - name: Replay canonical migrations from empty database
         working-directory: ${{ runner.temp }}/nextaction-migration-replay
         run: supabase db reset --local --no-seed
@@ -164,6 +201,9 @@ jobs:
       - name: Verify runtime RPC contracts
         working-directory: ${{ runner.temp }}/nextaction-migration-replay
         run: supabase test db --local
+      - name: Verify true concurrent worker claims and settlement idempotency
+        working-directory: ${{ runner.temp }}/nextaction-migration-replay
+        run: bash "$GITHUB_WORKSPACE/scripts/test-disposable-runtime-concurrency.sh"
       - name: Stop disposable Supabase
         if: always()
         working-directory: ${{ runner.temp }}/nextaction-migration-replay

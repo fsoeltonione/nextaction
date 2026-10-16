@@ -1,0 +1,142 @@
+name: Staging Migration Dry-Run (Read-Only)
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/migration-filenames-test.mjs"
+      - ".github/workflows/disposable-migration-replay.yml"
+      - ".github/workflows/staging-migration-dry-run.yml"
+      - "docs/operations/staging-production-migration-manifest-2026-10-14.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-migration-dry-run:
+    name: Staging history list and no-write dry-run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+
+      - name: Validate staging connection target without printing credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${STAGING_DATABASE_URL:-}" ]]; then
+            echo "::error::Missing STAGING_DATABASE_URL secret; no database command was executed."
+            exit 1
+          fi
+          node <<'NODE'
+          const raw = process.env.STAGING_DATABASE_URL;
+          let url;
+          try {
+            url = new URL(raw);
+          } catch {
+            throw new Error("STAGING_DATABASE_URL is not a valid PostgreSQL URL; value was not printed.");
+          }
+          if (!["postgres:", "postgresql:"].includes(url.protocol)) {
+            throw new Error("Staging connection must use postgres:// or postgresql://.");
+          }
+          // GitHub Actions runners are IPv4-only; Supabase direct DB endpoints are IPv6-only
+          // on the Free plan. Require the project's IPv4-compatible Supavisor Session Pooler.
+          if (!url.hostname.endsWith(".pooler.supabase.com")) {
+            throw new Error("Refusing to connect: use the Supabase Session Pooler host from the staging project's Connect dialog.");
+          }
+          if (url.port !== "5432") {
+            throw new Error("Refusing to connect: staging must use Session Pooler port 5432, not transaction mode.");
+          }
+          if (url.username !== "postgres.njjybpswxalxjhqjlvqa") {
+            throw new Error("Refusing to connect: pooler username does not identify the configured staging project.");
+          }
+          if (url.pathname !== "/postgres" || !url.password) {
+            throw new Error("Staging Session Pooler URL must include database /postgres and credentials; value was not printed.");
+          }
+          console.log("Staging project identity and Session Pooler target validated. Connection URL is not displayed.");
+          NODE
+
+      - name: List staging migration history (read only)
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          supabase migration list --db-url "$STAGING_DATABASE_URL" > "$RUNNER_TEMP/staging-migration-list.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/staging-migration-list.txt"
+          echo "STAGING_MIGRATION_LIST_EXIT_CODE=$status" >> "$GITHUB_ENV"
+
+      - name: Preview migration changes with dry-run only
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          supabase db push --dry-run --db-url "$STAGING_DATABASE_URL" > "$RUNNER_TEMP/staging-db-push-dry-run.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/staging-db-push-dry-run.txt"
+          echo "STAGING_DRY_RUN_EXIT_CODE=$status" >> "$GITHUB_ENV"
+
+      - name: Require synchronized migration history and no-op dry-run
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const listPath = process.env.RUNNER_TEMP + "/staging-migration-list.txt";
+          const dryPath = process.env.RUNNER_TEMP + "/staging-db-push-dry-run.txt";
+          const list = fs.readFileSync(listPath, "utf8");
+          const dry = fs.readFileSync(dryPath, "utf8");
+          const version = /^\d{14}$/;
+          let paired = 0;
+          const unpaired = [];
+          for (const line of list.split(/\r?\n/)) {
+            // Supabase CLI output can use ASCII pipes or Unicode box-drawing separators.
+            if (!line.includes("|") && !line.includes("│")) continue;
+            // Version values may be wrapped in Markdown-style backticks.
+            const fields = line.split(/[|│]/).map((value) => value.trim().replace(/^`|`$/g, "").trim());
+            if (fields.length < 2) continue;
+            const local = fields[0], remote = fields[1];
+            if (!version.test(local) && !version.test(remote)) continue;
+            if (version.test(local) && version.test(remote)) paired++;
+            else unpaired.push({local: local || "(missing)", remote: remote || "(missing)"});
+          }
+          const localOnly = unpaired.filter((row) => version.test(row.local));
+          const remoteOnly = unpaired.filter((row) => version.test(row.remote));
+          const noOp = /remote database is up to date|no migrations to apply|nothing to push/i.test(dry);
+          const proposed = /would push these migrations|applying migration|pending migrations|migration.*will be applied/i.test(dry);
+          const remoteVersionsMissingLocally = /remote migration versions not found in local migrations directory/i.test(dry);
+          console.log("Paired version rows: " + paired);
+          console.log("Local-only version rows: " + localOnly.length);
+          console.log("Remote-only version rows: " + remoteOnly.length);
+          console.log("Unpaired version rows: " + unpaired.length);
+          console.log("Dry-run reports no-op: " + noOp);
+          console.log("Dry-run proposes migrations: " + proposed);
+          if (process.env.STAGING_MIGRATION_LIST_EXIT_CODE !== "0") {
+            throw new Error("Read-only staging migration list failed; sync not proven.");
+          }
+          if (remoteVersionsMissingLocally) {
+            console.error("Remote history contains versions absent from the local migration directory. This is a lineage blocker; do not run migration repair or push migrations.");
+            console.error(JSON.stringify(remoteOnly.slice(0, 60)));
+            throw new Error("Staging migration history diverges: remote versions are not present locally. No writes were executed.");
+          }
+          if (process.env.STAGING_DRY_RUN_EXIT_CODE !== "0") {
+            throw new Error("Staging dry-run failed; sync not proven.");
+          }
+          if (unpaired.length || !noOp || proposed) {
+            console.error(JSON.stringify(unpaired.slice(0, 20)));
+            throw new Error("Staging migration history is not synchronized. No writes were executed.");
+          }
+          console.log("STAGING MIGRATION SYNC PROOF: PASS (list paired and dry-run no-op).");
+          NODE
+          # This workflow contains no non-dry-run db push, no migration repair,
+          # and no writes to supabase_migrations.

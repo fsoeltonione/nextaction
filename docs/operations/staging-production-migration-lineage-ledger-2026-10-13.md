@@ -315,3 +315,14 @@ Dua history row `stage14_staging_stage9_hardening` dan `stage14_staging_stage9_s
 3. Verifikasi alur bisnis inti sudah lulus pada run #39. Log staging smoke mencatat Event idempotency, Event → Moment, Decision → Delivery, concurrent Click replay, serta concurrent settlement replay. Snapshot ekonominya memvalidasi satu settlement, tiga financial entries, charge `100` cents USD, publisher share `75` cents, platform share `25` cents, dan debit/kredit berimbang; replay mempertahankan ID settlement dan tidak menambah entri ekonomi.
 4. Rollout production sudah selesai melalui Release Gate resmi run [#40](https://github.com/fsoeltonione/nextaction/actions/runs/38425884302) dengan `release_target=production`. SHA yang dibangun dan diverifikasi adalah `1d058c40456e483ddb585bf9683100113e2549b0`; Cloudflare audit memperoleh HTTP 200, production smoke mengonfirmasi provenance, runtime readiness, auth guards, alur bisnis lengkap, settlement replay, dan ledger seimbang. Canary production yang digunakan smoke bersifat persisten; jangan menghapusnya secara manual karena riwayat finansial bersifat immutable.
 5. Simpan manifest lineage, source commit, recorded history versions, SQL length/MD5, dan post-deployment proof dalam ledger; jangan mengubah, menghapus, atau menggabungkan `schema_migrations` rows.
+
+
+---
+
+## 2026-10-14 evidence correction
+
+The row-by-row payload manifest now supersedes prior classifications relying only on remote `name` or a candidate filename: [Migration lineage and staging sync manifest](./staging-production-migration-manifest-2026-10-14.md).
+
+Production `20260925205217 / stage_6_production_foundation` contains only a comment plus `SELECT 1;`; it is not byte-identical to the canonical foundation file. Production `20260925212930 / stage_8_function_grant_hardening` matches current `20260926010000_stage_8_function_grant_hardening.sql` bytes, not the same-named `20260925212930` source. Non-exact rows remain unresolved until SQL variant/effect evidence and catalog differences are reconciled.
+
+The fresh catalog fingerprints show four public-column default differences and six function-definition differences between staging and production. Equal object counts and a successful runtime smoke do not establish migration-history or exact-schema synchronization. Do not run staging `db push` or history repair before official CLI dry-run using a staging database connection and before its proposal has been reviewed. Production remains untouched.
