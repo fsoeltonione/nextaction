@@ -235,3 +235,13 @@ If and only if P1–P5 pass and the user separately approves the exact execution
 P0 (complete) → P1 (complete as the baseline 54-row / 51-file inventory) → P2 (complete: 14 SQL files / 238 assertions plus historical pre-state and cross-session races pass) → P3 (blocked by D7; source-backed CLI/history strategy) → P4 (backup/restore rehearsal) → P5 (read-only preflight) → separate user go/no-go → P6 (if separately approved) → P7 (if completed).
 
 The current code branch includes a new proposed P2 readiness migration, so it has 52 local migration files; that file is outside the frozen P1 51-file map and is not represented as already deployed. P2's agreed disposable behavioral matrix is complete, but D4/D5 and H2.1 retain historical source-attribution limitations. P3 still depends on a source-backed strategy for the D7 version mismatch; P4 depends on a concrete P3 proposal so recovery covers actual risks. P5/P6 cannot proceed while D7 remains open. Approval of D1–D12 and passing disposable tests do not change this order.
+
+---
+
+## P3 CLI transition gate — 2026-10-16 (authoritative current outcome)
+
+P3 has produced a full transition register for all **54 staging history rows** and **52 local migration files** in [the P3 CLI transition register](./staging-reconciliation-p3-cli-transition-register-2026-10-16.md). Current-head CI reconfirmed Quality PASS and disposable replay PASS; the read-only staging CLI gate still fails closed at **0 paired / 52 local-only / 54 remote-only**, with no writes executed.
+
+**P3 decision: NO-GO on metadata reconciliation.** Preserve the mismatch as an interim hold state. The content/effect mappings in P1 do not create timestamp matches in the CLI, and there is no evidence-backed one-to-one transition set. In particular, do not mark the branch-only `20261015120000_runtime_full_integrity_readiness.sql` as applied. The exact CLI mutation rehearsal is deferred because no proposed mutation sequence passes source/effect preconditions; the current read-only list/dry-run remains evidence of the blocker, not approval to repair it.
+
+P2's agreed disposable contracts are complete, but P2 does not establish hosted history convergence. D7 remains OPEN; P4 backup/restore readiness and P5 preflight cannot close D7, and P5 remains NO-GO. **HOLD — NO DATABASE WRITES. PR #141 stays open and Draft.** This update supersedes earlier sequencing text that described P3 only as a future phase.
