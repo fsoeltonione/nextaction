@@ -233,7 +233,7 @@ bootstrap_call() {
       'p2-first-workspace.invalid',
       'P2 First Workspace Bootstrap',
       NULL,
-      '[{""key"":""first_moment"",""label"":""First Moment""}]'::JSONB
+      jsonb_build_array(jsonb_build_object('key', 'first_moment', 'label', 'First Moment'))
     );
   "
 }
