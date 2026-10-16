@@ -6,14 +6,27 @@
 
 This is a decision matrix, not an instruction to execute repairs. Production is explicitly out of scope. The live catalog currently corroborates some end-state effects, but catalog state alone does not prove historical SQL payloads or application order.
 
+## Current P2 closure update — 2026-10-16 (authoritative for P2 status)
+
+P2 disposable behavioral contracts are **COMPLETE** on code commit `0474cf11292d2af5c1b46293036d4790e5694a1f`.
+
+- [Disposable Migration Replay run 38883415296](https://github.com/fsoeltonione/nextaction/actions/runs/38883415296): PASS — **14 SQL files / 238 pgTAP assertions**, verified canonical replay of 52 migration files plus one disposable Stage 14 baseline (53 applied entries), historical Stage 17 pre-state rehearsal, and independent-session concurrency checks. Log: `All tests successful`, `Result: PASS`.
+- [Quality run 38883415252](https://github.com/fsoeltonione/nextaction/actions/runs/38883415252): PASS — all Quality jobs including Cloudflare build.
+- The cross-session runner passed three races: one worker claim/archive for a malformed queue message; one settlement plus one replay without duplicate ledger/debit; and concurrent first-workspace confirmation creating exactly one Workspace, Product and Moment.
+- Stage 17 disposable pre-state tests passed with a standalone unique index and with neither index nor constraint; the unique settlement guard held in both states. The historical verifier `created_at` variant reproduced `undefined_column` on the actual Click schema, while the current verifier uses `clicked_at`.
+- [Current staging CLI gate run 38883416081](https://github.com/fsoeltonione/nextaction/actions/runs/38883416081) still fails closed: **0 paired / 52 local-only / 54 remote-only**. Its logs explicitly state no writes were executed. That remains D7, separate from P2.
+- The branch's readiness migration/tests are branch/disposable-only. **No staging or production schema, function, grant, RLS policy, index, business row or migration history was changed.** Keep PR #141 open and Draft while D7 remains unresolved.
+
+This current-head closure supersedes the historical P2 counts and “P2 open” status recorded in earlier dated snapshots below. It does **not** close the remaining exact-source attribution notes for D4/D5 or H2.1 and does not authorize migration repair, non-dry-run push, hosted history mutation, merge or production action.
+
 ## Verified evidence baseline
 
 - Repository/project refs: `fsoeltonione/nextaction`; staging `njjybpswxalxjhqjlvqa`; production `khoygjyikxkdwonygzyh`.
 - Live migration history lists 54 entries in staging and 54 in production.
 - In the 2026-10-14 manifest, 27/54 staging and 24/54 production rows match a full current migration source by stored statement length + MD5. It identifies 14 current source files without an exact payload in either environment. Absence of an exact match is **not evidence the migration was unapplied**.
 - Staging history version keys have zero exact overlap with current local migration filename prefixes. The latest read-only `list_migrations` re-confirmed that aliases/legacy versions remain.
-- PR #141 is open and draft. The 2026-10-14 CLI observation was **0 paired / 51 local-only / 54 remote-only**. Current follow-up evidence dated 2026-10-15 is recorded below: the branch now has 52 local migration files after adding a proposed P2 readiness migration, and the current CLI gate is **0 paired / 52 local-only / 54 remote-only**. Both gates fail closed and execute no writes.
-- Disposable replay and quality CI passed in the reported runs. Replay proves the current source chain on an isolated disposable database with the Stage 14 baseline; it does not prove remote historical payload lineage.
+- PR #141 is open and Draft. The 2026-10-14 CLI observation was **0 paired / 51 local-only / 54 remote-only**. Current-head read-only gate [38883416081](https://github.com/fsoeltonione/nextaction/actions/runs/38883416081) reports **0 paired / 52 local-only / 54 remote-only**; logs confirm no writes. Both results fail closed.
+- Current disposable replay [38883415296](https://github.com/fsoeltonione/nextaction/actions/runs/38883415296) and Quality [38883415252](https://github.com/fsoeltonione/nextaction/actions/runs/38883415252) both pass on code commit `0474cf11292d2af5c1b46293036d4790e5694a1f`. Replay proves the current source chain and named behavioral contracts in a disposable database with the Stage 14 baseline; it does not prove remote historical payload lineage.
 - Live catalog differences previously recorded: four UUID defaults, six function definitions. The source manifest says `runtime_accept_event` needs a targeted contract test.
 
 ## Additional live verification completed on 2026-10-14
@@ -31,7 +44,7 @@ Run: https://github.com/fsoeltonione/nextaction/actions/runs/38589868869
 
 - Quality run https://github.com/fsoeltonione/nextaction/actions/runs/38589868560 passed all jobs, including lint, typecheck, build, Cloudflare build, migration filename uniqueness and existing runtime contracts.
 - Disposable replay retry https://github.com/fsoeltonione/nextaction/actions/runs/38589868484 passed: all 51 canonical source migrations plus one runner-only Stage 14 baseline were applied in the isolated database, history matched 52/52 in timestamp order, and database RPC tests passed. The preceding attempt failed before SQL replay because of transient Docker Hub rate limiting and an occupied local container port; it was infrastructure noise, not a migration SQL failure.
-- Latest-head run `38610138166` completed the disposable replay successfully and `supabase test db --local` reported all four database contract files successful: `pgmq_service_role_usage_hardening.sql`, `runtime_accept_event_contract.sql`, `runtime_rate_limit_scope_normalization.sql`, and `runtime_rpc_contract.sql`. This is isolated-database evidence only; it is not proof of remote staging history synchronization.
+- Historical run `38610138166` was an earlier disposable test snapshot and is superseded by current-head P2 run `38883415296`, which passed all 14 SQL contract files / 238 assertions plus Stage 17 historical pre-state and concurrency scripts. This is isolated-database evidence only; it is not proof of remote staging history synchronization.
 
 ### Stronger row-level SQL provenance obtained through read-only queries
 
@@ -263,7 +276,7 @@ Task 5 does not change live functions, defaults, grants, RLS, indexes, or migrat
 - [Quality run 38637990582](https://github.com/fsoeltonione/nextaction/actions/runs/38637990582): PASS, including Cloudflare build.
 - Detailed contract matrix and remaining gaps: [P2 Disposable Behavioral Contract Results — 2026-10-15](staging-reconciliation-p2-contract-results-2026-10-15.md).
 - Verified behavior includes focused resolver/Event idempotency cases; worker bounds, quarantine upsert and actual malformed-message handling; D10 full-integrity readiness contract; Stage 16 non-member workspace boundaries; H3.1 active Network Moment targeting plus legacy fallback; no-capacity/success/replay settlement; H4.1 stale Qualified Click recovery; and UUID default resolution.
-- **P2 remains OPEN** for actual retry-budget/exhaustion, failed-archive recovery and concurrent worker claims; D4/D5 historical pre-state and `created_at` versus `clicked_at` verifier proof; composite click/settlement atomicity and concurrent financial writes; readiness positive-path with fresh successful scheduler runs + snapshot; and remaining resolver/activation edge cases.
+- **Historical status as of 2026-10-15 (superseded by the 2026-10-16 update above):** P2 remained open for retry exhaustion/archive/concurrency, D4/D5 historical pre-states, composite financial atomicity/concurrency, readiness positive path, and resolver/activation edge cases. All those named disposable behavioral contracts are now covered by current-head run `38883415296`; full historical source attribution and D7 remain separate.
 - The new migration `20261015120000_runtime_full_integrity_readiness.sql` exists only in the branch/disposable replay. The P1 file map is a snapshot of the earlier 51-file set; the current branch has 52 migration files.
 - Current staging-only CLI [run 38637990404](https://github.com/fsoeltonione/nextaction/actions/runs/38637990404) fails closed: **0 paired / 52 local-only / 54 remote-only**. Its commands were read-only/dry-run and logs explicitly say no writes were executed. D7 remains open; PR #141 remains Draft.
 
