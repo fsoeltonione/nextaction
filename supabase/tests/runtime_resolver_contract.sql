@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(10);
+SELECT plan(13);
 
 INSERT INTO public.workspaces (id, name, user_id, created_by)
 VALUES (
@@ -137,6 +137,48 @@ SELECT is(
   (SELECT result_status FROM public.resolve_runtime_integration(repeat('a', 64))),
   'invalid_integration_credential',
   'missing integration secret row is indistinguishable from an unknown credential'
+);
+
+SELECT is(
+  (SELECT result_status FROM public.resolve_runtime_integration(repeat('a', 64))),
+  'invalid_integration_credential',
+  'deleting an integration cascades its secret and makes the former credential fail closed'
+);
+
+INSERT INTO public.integrations (id, product_id, name, status)
+VALUES (
+  '00000000-0000-4000-8000-000000000203',
+  '00000000-0000-4000-8000-000000000202',
+  'P2 Resolver Contract Integration',
+  'active'
+);
+INSERT INTO private.integration_secrets (integration_id, credential_hash)
+VALUES ('00000000-0000-4000-8000-000000000203', repeat('a', 64));
+
+DELETE FROM public.products
+WHERE id = '00000000-0000-4000-8000-000000000202';
+
+SELECT is(
+  (SELECT result_status FROM public.resolve_runtime_integration(repeat('a', 64))),
+  'invalid_integration_credential',
+  'missing Product dependency removes the credential mapping and fails closed'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_constraint AS c
+    JOIN pg_catalog.pg_attribute AS a
+      ON a.attrelid = c.conrelid
+     AND a.attnum = ANY(c.conkey)
+    WHERE c.conrelid = 'public.products'::REGCLASS
+      AND c.contype = 'f'
+      AND c.convalidated
+      AND a.attname = 'workspace_id'
+      AND c.confrelid = 'public.workspaces'::REGCLASS
+      AND c.confdeltype = 'c'
+  ),
+  'validated Product-to-Workspace foreign key prevents an orphan Workspace reference'
 );
 
 SELECT * FROM finish();
