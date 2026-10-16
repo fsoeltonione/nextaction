@@ -58,7 +58,7 @@ if [[ "$worker_results" != "0:0,0:1" ]]; then
 fi
 
 dead_letter_count="$(psql_db -c "SELECT count(*) FROM private.runtime_dead_letters WHERE message->>'p2_concurrency' = 'worker';" | tr -d '[:space:]')"
-active_queue_count="$(psql_db -c "SELECT count(*) FROM pgmq.\\"q_runtime-events\\" WHERE message->>'p2_concurrency' = 'worker';" | tr -d '[:space:]')"
+active_queue_count="$(psql_db -c "SELECT count(*) FROM pgmq.\"q_runtime-events\" WHERE message->>'p2_concurrency' = 'worker';" | tr -d '[:space:]')"
 [[ "$dead_letter_count" == "1" ]] || { echo "Expected one worker dead letter, got $dead_letter_count" >&2; exit 1; }
 [[ "$active_queue_count" == "0" ]] || { echo "Expected the message archived, got active count $active_queue_count" >&2; exit 1; }
 echo "PASS: one worker handled and archived the malformed message; the concurrent worker did not claim it."
