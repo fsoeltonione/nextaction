@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(8);
+SELECT plan(10);
 
 INSERT INTO public.workspaces (id, name, user_id, created_by)
 VALUES (
@@ -113,6 +113,30 @@ SELECT ok(
     FROM public.resolve_runtime_integration(repeat('a', 64)) AS r
   ),
   'resolver response does not expose credential hash or secret material'
+);
+
+
+UPDATE public.integrations
+SET status = 'active', revoked_at = NULL
+WHERE id = '00000000-0000-4000-8000-000000000203';
+
+DELETE FROM public.workspace_capabilities
+WHERE workspace_id = '00000000-0000-4000-8000-000000000201'
+  AND capability = 'make_money';
+
+SELECT is(
+  (SELECT result_status FROM public.resolve_runtime_integration(repeat('a', 64))),
+  'make_money_not_active',
+  'missing make_money capability row fails closed'
+);
+
+DELETE FROM private.integration_secrets
+WHERE integration_id = '00000000-0000-4000-8000-000000000203';
+
+SELECT is(
+  (SELECT result_status FROM public.resolve_runtime_integration(repeat('a', 64))),
+  'invalid_integration_credential',
+  'missing integration secret row is indistinguishable from an unknown credential'
 );
 
 SELECT * FROM finish();

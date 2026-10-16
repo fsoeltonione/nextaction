@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(8);
+SELECT plan(10);
 
 SELECT ok(
   EXISTS (
@@ -98,6 +98,23 @@ SELECT throws_ok(
   '23505',
   'duplicate key value violates unique constraint "p2_settlement_direct_constraint_probe_uq"',
   'direct UNIQUE(column) branch enforces duplicate rejection'
+);
+
+
+SELECT ok(
+  position(
+    'ORDER BY c.clicked_at DESC, c.id DESC'
+    IN pg_get_functiondef('public.production_smoke_fixture_verify(uuid,uuid)'::REGPROCEDURE)
+  ) > 0,
+  'current smoke verifier orders Click records by clicked_at, the deployed column'
+);
+
+SELECT ok(
+  position(
+    'ORDER BY c.created_at DESC, c.id DESC'
+    IN pg_get_functiondef('public.production_smoke_fixture_verify(uuid,uuid)'::REGPROCEDURE)
+  ) = 0,
+  'current smoke verifier does not regress to the historical nonexistent Click created_at column'
 );
 
 SELECT * FROM finish();

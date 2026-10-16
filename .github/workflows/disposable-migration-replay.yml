@@ -10,6 +10,7 @@ on:
       - 'supabase/staging/STAGE14_BOOTSTRAP.sql'
       - '.github/workflows/disposable-migration-replay.yml'
       - 'scripts/migration-filenames-test.mjs'
+      - 'scripts/test-disposable-runtime-concurrency.sh'
   workflow_dispatch:
 
 permissions:
@@ -160,6 +161,9 @@ jobs:
       - name: Verify runtime RPC contracts
         working-directory: ${{ runner.temp }}/nextaction-migration-replay
         run: supabase test db --local
+      - name: Verify true concurrent worker claims and settlement idempotency
+        working-directory: ${{ runner.temp }}/nextaction-migration-replay
+        run: bash "$GITHUB_WORKSPACE/scripts/test-disposable-runtime-concurrency.sh"
       - name: Stop disposable Supabase
         if: always()
         working-directory: ${{ runner.temp }}/nextaction-migration-replay
