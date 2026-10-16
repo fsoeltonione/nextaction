@@ -1,59 +1,70 @@
-# P2 Disposable Behavioral Contract Results — 2026-10-15
+# P2 Disposable Behavioral Contract Results — updated 2026-10-16
 
-## Result and safety boundary
+## Result
 
-**Result: the disposable migration replay passed 194 pgTAP assertions across 13 SQL test files. P2 is substantially advanced, but is not fully closed.**
+**P2 disposable behavioral contract suite: PASS / COMPLETE** on code commit `0474cf11292d2af5c1b46293036d4790e5694a1f`.
 
-- Repository/PR: [fsoeltonione/nextaction PR #141](https://github.com/fsoeltonione/nextaction/pull/141), branch `audit/staging-migration-lineage-20261014`.
-- Tested source commit: `c52478936d82d90fba07b994a46bbf80b02e4de7`.
-- Disposable replay: [workflow run 38637990437](https://github.com/fsoeltonione/nextaction/actions/runs/38637990437), job `116105978075`. Log result: `Files=13, Tests=194`, `All tests successful`, `Result: PASS`.
-- At the last status read, Quality run [38637990582](https://github.com/fsoeltonione/nextaction/actions/runs/38637990582) had passed core Quality, Stage 16, H3.1, H2.3, runtime-hardening and release-boundary checks, plus Cloudflare compatibility; Cloudflare build was still in progress. Re-check the workflow before marking the full Quality workflow complete.
-- The staging-only CLI gate [run 38637990404](https://github.com/fsoeltonione/nextaction/actions/runs/38637990404) remains failed by its deliberate sync assertion: **0 paired, 52 local-only, 54 remote-only (106 unpaired)**. The workflow ran read-only `migration list` and `db push --dry-run`; it explicitly reports that no writes were executed.
-- No direct SQL write, schema change, migration-history repair, or migration push was made to hosted staging or production. The added migration and test fixtures are only in the GitHub branch; test fixtures are wrapped in rollback transactions.
-- PR #141 remains **open and Draft**. D7 remains an open blocker; no merge or hosted execution is authorized by these test results.
+- [Disposable Migration Replay — run 38883415296](https://github.com/fsoeltonione/nextaction/actions/runs/38883415296): PASS. Fresh disposable Supabase replay, Stage 17 historical pre-state checks, all SQL tests, and independent-session concurrency checks completed successfully.
+- [Quality — run 38883415252](https://github.com/fsoeltonione/nextaction/actions/runs/38883415252): PASS, including Quality, Stage 16 activation, H2.3 release proof, runtime hardening, H3.1, release-boundary, Cloudflare compatibility and Cloudflare build.
+- SQL contracts: **14 files / 238 pgTAP assertions**, all successful. The replay log reports `All tests successful`, `Files=14, Tests=238`, and `Result: PASS`.
+- Migration history inside disposable replay: **53 applied entries in timestamp order** — 52 canonical migration files from the branch plus one runner-only Stage 14 baseline.
+- [Staging Migration Dry-Run — read-only run 38883416081](https://github.com/fsoeltonione/nextaction/actions/runs/38883416081): fails closed at **0 paired / 52 local-only / 54 remote-only**. The log confirms no writes were executed. This is the separate D7 lineage blocker, not a P2 behavioral-test failure.
+- PR [#141](https://github.com/fsoeltonione/nextaction/pull/141) remains open and Draft. The readiness migration and all tests remain branch/disposable-only.
 
-## Tested contracts
+## SQL contract inventory
 
-All 13 files passed in the disposable replay:
-
-| SQL test file | Assertions | Coverage demonstrated |
+| SQL test | Assertions | Verified scope |
 |---|---:|---|
-| `runtime_resolver_contract.sql` | 8 | Malformed/unknown credentials, confirmed vs proposed product, make_money capability disabled, revoked integration and revoked timestamp, no credential hash/secret in the resolver result. This is a focused state matrix, not yet every missing-row edge case. |
-| `runtime_accept_event_contract.sql` | 12 | Event acceptance and exact idempotent replay; rejects changed payload, event type and occurred-at timestamp under the same idempotency key; validates malformed/missing input paths. |
-| `runtime_rpc_contract.sql` | 78 | Presence, SECURITY DEFINER, pinned search path and role grants for the listed runtime RPCs. These are catalog/ACL checks, not full business-path proofs for every RPC. |
-| `pgmq_service_role_usage_hardening.sql` | 4 | PGMQ service-role usage hardening assertions. |
-| `runtime_rate_limit_scope_normalization.sql` | 3 | Rate-limit scope normalization assertions. |
-| `runtime_worker_quarantine_contract.sql` | 21 | Worker and operations argument bounds; quarantine upsert refreshes metadata/last-seen without duplicate dead-letter rows; actual worker RPC quarantines and archives non-object payload and invalid event ID messages. |
-| `runtime_full_integrity_readiness_contract.sql` | 9 | Readiness definition requires worker, operations and integrity-audit scheduling plus a fresh zero-anomaly snapshot; output exposes each readiness component. |
-| `stage16_activation_isolation_contract.sql` | 11 | Authenticated caller cannot activate or create against a non-member workspace; anon execution is denied; unavailable network target and disabled capability are rejected. |
-| `stage17_constraint_reconciliation_contract.sql` | 8 | Current settlements table has a validated unique Qualified Click constraint and valid/ready unique index; disposable probes verify both index-attachment and direct UNIQUE(column) semantics. |
-| `h3_network_moment_runtime_contract.sql` | 10 | Active Network Moment targeting creates a fill, legacy product-scoped targeting remains the fallback when the network path has no eligible target, and no eligible target yields a no-fill with no delivery. |
-| `h4_settlement_capacity_idempotency_contract.sql` | 16 | Zero capacity returns retryable `no_capacity` without settlement/ledger/credit consumption; capacity permits the $1 / 75–25 split; exactly three balanced financial entries are recorded; repeat settlement returns `replayed` and does not duplicate charges or ledger rows. |
-| `h4_unsettled_settlement_recovery_contract.sql` | 10 | Bounded recovery selects one stale eligible Qualified Click, settles it, records three ledger entries, consumes one unit, and skips the already-settled click on a subsequent pass. |
-| `uuid_default_resolution_contract.sql` | 4 | Schema-qualified and unqualified UUID default expressions both resolve to UUID-producing functions in disposable PostgreSQL. This does not authorize normalization of hosted defaults. |
+| `h3_network_moment_runtime_contract.sql` | 10 | Active Network Moment targeting fills; legacy product-scoped targeting remains a fallback when no network target is eligible; no eligible target yields `no_fill` without a Delivery. |
+| `h4_settlement_capacity_idempotency_contract.sql` | 16 | `no_capacity` persists no settlement, ledger or consumption; capacity allows the $1 USD charge with 75/25 split; three balanced financial entries; replay does not duplicate Settlement, entries or consumption. |
+| `h4_unsettled_settlement_recovery_contract.sql` | 10 | Recovery finds an eligible stale Qualified Click, settles it and records ledger/capacity effects once; settled clicks are skipped on subsequent runs. |
+| `pgmq_service_role_usage_hardening.sql` | 4 | PGMQ schema-use/grant boundary. |
+| `runtime_accept_event_contract.sql` | 12 | First Event and exact replay are idempotent; reuse of an idempotency key with changed payload, event type or `occurred_at` is rejected; malformed inputs fail closed. |
+| `runtime_click_settlement_atomicity_contract.sql` | 7 | A composite `runtime_click_qualify_and_settle` call with unavailable financial accounts raises the expected failure and leaves no Click, Qualified Click, Settlement, financial entries or credit consumption; capacity remains available for retry. |
+| `runtime_full_integrity_readiness_contract.sql` | 24 | A seeded fresh-success path produces `ready`; inactive, stale and failed worker/operations/integrity schedules produce `not_ready`; missing, stale, warning, critical or anomalous integrity snapshots also fail closed. |
+| `runtime_rate_limit_scope_normalization.sql` | 3 | Rate-limit scope normalization behavior. |
+| `runtime_resolver_contract.sql` | 13 | Malformed/unknown credentials; confirmed/proposed Product; inactive/missing `make_money`; revoked Integration and `revoked_at`; no secret disclosure; missing secret/Integration/Product dependencies fail closed; Product-to-Workspace FK remains validated with cascade semantics. |
+| `runtime_rpc_contract.sql` | 78 | RPC existence, security-definer/search-path expectations and role grants; catalog/ACL evidence, not by itself full business-path proof. |
+| `runtime_worker_quarantine_contract.sql` | 33 | Bounds; quarantine refresh without duplicate dead letters; malformed payload/invalid event ID path through actual worker; retry budget progression through the fifth `retry_exhausted` attempt; SQLSTATE/read count in dead letter; archive-failure recovery without partial occurrence writes or duplicate dead letters. |
+| `stage16_activation_isolation_contract.sql` | 14 | `anon` denied; non-member/wrong-workspace activation rejected; missing/inactive Network Moment target and disabled capability rejected; malformed canonical URL, empty Moment list and non-HTTP Offer destination rejected. |
+| `stage17_constraint_reconciliation_contract.sql` | 10 | Live validated settlement uniqueness and ready index; both disposable constraint-construction branches; duplicate rejection; current verifier uses `clicked_at`, not the nonexistent Click `created_at` column. |
+| `uuid_default_resolution_contract.sql` | 4 | Qualified and unqualified UUID defaults resolve and return UUID values in disposable PostgreSQL; no hosted default normalization. |
+| **Total** | **238** | **All 14 SQL contract files passed on the verified commit above.** |
 
-## D10 full-integrity readiness implementation
+## Additional disposable integration tests (not included in the 238 pgTAP count)
 
-Added [`20261015120000_runtime_full_integrity_readiness.sql`](https://github.com/fsoeltonione/nextaction/blob/audit/staging-migration-lineage-20261014/supabase/migrations/20261015120000_runtime_full_integrity_readiness.sql) in the branch. `runtime_readiness()` now requires:
-1. runtime queue and worker function exist;
-2. worker schedule active with a recent successful run;
-3. operations schedule active with a recent successful run;
-4. integrity-audit schedule active with a recent successful run; and
-5. the latest integrity snapshot is fresh (10 minutes), `status = 'ok'`, and `anomaly_count = 0`.
+### Historical Stage 17 pre-state reproduction
 
-The migration was applied only by the disposable local replay. It has **not** been pushed to staging or production. The current readiness contract checks the blocking conditions and output shape; a positive-path test proving `ready` with deliberately seeded fresh cron history and snapshot is still outstanding.
+The replay workflow ran `scripts/test-stage17-historical-prestate.sh` against a disposable database in two separate initial states:
 
-## Remaining P2 gaps — keep OPEN
+1. A standalone unique index existed without the same-named constraint. Stage 17 attached the index to a validated unique constraint; a second Settlement for the same Qualified Click was rejected.
+2. Neither the same-named index nor constraint existed. Stage 17 produced the validated unique constraint; duplicate settlement was rejected.
 
-1. **Worker retry / failure containment:** the actual malformed-message path and dead-letter upsert are covered. Retry progression through the retry budget, retry exhaustion by the actual worker, archive failure recovery, and concurrent worker claims are not yet demonstrated end-to-end.
-2. **D4/D5 verifier and historical constraint behavior:** the current unique settlement invariant and two generic disposable constraint branches pass. The tests do not yet replay each historical Stage 17 pre-state and prove the old `created_at` verifier variant versus current `clicked_at` behavior, or prove the migration branch against an actual historical index/constraint arrangement. D4/D5 therefore remain **OPEN**.
-3. **Financial atomicity and concurrency:** direct settlement no-capacity, success, replay, and H4.1 recovery are tested. Concurrent settlement races, the composite `runtime_click_qualify_and_settle` rollback contract when the financial system is unavailable, and duplicate/no-double-debit behavior under simultaneous callers remain unproven.
-4. **Resolver and activation edge coverage:** add missing secret row, integration/product/workspace missing or inconsistent cases, capability row absent vs disabled, concurrent activation/workspace creation and broader negative-input boundaries where relevant.
-5. **Readiness positive path:** prove the RPC returns `ready` only when each scheduler has recent successful history and the latest zero-anomaly snapshot is fresh; prove stale, critical and missing snapshots each produce `not_ready`.
-6. **D7 CLI lineage blocker:** this is independent of behavioral-test success. Do not use `migration repair`, non-dry-run `db push`, or direct edits to hosted `supabase_migrations.schema_migrations` to make the gate pass. Continue source-backed pairing; preserve HOLD while any remote version remains unpaired.
+The script also reconstructed the historical verifier ordering variant that refers to `private.clicks.created_at`. Against the actual schema, that variant reproduced `undefined_column`; the current verifier uses the deployed `clicked_at` column. The workflow passed both historical pre-state variants. This is proof of effective behavior in disposable rehearsal; it does **not** identify the exact original full SQL blob for every historical staging row.
 
-## Next step
+### Independent-session concurrency
 
-Continue P2 as a bounded disposable-only workstream for the remaining worker retry/concurrency, historical verifier behavior, financial atomicity/concurrency and readiness positive-path proofs. After each batch, rerun the disposable migration replay and current-head Quality. Only then update the decision matrix and final plan to distinguish each demonstrated contract from residual uncertainty.
+The replay workflow also passed `scripts/test-disposable-runtime-concurrency.sh`:
 
-**Final safety decision: HOLD — NO HOSTED DATABASE WRITES.**
+- **Worker queue claim race:** two independent sessions attempted to process the same malformed queue message. Exactly one worker handled and archived it; the other did not claim it. One dead-letter record remained and the active queue row was gone.
+- **Settlement race:** simultaneous settlement calls returned `settled` and `replayed`; exactly one Settlement, three financial ledger entries, one credit-consumption entry and zero remaining capacity resulted.
+- **First-workspace bootstrap race:** two independent authenticated sessions confirmed the same first Product concurrently. Exactly one Workspace, one Product and one Moment were persisted for the test user.
+
+All IDs, trigger delays and effects above are disposable CI fixtures. They were not run against staging or production.
+
+## D10 readiness candidate
+
+The forward-only candidate migration `supabase/migrations/20261015120000_runtime_full_integrity_readiness.sql` remains in the branch. The `runtime_readiness()` contract now includes the integrity-audit schedule, recent successful run and latest fresh zero-anomaly `ok` snapshot alongside worker/operations health. CI proves behavior on replay only; this migration has **not** been applied to hosted staging or production.
+
+## Exit assessment and remaining non-P2 gates
+
+P2's agreed disposable behavioral contracts are complete for the cases listed above. That does not mean the overall reconciliation is ready to execute:
+
+- **D7 is still OPEN and blocking.** Current staging CLI result remains 0 paired, 52 local-only and 54 remote-only. Preserve all hosted history rows. Do not run `supabase migration repair`, non-dry-run `supabase db push`, direct DML against `supabase_migrations.schema_migrations`, or merge PR #141 while this gate is open.
+- **D4/D5 source attribution remains partial.** The effective constraint branches and old/new verifier behavior are now exercised in disposable pre-state runs, but the complete original historical source payloads/source commits remain unbound. Do not convert behavioral proof into a claim of byte-level historical provenance.
+- **H2.1 full-file source identity and other explicitly documented historical payload exceptions remain provenance issues.** P2 success does not retroactively rewrite or pair remote version keys with local migration filenames.
+- **No hosted database schema, function, policy, grant, index, business row or migration history was changed.** PR #141 remains open and Draft; P3 convergence/any go-no-go requires a separately reviewed, source-backed decision after D7 is resolved.
+
+## Previous snapshot
+
+The 194-assertion / 13-file count recorded on 2026-10-15 was an earlier P2 snapshot and is superseded by the current-head result above. Earlier point-in-time status notes are retained in the final plan and decision matrix for audit chronology.
